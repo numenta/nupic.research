@@ -30,7 +30,8 @@ import pandas as pd
 from torchvision import datasets, transforms
 
 from nupic.research.frameworks.pytorch.image_transforms import RandomNoise
-from nupic.research.support import load_ray_tune_experiment, parse_config
+from nupic.research.frameworks.ray import load_ray_tune_experiment
+from nupic.research.support import parse_config
 
 logging.basicConfig(level=logging.ERROR)
 

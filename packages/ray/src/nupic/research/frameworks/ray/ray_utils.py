@@ -26,6 +26,13 @@ import torch
 from ray.tune.suggest.variant_generator import format_vars, generate_variants
 from ray.tune.trial_runner import _TuneFunctionDecoder
 
+__all__ = [
+    "generate_trial_variants",
+    "get_last_checkpoint",
+    "load_ray_tune_experiment",
+    "load_ray_tune_experiments",
+]
+
 
 def load_ray_tune_experiments(
     experiment_path, load_results=False

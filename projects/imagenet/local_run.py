@@ -51,7 +51,7 @@ def create_trials(config):
     :param config: Ray tune configuration with 'ray.tune' functions
     :return: list of dict for each trial configuration variant
     """
-    from nupic.research.support.ray_utils import generate_trial_variants
+    from nupic.research.frameworks.ray.ray_utils import generate_trial_variants
 
     trials = generate_trial_variants(config)
     timestamp = datetime.today().strftime("%Y-%m-%d_%H-%M-%S")

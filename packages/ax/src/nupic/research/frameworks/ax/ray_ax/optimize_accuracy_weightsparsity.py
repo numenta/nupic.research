@@ -30,7 +30,7 @@ import ray
 import torch
 from ray import tune
 
-from nupic.research.frameworks.vernon.ray_custom_loggers import DEFAULT_LOGGERS
+from nupic.research.frameworks.ray.ray_custom_loggers import DEFAULT_LOGGERS
 
 from .ray_ax_utils import (
     AxSearch,

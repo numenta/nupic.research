@@ -27,13 +27,19 @@ import ray.resource_spec
 import torch
 from ray.tune import Trainable, tune
 
-from nupic.research.frameworks.vernon import interfaces, trainables
-from nupic.research.frameworks.vernon.experiment_utils import get_free_port
-from nupic.research.frameworks.vernon.search import TrialsCollection
-from nupic.research.support.ray_utils import (
+from nupic.research.frameworks.ray import (
     get_last_checkpoint,
     register_torch_serializers,
+    trainables,
 )
+from nupic.research.frameworks.vernon import interfaces
+from nupic.research.frameworks.vernon.experiment_utils import get_free_port
+from nupic.research.frameworks.vernon.search import TrialsCollection
+
+__all__ = [
+    "run",
+    "run_single_instance",
+]
 
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 

@@ -32,9 +32,9 @@ import argparse
 import copy
 
 from experiments import CONFIGS
+from nupic.research.frameworks.ray.run_with_raytune import run as run_with_ray_tune
 from nupic.research.frameworks.vernon.parser_utils import DEFAULT_PARSERS, process_args
 from nupic.research.frameworks.vernon.run import run as run
-from nupic.research.frameworks.vernon.run_with_raytune import run as run_with_ray_tune
 
 if __name__ == "__main__":
 
@@ -47,7 +47,7 @@ if __name__ == "__main__":
                         choices=list(CONFIGS.keys()))
     parser.add_argument("--run_without_ray_tune", dest="run_without_ray_tune",
                         type=bool, default=False,
-                        help="run by calling vernon.run_with_ray_tune or vernon.run")
+                        help="run by calling ray.run_with_ray_tune or vernon.run")
 
     args = parser.parse_args()
     if args.name is None:

@@ -29,7 +29,7 @@ from pathlib import Path
 import pandas as pd
 
 from experiments import CONFIGS
-from nupic.research.support import load_ray_tune_experiments
+from nupic.research.frameworks.ray import load_ray_tune_experiments
 
 
 # Select a unique tag for each parameter combination, ignoring seed value

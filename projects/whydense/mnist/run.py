@@ -31,7 +31,8 @@ import torch
 
 from mnist_sparse_experiment import MNISTSparseExperiment
 from nupic.research.frameworks.pytorch.model_utils import set_random_seed
-from nupic.research.support import load_ray_tune_experiment, parse_config
+from nupic.research.frameworks.ray import load_ray_tune_experiment
+from nupic.research.support import parse_config
 
 
 class MNISTExperimentTune(tune.Trainable):

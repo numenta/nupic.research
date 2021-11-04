@@ -147,7 +147,7 @@ def process_args(args, config):
 
         from wandb import util
         from nupic.research.frameworks.wandb import ray_wandb
-        from nupic.research.frameworks.vernon.ray_custom_loggers import (
+        from nupic.research.frameworks.ray.ray_custom_loggers import (
             DEFAULT_LOGGERS
         )
 

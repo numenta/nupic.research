@@ -43,6 +43,12 @@ logger = logging.getLogger(__name__)
 # tensorflow 2.0 and up.
 #
 
+__all__ = [
+    "CSVLoggerPlus",
+    "TFLoggerPlus",
+    "DEFAULT_LOGGERS",
+]
+
 
 def record_tf_values(result, path, step, num_hist_bins=None):
     """

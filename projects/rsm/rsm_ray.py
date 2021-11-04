@@ -25,7 +25,7 @@ import torch
 from ray import tune
 from ray.tune.logger import CSVLogger, JsonLogger
 
-from nupic.research.frameworks.pytorch.tf_tune_utils import TFLoggerPlus
+from nupic.research.frameworks.ray.tf_tune_utils import TFLoggerPlus
 from nupic.research.support.parse_config import parse_config
 from rsm_experiment import RSMExperiment
 
