@@ -42,7 +42,10 @@ def compare_models(
 
     :return: Boolean
     """
-    x = torch.randn((num_samples,) + input_shape)
+
+    device1 = next(model1.parameters()).device
+
+    x = torch.randn((num_samples,) + input_shape, device=device1)
 
     model1.eval()
     model2.eval()
