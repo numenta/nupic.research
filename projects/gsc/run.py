@@ -27,14 +27,14 @@ from experiments import CONFIGS
 from mixins import GSCNoiseTest
 from nupic.research.frameworks.ray.run_with_raytune import run
 from nupic.research.frameworks.vernon.parser_utils import (
-    DEFAULT_PARSERS,
+    get_default_parsers,
     insert_experiment_mixin,
     process_args,
 )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        parents=DEFAULT_PARSERS,
+        parents=get_default_parsers(),
     )
     parser.add_argument("-e", "--experiment", dest="name", default="default_base",
                         help="Experiment to run", choices=CONFIGS.keys())

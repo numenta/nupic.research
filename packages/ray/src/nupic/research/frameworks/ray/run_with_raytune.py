@@ -27,14 +27,12 @@ import ray.resource_spec
 import torch
 from ray.tune import Trainable, tune
 
-from nupic.research.frameworks.ray import (
-    get_last_checkpoint,
-    register_torch_serializers,
-    trainables,
-)
 from nupic.research.frameworks.vernon import interfaces
 from nupic.research.frameworks.vernon.experiment_utils import get_free_port
 from nupic.research.frameworks.vernon.search import TrialsCollection
+
+from .ray_utils import get_last_checkpoint, register_torch_serializers
+from .trainables import DistributedTrainable, RemoteProcessTrainable
 
 __all__ = [
     "run",
@@ -157,9 +155,9 @@ def get_tune_kwargs(config):
                              if distributed
                              else sigopt.SigOptRemoteProcessTrainable)
     else:
-        default_trainable = (trainables.DistributedTrainable
+        default_trainable = (DistributedTrainable
                              if distributed
-                             else trainables.RemoteProcessTrainable)
+                             else RemoteProcessTrainable)
 
     ray_trainable = config.get("ray_trainable", default_trainable)
     assert issubclass(ray_trainable, Trainable)

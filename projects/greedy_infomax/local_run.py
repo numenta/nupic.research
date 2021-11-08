@@ -35,7 +35,10 @@ import ray  # noqa: F401, I001
 import torch.multiprocessing as multiprocessing
 
 from experiments import CONFIGS
-from nupic.research.frameworks.vernon.parser_utils import MAIN_PARSER, process_args
+from nupic.research.frameworks.vernon.parser_utils import (
+    get_default_parsers,
+    process_args,
+)
 from nupic.research.frameworks.vernon.run import run, terminate_processes
 
 multiprocessing.set_start_method("spawn", force=True)
@@ -175,7 +178,8 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        parents=[MAIN_PARSER], argument_default=argparse.SUPPRESS, description=__doc__
+        parents=get_default_parsers(), argument_default=argparse.SUPPRESS,
+        description=__doc__
     )
     parser.add_argument(
         "-e",

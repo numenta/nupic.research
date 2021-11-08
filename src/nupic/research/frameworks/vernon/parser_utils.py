@@ -20,105 +20,93 @@
 # ----------------------------------------------------------------------
 
 import argparse
-import socket
+from importlib import metadata
 
 import torch
 
 from nupic.research.frameworks.vernon import mixins
 
 __all__ = [
-    "DEFAULT_PARSERS",
-    "MAIN_PARSER",
-    "RAY_PARSER",
-    "SIGOPT_PARSER",
-    "WANDB_PARSER",
-    "process_args",
+    "get_default_parsers",
     "insert_experiment_mixin",
+    "process_args",
 ]
 
 
-MAIN_PARSER = argparse.ArgumentParser(
-    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    argument_default=argparse.SUPPRESS,
-    add_help=False,
-)
-MAIN_PARSER.add_argument("-g", "--num-gpus", type=int,
-                         default=torch.cuda.device_count(),
-                         help="number of GPUs to use")
-MAIN_PARSER.add_argument("-n", "--num-cpus", type=int,
-                         default=torch.get_num_interop_threads(),
-                         help="number of CPUs to use when GPU is not available."),
-MAIN_PARSER.add_argument("-r", "--restore", action="store_true",
-                         help="Restore training from last known checkpoint")
-MAIN_PARSER.add_argument("-c", "--checkpoint-file", dest="restore_checkpoint_file",
-                         help="Resume experiment from specific checkpoint file")
-MAIN_PARSER.add_argument("-d", "--copy-checkpoint-to-dir", dest="copy_checkpoint_dir",
-                         help="Copy final saved checkpoint to specified directory.")
-MAIN_PARSER.add_argument("-j", "--workers", type=int, default=4,
-                         help="Number of dataloaders workers")
-MAIN_PARSER.add_argument("-b", "--backend", choices=["nccl", "gloo"],
-                         help="Pytorch Distributed backend", default="nccl")
-MAIN_PARSER.add_argument("-p", "--progress", action="store_true",
-                         help="Show progress during training")
-MAIN_PARSER.add_argument("-l", "--log-level",
-                         choices=["critical", "error", "warning", "info", "debug"],
-                         help="Python Logging level")
-MAIN_PARSER.add_argument("-f", "--log-format",
-                         help="Python Logging Format")
-MAIN_PARSER.add_argument("-x", "--max-failures", type=int,
-                         help="How many times to try to recover before stopping")
-MAIN_PARSER.add_argument("--checkpoint-freq", type=int,
-                         help="How often to checkpoint (epochs)")
-MAIN_PARSER.add_argument("--profile", action="store_true",
-                         help="Enable cProfile tracing")
-MAIN_PARSER.add_argument("--profile-autograd", action="store_true",
-                         help="Enable torch.autograd.profiler.profile during training")
+def _get_frameworks_command_line_args_():
+    """
+    Get installed frameworks extentions to command line arguments.
+    Each framework willing to extend the command line args must implement a
+    module with the following functions:
+        def get_parser() -> argparse.ArgumentParser:
+        def process_args(args: argpase.Namespace, config: dict) -> dict:
+    And advertise the extension module using an entry point named "command_line_args"
+    under the "nupic.research.frameworks" entry point group. For example::
+
+    setups.cfg:
+        [options.entry_points]
+        nupic.research.frameworks =
+            command_line_args = nupic.research.frameworks.ray.command_line_args
+
+    see:: https://setuptools.pypa.io/en/latest/userguide/entry_point.html
+
+    """
+    # Load currently installed nupic.research.frameworks with plugins
+    return [
+        ep.load() for ep in metadata.entry_points()["nupic.research.frameworks"]
+        if ep.name == "command_line_args"
+    ]
 
 
-RAY_PARSER = argparse.ArgumentParser(
-    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    argument_default=argparse.SUPPRESS,
-    add_help=False,
-)
-RAY_PARSER.add_argument("-s", "--with-server", action="store_true",
-                        help="Start Ray Tune API server")
-RAY_PARSER.add_argument("--single_instance", action="store_true",
-                        help="Uses single instance run method")
-RAY_PARSER.add_argument("--local-mode", action="store_true",
-                        help="Start ray in local mode. Useful for debugging")
-RAY_PARSER.add_argument("-a", "--redis-address",
-                        help="redis address of an existing Ray server",
-                        default="{}:6379".format(
-                            socket.gethostbyname(socket.gethostname())
-                        ))
+def get_default_parsers():
+    """
+    Returns command line `argparse.ArgumentParser` with vernon default options
+    as well as the command line options for any installed nupic.research.framework
+    """
+    main_parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        argument_default=argparse.SUPPRESS,
+        add_help=False,
+    )
+    main_parser.add_argument("-g", "--num-gpus", type=int,
+                             default=torch.cuda.device_count(),
+                             help="number of GPUs to use")
+    main_parser.add_argument("-n", "--num-cpus", type=int,
+                             default=torch.get_num_interop_threads(),
+                             help="number of CPUs to use when GPU is not available."),
+    main_parser.add_argument("-r", "--restore", action="store_true",
+                             help="Restore training from last known checkpoint")
+    main_parser.add_argument("-c", "--checkpoint-file", dest="restore_checkpoint_file",
+                             help="Resume experiment from specific checkpoint file")
+    main_parser.add_argument("-d", "--copy-checkpoint-to-dir",
+                             dest="copy_checkpoint_dir",
+                             help="Copy final saved checkpoint to specified directory.")
+    main_parser.add_argument("-j", "--workers", type=int, default=4,
+                             help="Number of dataloaders workers")
+    main_parser.add_argument("-b", "--backend", choices=["nccl", "gloo"],
+                             help="Pytorch Distributed backend", default="nccl")
+    main_parser.add_argument("-p", "--progress", action="store_true",
+                             help="Show progress during training")
+    main_parser.add_argument("-l", "--log-level",
+                             choices=["critical", "error", "warning", "info", "debug"],
+                             help="Python Logging level")
+    main_parser.add_argument("-f", "--log-format",
+                             help="Python Logging Format")
+    main_parser.add_argument("-x", "--max-failures", type=int,
+                             help="How many times to try to recover before stopping")
+    main_parser.add_argument("--checkpoint-freq", type=int,
+                             help="How often to checkpoint (epochs)")
+    main_parser.add_argument("--profile", action="store_true",
+                             help="Enable cProfile tracing")
+    main_parser.add_argument("--profile-autograd", action="store_true",
+                             help="Enable torch.autograd.profiler.profile during"
+                                  " training")
 
-
-SIGOPT_PARSER = argparse.ArgumentParser(
-    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    argument_default=argparse.SUPPRESS,
-    add_help=False,
-)
-SIGOPT_PARSER.add_argument("-t", "--create_sigopt", action="store_true",
-                           help="Create a new sigopt experiment using the config")
-
-
-WANDB_PARSER = argparse.ArgumentParser(
-    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    argument_default=argparse.SUPPRESS,
-    add_help=False,
-)
-WANDB_PARSER.add_argument("--wandb", action="store_true",
-                          help="Enable logging through wandb.")
-WANDB_PARSER.add_argument("--wandb_resume", action="store_true",
-                          help="Resume logging through wandb.")
-
-
-DEFAULT_PARSERS = [
-    MAIN_PARSER,
-    RAY_PARSER,
-    SIGOPT_PARSER,
-    WANDB_PARSER,
-]
+    parsers = [main_parser]
+    installed_frameworks = _get_frameworks_command_line_args_()
+    for framework in installed_frameworks:
+        parsers.append(framework.get_parser())
+    return parsers
 
 
 def process_args(args, config):
@@ -143,46 +131,12 @@ def process_args(args, config):
             config, mixins.SaveFinalCheckpoint, prepend_name=False
         )
 
-    if "wandb" in args and args.wandb:
-
-        from wandb import util
-        from nupic.research.frameworks.wandb import ray_wandb
-        from nupic.research.frameworks.ray.ray_custom_loggers import (
-            DEFAULT_LOGGERS
-        )
-
-        # Add ray-wandb logger to loggers.
-        config.setdefault("loggers", [])
-        config["loggers"].extend(list(DEFAULT_LOGGERS) + [ray_wandb.WandbLogger])
-
-        # One may specify `wandb_args` or `env_config["wandb"]`
-        name = config.get("name", "unknown_name")
-        wandb_args = config.get("wandb_args", {})
-        wandb_args.setdefault("name", name)
-        config.setdefault("env_config", {})
-        config["env_config"].setdefault("wandb", wandb_args)
-
-        # Either restore from a run-id generate a new one.
-        resume = wandb_args.get("resume", False)
-        if ("wandb_resume" in args and args.wandb_resume) or resume:
-            wandb_args.setdefault("resume", True)
-            ray_wandb.enable_run_resume(wandb_args)
-        else:
-            wandb_id = util.generate_id()
-            wandb_args["id"] = wandb_id
-
-        # Enable logging on workers.
-        insert_experiment_mixin(config, ray_wandb.PrepPlotForWandb, prepend_name=False)
-
-    if "create_sigopt" in args:
-
-        from nupic.research.frameworks.sigopt import SigOptExperiment
-
-        s = SigOptExperiment()
-        s.create_experiment(config["sigopt_config"])
-        print("Created experiment: https://app.sigopt.com/experiment/",
-              s.experiment_id)
-        return
+    installed_frameworks = _get_frameworks_command_line_args_()
+    for entry_point in installed_frameworks:
+        config = entry_point.process_args(args, config)
+        if config is None:
+            # Return None to exit. Used by sigopt when the experiments is created
+            return None
 
     return config
 

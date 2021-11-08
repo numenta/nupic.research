@@ -21,8 +21,8 @@
 
 from pprint import pformat, pprint
 
-from nupic.research.frameworks.sigopt import SigOptExperiment
 from nupic.research.frameworks.ray.trainables import RemoteProcessTrainable
+from nupic.research.frameworks.sigopt import SigOptExperiment
 
 
 class MetaCLSigOptRemoteProcessTrainable(RemoteProcessTrainable):
