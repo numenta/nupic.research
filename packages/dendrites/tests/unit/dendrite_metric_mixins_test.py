@@ -35,8 +35,7 @@ from nupic.research.frameworks.vernon import SupervisedExperiment
 from nupic.torch.modules import KWinners, SparseWeights
 
 
-class TrackStatsSupervisedExperiment(mixins.PlotDendriteMetrics,
-                                     SupervisedExperiment):
+class TrackStatsSupervisedExperiment(mixins.PlotDendriteMetrics, SupervisedExperiment):
     pass
 
 
@@ -59,7 +58,10 @@ class SimpleMLP(torch.nn.Module):
 
         batch_size, num_units = y.shape
         num_segments = 10
-        dendritic_activations = torch.rand(batch_size, num_units, num_segments)
+
+        dendritic_activations = torch.rand(
+            batch_size, num_units, num_segments, device=y.device
+        )
         y = self.dendritic_gate(y, dendritic_activations).values
 
         y = self.kwinners(y)
@@ -71,17 +73,13 @@ def fake_data(size=100, image_size=(1, 4, 4), train=False):
 
 
 simple_supervised_config = dict(
-
     experiment_class=TrackStatsSupervisedExperiment,
     num_classes=10,
-
     # Dataset
     dataset_class=fake_data,
-
     # Number of epochs
     epochs=1,
     batch_size=5,
-
     # Model class. Must inherit from "torch.nn.Module"
     model_class=SimpleMLP,
     # model model class arguments passed to the constructor
@@ -89,22 +87,19 @@ simple_supervised_config = dict(
         num_classes=10,
         input_shape=(1, 4, 4),
     ),
-
     plot_dendrite_metrics_args=dict(
         include_modules=[DendriticAbsoluteMaxGate1d],
         mean_selected=dict(
             max_samples_to_plot=400,
             plot_freq=2,
-            plot_func=plot_mean_selected_activations
-        )
+            plot_func=plot_mean_selected_activations,
+        ),
     ),
-
     # Optimizer class class arguments passed to the constructor
     optimizer_args=dict(lr=0.1),
     fast_params=[".*"],  # <- all params get updated in inner loop
-
     # Suppress logging.
-    log_level="NOTSET"
+    log_level="NOTSET",
 )
 
 
