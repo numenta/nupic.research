@@ -19,23 +19,6 @@
 #  http://numenta.org/licenses/
 #
 # ------------------------------------------------------------------------------
-[metadata]
-name = nupic.research.ax
-version = 0.0.1.dev0
+from setuptools import setup
 
-[options]
-zip_safe = False
-packages = find_namespace:
-package_dir =
-    =src
-install_requires =
-    nupic.research
-    nupic.research.ray
-    ax-platform<0.1.10
-    ray[tune]>=0.8.3,<0.8.5
-    botorch
-    gpytorch
-
-[options.packages.find]
-where = src
-
+setup()

@@ -29,7 +29,8 @@ import click
 import numpy as np
 from tabulate import tabulate
 
-from nupic.research.support import load_ray_tune_experiments, parse_config
+from nupic.research.frameworks.ray import load_ray_tune_experiments
+from nupic.research.support import parse_config
 
 
 @click.command(help="Train models")

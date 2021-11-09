@@ -26,7 +26,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from nupic.research.support import load_ray_tune_experiments, parse_config
+from nupic.research.frameworks.ray import load_ray_tune_experiments
+from nupic.research.support import parse_config
 
 
 # Select a unique tag for each parameter combination, ignoring seed value

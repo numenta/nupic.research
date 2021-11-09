@@ -2,6 +2,7 @@
 -e .[dev]
 
 # Install nupic.research frameworks
+-e packages/ray
 -e packages/dendrites
 -e packages/sigopt
 -e packages/wandb

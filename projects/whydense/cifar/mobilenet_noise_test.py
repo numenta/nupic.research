@@ -31,7 +31,7 @@ import ray.tune as tune
 import torch
 from torchvision import datasets
 
-from nupic.research.support import load_ray_tune_experiment, parse_config
+from nupic.research.frameworks.ray import load_ray_tune_experiment, parse_config
 from projects.whydense.cifar.mobilenet_cifar import MobileNetCIFAR10
 
 matplotlib.use("Agg")

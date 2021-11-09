@@ -36,6 +36,14 @@ from ray.tune.utils import warn_if_slow
 
 from nupic.research.frameworks.vernon.experiment_utils import get_free_port
 
+__all__ = [
+    "DebugTrainable",
+    "DistributedTrainable",
+    "RayActorHelperMethods",
+    "RemoteProcessTrainable",
+    "RemoteTrainableBase",
+]
+
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
 
