@@ -73,11 +73,10 @@ simple_metacl_config = dict(
 
     experiment_class=TrackStatsMetaCLExperiment,
     num_classes=10,
-    
-    # FIXME SKIP GPU FOR NOW, 
+    # FIXME SKIP GPU FOR NOW,
     # eventually we must test it on GPU too
     device="cpu",
-    
+
     # Dataset
     dataset_class=fake_data,
 
