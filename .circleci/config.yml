@@ -125,13 +125,16 @@ jobs:
   test:
     working_directory: ~/nta/nupic.research
     parallelism: 4 
-    docker:
-      - image: circleci/python:3.8
+    machine:
+      resource_class: gpu.nvidia.small
+      image: ubuntu-1604-cuda-11.1:202012-01
     steps:
       - attach_workspace:
           at: ~/nta
       - restore_cache:
           key: pip-cache-v1-{{ arch }}-{{ checksum "nupic.torch.sha" }}-{{ checksum "setup.cfg" }}-{{ checksum "packages.dependencies"}}
+      - run: nvidia-smi
+      - run: python --version
       - run:
           name: Run python tests
           environment:
