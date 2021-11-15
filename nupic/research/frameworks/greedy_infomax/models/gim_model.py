@@ -35,7 +35,7 @@ class GreedyInfoMaxModel(nn.Sequential):
     """
     A model which wraps another model and adds Greedy InfoMax functionality. It does
     this by
-    1. adding a _PatchifyInputs layer to the beginning of the network
+    1. adding a PatchifyInputs layer to the beginning of the network
     2. adds GIM blocks to the network and connects them using forward hooks on the model
     3. tracks the info estimates using InfoEstimateAggregator
     4. tracks the encodings using the EncodingAggregator

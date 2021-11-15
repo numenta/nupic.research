@@ -27,6 +27,9 @@ from .block_model_experiment import BlockModelExperiment
 
 
 class DataParallelBlockModelExperiment(BlockModelExperiment):
+    """
+    A BlockModelExperiment that runs in parallel on multiple GPUs using DataParallel.
+    """
     def setup_experiment(self, config):
         super(DataParallelBlockModelExperiment, self).setup_experiment(config)
         torch.backends.cudnn.benchmark = True

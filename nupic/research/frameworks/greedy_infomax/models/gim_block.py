@@ -32,7 +32,8 @@ import torch.nn.functional as F
 
 class InfoEstimateAggregator(nn.Identity):
     """
-    Aggregates all of the outputs of the Bilinear Info Estimators in the model into a single list.
+    Aggregates all the outputs of the Bilinear Info Estimators in the model into
+    a single list.
     """
 
     def __init__(self, *args, **kwargs):
@@ -51,7 +52,8 @@ class InfoEstimateAggregator(nn.Identity):
 
 class EncodingAggregator(nn.Identity):
     """
-    Gathers all of the outputs of the EmitEncoding layers in the model.
+    Gathers all of the outputs of the EmitEncoding layers in the model into a single
+    list.
     """
 
     def __init__(self, *args, **kwargs):
@@ -104,10 +106,7 @@ class GreedyInfoMaxBlock(nn.Module):
         self.gradient_block = GradientBlock()
         self.n_patches_x, self.n_patches_y = n_patches_x, n_patches_y
 
-    """
-    During unsupervised training, this function will be linked to the forward hook 
-    for its corresponding module.
-    """
+
     def forward(self, x):
         out = F.adaptive_avg_pool2d(x, 1)
         out = out.reshape(-1, self.n_patches_x, self.n_patches_y, out.shape[1])
@@ -117,17 +116,22 @@ class GreedyInfoMaxBlock(nn.Module):
         x_blocked = self.gradient_block(x).clone()
         return x_blocked
 
+    """
+    During unsupervised training, this function will be linked to the forward hook 
+    for its corresponding module.
+    """
     def wrapped_forward(self, module, input, output):
         return self.forward(output)
+
+
+    def encode(self, x):
+        encoded = self.emit_encoding.encode(x, self.n_patches_x, self.n_patches_y)
+        self.encoding_aggregator.append(encoded)
 
     """
     During supervised training, this function will be linked to the forward hook for
     its corresponding module.
     """
-    def encode(self, x):
-        encoded = self.emit_encoding.encode(x, self.n_patches_x, self.n_patches_y)
-        self.encoding_aggregator.append(encoded)
-
     def wrapped_encode(self, module, input, output):
         return self.encode(output)
 

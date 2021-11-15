@@ -56,7 +56,7 @@ class GreedyInfoMaxExperiment(
     modules at specific points in the model's forward pass. It does all of the
     following:
 
-    1. Adds a _PatchifyInputs module at the beginning of the model
+    1. Adds a PatchifyInputs module at the beginning of the model
     2. Adds a GreedyInfoMaxBlock module to any specified modules
     3. Adds an EncodingAggregator module to the model
     4. Adds an InfoEstimateAggregator module to the model
@@ -77,7 +77,7 @@ class GreedyInfoMaxExperiment(
                 info estimate block (defaults to 16)
             -patchify_inputs_args: a dict containing the following
                 - patch_size: the size of the patches to use for the model (defaults
-                to 5)
+                to 16)
                 - overlap: the amount of overlap between patches (defaults to 2)
 
     Example config:
@@ -152,7 +152,7 @@ class GreedyInfoMaxExperiment(
 
     def get_sample_data(self, config):
         """
-        Get a sample data dictionary for the model.
+        Gets a sample batch from the dataset.
         """
         sample_dataset = self.load_dataset(config, dataset_type="supervised")
         sample_dataloader = DataLoader(
@@ -231,5 +231,9 @@ def get_channel_sizes(model, named_modules, sample_data):
     return modules_and_channel_sizes
 
 def get_patch_dimensions(sample_data, patch_size=16, overlap=2):
+    """
+    Gets the dimensions of the patched inputs. This is used for the initialization
+    of GreedyInfoMaxBlocks.
+    """
     x, n_patches_x, n_patches_y = patchify_inputs(sample_data, patch_size, overlap)
     return n_patches_x, n_patches_y

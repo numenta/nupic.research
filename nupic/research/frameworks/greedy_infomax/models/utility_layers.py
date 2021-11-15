@@ -40,8 +40,10 @@ class GradientBlock(nn.Module):
         return x.detach()
 
 
-# used to emit encodings at various points in the model's computation graph
 class EmitEncoding(nn.Identity):
+    """
+    A module which emits the encoding of a given input by first average pooling.
+    """
     def __init__(self, channels):
         super(EmitEncoding, self).__init__()
         self.channels = channels
@@ -73,7 +75,7 @@ class _PatchifyInputs(nn.Module):
 class PatchifyInputs(nn.Module):
     """
     This module takes a batch of images and returns a batch of image patches
-    parameterized by patch_size and overlap
+    parameterized by patch_size and overlap.
     """
     def __init__(self, patch_size=16, overlap=2):
         super(PatchifyInputs, self).__init__()
@@ -88,6 +90,9 @@ class PatchifyInputs(nn.Module):
 
 
 class SparseConv2d(nn.Module):
+    """
+    The combination of SparseWeights2d and nn.Conv2d in one module.
+    """
     def __init__(
         self,
         in_channels: int,

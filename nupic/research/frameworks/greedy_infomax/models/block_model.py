@@ -36,18 +36,31 @@ from nupic.research.frameworks.greedy_infomax.models.utility_layers import (
 
 
 class BlockModel(nn.Module):
+    """
+    A model that supports Greedy InfoMax experiments. This has been deprecated in
+    favor of the more recent GreedyInfoMaxModel which is more general. This module
+    contains a list of modules which are sequentially iterated through for the
+    forward/encode pass. The distinction between supervised training and unsupervised
+    training is implemented by switching which modules are used for the forward pass
+    versus the encode pass. In the forward pass, the BilinearInfoModules are active
+    and the EmitEncoding module is inactive. In the encode pass, the BilinearInfo
+    modules are inactive and the EmitEncoding modules are active.
+    """
     def __init__(self, modules, **kwargs):
         super(BlockModel, self).__init__()
         self.module_list = nn.ModuleList(modules)
 
-    # The forward method only emits BilinearInfo estimations.
-    # Notice how there are no detach() calls in this forward pass: the detaching is
-    # done by the GradientBlock layers, which gives users more flexibility to
-    # place them as desired. Maybe you want each layer to receive gradients from
-    # multiple BilinearInfoLegacy estimators, for example.
-    # The EmitEncoding layers inherit from nn.Identity, so they just pass the input
-    # along without modifying it
+
     def forward(self, x):
+        """
+        The forward method only emits BilinearInfo estimations.
+        Notice how there are no detach() calls in this forward pass: the detaching is
+        done by the GradientBlock layers, which gives users more flexibility to
+        place them as desired. Maybe you want each layer to receive gradients from
+        multiple BilinearInfo estimators, for example.
+        The EmitEncoding layers inherit from nn.Identity, so they just pass the input
+        along without modifying it
+        """
         n_patches_x, n_patches_y = None, None
         log_f_module_list = []
         for module in self.module_list:
@@ -63,10 +76,13 @@ class BlockModel(nn.Module):
                 x = module(x)
         return log_f_module_list
 
-    # The BilinearInfo layers inherit from nn.Identity, so they will just pass along
-    # their input without modifying it during the encode() pass. This will be called
-    # under a torch.no_grad() scope
+
     def encode(self, x):
+        """
+        The BilinearInfo layers inherit from nn.Identity, so they will just pass along
+        their input without modifying it during the encode() pass. This will be called
+        under a torch.no_grad() scope
+        """
         n_patches_x, n_patches_y = None, None
         all_outputs = []
         for module in self.module_list:

@@ -53,8 +53,13 @@ class FullVisionModel(torch.nn.Module):
     is the encoder in self-supervised experiments and does not include a built in
     classifier. As an encoder, this module utilizes a .forward() for unsupervised
     training and a .encode() to produce patch-level representations. The
-    BilinearInfoLegacy modules are thus only called during .forward() to prevent
+    _BilinearInfo modules are thus only called during .forward() to prevent
     wasted computation.
+
+    This has been deprecated in favor of the more general GreedyInfoMaxModel. The
+    difference is that this is a single model which includes all of the Greedy
+    InfoMax machinery, whereas the newer GreedyInfoMaxModel wraps a model and adds
+    the functionality on top of an arbitrary model.
 
     :param negative_samples: number of negative samples to contrast per positive sample
     :param k_predictions: number of prediction steps to compare positive examples.
@@ -163,6 +168,8 @@ class FullVisionModel(torch.nn.Module):
 class SparseFullVisionModel(FullVisionModel):
     """
     A version of the above FullVisionModel that uses sparse weights and activations.
+    This is also deprecated in favor of the more general GreedyInfoMaxModel.
+
     :param negative_samples: number of negative samples to contrast per positive sample
     :param k_predictions: number of prediction steps to compare positive examples.
                           For example, if k_predictions is 5 and skip_step is 1,
@@ -276,7 +283,8 @@ class VDropSparseFullVisionModel(FullVisionModel):
     """
     A version of the above FullVisionModel that uses global variational dropout to
     achieve sparse weights and k-winners modules for sparse activations. Note that
-    the weight sparsity is controlled by the PruneLowSNR mixin config.
+    the weight sparsity is controlled by the PruneLowSNR mixin config. This is also
+    deprecated in favor of the GreedyInfoMaxModel.
 
     :param negative_samples: number of negative samples to contrast per positive sample
     :param k_predictions: number of prediction steps to compare positive examples.
@@ -393,7 +401,8 @@ class VDropSparseFullVisionModel(FullVisionModel):
 class SmallVisionModel(torch.nn.Module):
     """
     A smaller version of the above FullVisionModel which only uses the first
-    ResNetEncoder block.
+    ResNetEncoder block. Like the other models in this file, this has been deprecated in
+    favor of the more general GreedyInfoMaxModel.
 
     :param negative_samples: number of negative samples to contrast per positive sample
     :param k_predictions: number of prediction steps to compare positive examples.
@@ -492,6 +501,9 @@ class SmallVisionModel(torch.nn.Module):
 class SparseSmallVisionModel(SmallVisionModel):
     """
     A version of the above SmallVisionModel that uses sparse weights and activations.
+    Like the other models in this file, this has been deprecated in favor of the
+    more general GreedyInfoMaxModel.
+
     :param negative_samples: number of negative samples to contrast per positive sample
     :param k_predictions: number of prediction steps to compare positive examples.
                           For example, if k_predictions is 5 and skip_step is 1,
@@ -592,6 +604,12 @@ class SparseSmallVisionModel(SmallVisionModel):
 
 
 class WrappedSparseSmallVisionModel(SparseSmallVisionModel):
+    """
+    A version of the SparseSmallVisionModel which takes a single value for sparsity
+    and a single parameter for percent_on, which are then applied to every layer.
+    Like the other models in this file, this has been deprecated in favor of the
+    more general GreedyInfoMaxModel.
+    """
     def __init__(
         self,
         negative_samples=16,
@@ -638,7 +656,10 @@ class WrappedSparseSmallVisionModel(SparseSmallVisionModel):
 class SuperGreedySparseSmallVisionModel(SparseSmallVisionModel):
     """
     A version of the above SmallVisionModel that uses sparse weights and activations.
-    Also, this uses the GreedyInfoMax loss on a layer-by-layer basis.
+    Also, this uses the GreedyInfoMax loss on a layer-by-layer basis. Like the other
+    models in this file, this has been deprecated in favor of the more general
+    GreedyInfoMaxModel.
+
     :param negative_samples: number of negative samples to contrast per positive sample
     :param k_predictions: number of prediction steps to compare positive examples.
                           For example, if k_predictions is 5 and skip_step is 1,
@@ -753,6 +774,13 @@ class SuperGreedySparseSmallVisionModel(SparseSmallVisionModel):
 
 
 class WrappedSuperGreedySmallSparseVisionModel(SuperGreedySparseSmallVisionModel):
+    """
+
+    A version of the above SuperGreedySmallVisionModel that uses sparse weights and
+    activations, each controlled by a single parameter. Also, this uses the
+    GreedyInfoMax loss on a layer-by-layer basis. Like the other models in this
+    file, this has been deprecated in favor of the more general GreedyInfoMaxModel.
+    """
     def __init__(
         self,
         negative_samples=16,
@@ -800,7 +828,9 @@ class VDropSparseSmallVisionModel(SmallVisionModel):
     """
     A version of the above SmallVisionModel that uses global variational dropout to
     achieve sparse weights and k-winners modules for sparse activations. Note that
-    the weight sparsity is controlled by the PruneLowSNR mixin config.
+    the weight sparsity is controlled by the PruneLowSNR mixin config. Like the other
+    models in this file, this has been deprecated in favor of the more general
+    GreedyInfoMaxModel.
 
     :param negative_samples: number of negative samples to contrast per positive sample
     :param k_predictions: number of prediction steps to compare positive examples.

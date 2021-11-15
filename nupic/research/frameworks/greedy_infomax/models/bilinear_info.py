@@ -39,13 +39,19 @@ class BilinearInfo(nn.Identity):
     of information they convey about nearby (spatially coherent) patches. The
     positive sample is compared to many negative samples, and the bilinear model
     should be able to pick out the positive sample from the lineup (indicating high
-    mutual information). This inherits from nn.Identity because it is used in the
+    mutual information).
+
+    Also, it computes the loss for the model in the forward pass as opposed to in the
+    loss function. This reflects the original codebase, and is important for
+    compatibility with DataParallel.
+
+    This inherits from nn.Identity because it is used in the
     BlockModel setting. This module should be estimating the information content
     of the patches during the unsupervised training portion of the experiment, i.e.
     estimate_info(), but should pass through for the supervised training and
-    validation loops. See BlockModel for reference. Also, it computes the loss for
-    the model in the forward pass as opposed to in the loss function. This reflects
-    the original codebase, and is important for compatibility with DataParallel.
+    validation loops. See BlockModel for reference. Note that the BlockModel has been
+    deprecated in favor of the more general GreedyInfoMaxModel, but the BilinearInfo
+    module can be used in both cases.
 
     """
     def __init__(self, in_channels, out_channels, negative_samples=16, k_predictions=5):
@@ -204,16 +210,15 @@ class VDropSparseBilinearInfo(BilinearInfo):
         )
 
 
-class BilinearInfoLegacy(nn.Module):
+class _BilinearInfo(nn.Module):
     """
     From the Greedy InfoMax paper, a module which estimates the mutual information
     between two representations through a bilinear model. This is now named
-    "BilinearInfoLegacy" because it was used in older GreedyInfoMax experiments which
-    did not make use of the BlockModel. There are two differences between the
-    versions; first this one inherits from nn.Module, whereas the more recent
-    implementation inherits from nn.Identity. Second, this model does not compute the
-    full loss in the forward pass, whereas the newer implementation does compute the
-    loss in the forward pass.
+    "_BilinearInfo" because it was used in older GreedyInfoMax experiments and is now
+    deprecated. There are two differences between the versions; first this one
+    inherits from nn.Module, whereas the more recent implementation inherits from
+    nn.Identity. Second, this model does not compute the full loss in the forward
+    pass, whereas the newer implementation does compute the loss in the forward pass.
 
     Recall the loss for Greedy InfoMax:
 

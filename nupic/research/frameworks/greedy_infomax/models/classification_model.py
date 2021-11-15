@@ -38,7 +38,6 @@ class Classifier(nn.Module):
     :param in_channels: The dimensionality of the input to this model
     :param num_classes: The dimensionality of the output (the number of possible
     class labels)
-
     """
     def __init__(self, in_channels=256, num_classes=10):
         super().__init__()
@@ -50,8 +49,8 @@ class Classifier(nn.Module):
         )
 
     def forward(self, x):
-        # detach x just in case it's still connected to active parts of the
-        # computation graph
+        # detach x just in case it's still connected to active parts
+        # of the computation graph
         batch_size = x.shape[0]
         x = x.detach()
         x = self.avg_pool(x).squeeze()
