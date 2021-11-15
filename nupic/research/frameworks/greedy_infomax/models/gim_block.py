@@ -70,11 +70,13 @@ class EncodingAggregator(nn.Identity):
 
 class GreedyInfoMaxBlock(nn.Module):
     def __init__(self,
-                 estimator_outputs,
-                 encoding_outputs,
                  in_channels,
+                 estimate_info_aggregator,
+                 encoding_aggregator,
                  negative_samples=16,
-                 k_predictions=5):
+                 k_predictions=5,
+                 n_patches_x=None,
+                 n_patches_y=None,):
         """
         A block that can be placed after any module in a model which consists of:
         1. A BilinearInfo module
@@ -89,33 +91,45 @@ class GreedyInfoMaxBlock(nn.Module):
         is the most common use case.
         """
         super(GreedyInfoMaxBlock, self).__init__()
-        self.estimator_outputs = estimator_outputs
-        self.encoding_outputs = encoding_outputs
+        self.info_estimate_aggregator = estimate_info_aggregator
+        self.encoding_aggregator = encoding_aggregator
+        self.negative_samples = negative_samples
+        self.k_predictions = k_predictions
+        self.in_channels = in_channels
         self.bilinear_info = BilinearInfo(in_channels,
                                           in_channels,
-                                          negative_samples,
-                                          k_predictions)
+                                          self.negative_samples,
+                                          self.k_predictions)
         self.emit_encoding = EmitEncoding(in_channels)
         self.gradient_block = GradientBlock()
+        self.n_patches_x, self.n_patches_y = n_patches_x, n_patches_y
 
     """
     During unsupervised training, this function will be linked to the forward hook 
     for its corresponding module.
     """
-    def forward_unsupervised(self, x, n_patches_x, n_patches_y):
+    def forward(self, x):
         out = F.adaptive_avg_pool2d(x, 1)
-        out = out.reshape(-1, n_patches_x, n_patches_y, out.shape[1])
+        out = out.reshape(-1, self.n_patches_x, self.n_patches_y, out.shape[1])
         out = out.permute(0, 3, 1, 2).contiguous()
         info_estimate = self.bilinear_info.estimate_info(out, out)
-        self.estimator_outputs.append(info_estimate)
+        self.info_estimate_aggregator.append(info_estimate)
+        x_blocked = self.gradient_block(x).clone()
+        return x_blocked
+
+    def wrapped_forward(self, module, input, output):
+        return self.forward(output)
 
     """
     During supervised training, this function will be linked to the forward hook for
     its corresponding module.
     """
-    def forward_supervised(self, x, n_patches_x, n_patches_y):
-        encoded = self.emit_encoding.encode(x, n_patches_x, n_patches_y)
-        self.encoding_outputs.append(encoded)
+    def encode(self, x):
+        encoded = self.emit_encoding.encode(x, self.n_patches_x, self.n_patches_y)
+        self.encoding_aggregator.append(encoded)
+
+    def wrapped_encode(self, module, input, output):
+        return self.encode(output)
 
 class SparseGreedyInfoMaxBlock(GreedyInfoMaxBlock):
     """

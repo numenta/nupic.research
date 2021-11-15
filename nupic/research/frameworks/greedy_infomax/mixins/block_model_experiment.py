@@ -27,9 +27,9 @@ import torch
 from nupic.research.frameworks.greedy_infomax.models.block_model import BlockModel
 from nupic.research.frameworks.greedy_infomax.models.utility_layers import EmitEncoding
 from nupic.research.frameworks.greedy_infomax.utils.train_utils import (
-    aggregate_eval_results_block,
-    evaluate_block_model,
-    train_block_model,
+    aggregate_eval_results_gim,
+    evaluate_gim_model,
+    train_gim_model,
 )
 from nupic.research.frameworks.vernon import SelfSupervisedExperiment, mixins
 from nupic.research.frameworks.vernon.network_utils import create_model
@@ -54,8 +54,8 @@ class BlockModelExperiment(
             in_channels=emit_encoding_channels
         )
         super().setup_experiment(config)
-        self.evaluate_model = evaluate_block_model
-        self.train_model = self.train_model_supervised = train_block_model
+        self.evaluate_model = evaluate_gim_model
+        self.train_model = self.train_model_supervised = train_gim_model
         self.multiple_module_loss_history = []
 
     @classmethod
@@ -139,7 +139,7 @@ class BlockModelExperiment(
     @classmethod
     def _aggregate_validation_results(cls, results):
         result = copy.copy(results[0])
-        result.update(aggregate_eval_results_block(results))
+        result.update(aggregate_eval_results_gim(results))
         return result
 
     @classmethod

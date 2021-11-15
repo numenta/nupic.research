@@ -203,6 +203,55 @@ RESNET_50_DENSE_ONE_CYCLE_300.update(dict(
     ),
 ))
 
+import pickle
+import io
+from nupic.research.frameworks.pytorch.model_utils import (
+    deserialize_state_dict,
+)
+from nupic.research.frameworks.vernon.network_utils import (
+    get_compatible_state_dict,
+)
+class LoadBlockModelExperiment(DataParallelBlockModelExperiment):
+    def setup_experiment(self, config):
+        super(LoadBlockModelExperiment, self).setup_experiment(config)
+        self.load_file = config.get("model_path", None)
+        if self.load_file is not None:
+            with open(self.load_file, mode="rb") as f:
+                state = pickle.load(f)
+            if "model" in state:
+                with io.BytesIO(state["model"]) as buffer:
+                    state_dict = deserialize_state_dict(buffer, self.device)
+                model = self.model
+                if hasattr(model, "module"):
+                    # DistributedDataParallel
+                    model = model.module
+                state_dict = get_compatible_state_dict(state_dict, model)
+                model.load_state_dict(state_dict)
+
+RESNET_50_DENSE_TWO_CYCLE_300 = deepcopy(RESNET_50_DENSE_ONE_CYCLE_300)
+RESNET_50_DENSE_TWO_CYCLE_300.update(dict(
+    experiment_class=DataParallelBlockModelExperiment,
+    wandb_args=dict(
+            project="greedy_infomax_full_resnet_300",
+            name=f"dense_two_cycle",
+    ),
+    epochs=30,
+    epochs_to_validate=[0, 5, 10, 15, 20, 25, 29],
+    checkpoint_file="/home/ec2-user/nta/results/greedy_infomax/experiments"
+               "/resnet_50_dense_one_cycle_300/RemoteProcessTrainable_0_2021-10-28_18"
+               "-07-034z8mwnuw/checkpoint_300/checkpoint",
+    lr_scheduler_args=dict(
+        max_lr=0.0001,
+        div_factor=10,
+        final_div_factor=100,
+        pct_start=3.0 / 30.0,
+        epochs=30,
+        anneal_strategy="linear",
+        max_momentum=1e-4,
+        cycle_momentum=False,
+    ),
+))
+
 RESNET_50_SPARSE_70_ONE_CYCLE_300 = deepcopy(RESNET_50_DENSE_ONE_CYCLE_300)
 RESNET_50_SPARSE_70_ONE_CYCLE_300.update(dict(
     wandb_args=dict(
@@ -221,6 +270,31 @@ RESNET_50_SPARSE_70_ONE_CYCLE_300.update(dict(
         cycle_momentum=False,
     ),
 ))
+
+RESNET_50_SPARSE_70_TWO_CYCLE_300 = deepcopy(RESNET_50_SPARSE_70_ONE_CYCLE_300)
+RESNET_50_SPARSE_70_TWO_CYCLE_300.update(dict(
+    experiment_class=LoadBlockModelExperiment,
+    wandb_args=dict(
+            project="greedy_infomax_full_resnet_300",
+            name=f"sparse_70_two_cycle",
+    ),
+    epochs=30,
+    epochs_to_validate=[0, 5, 10, 15, 20, 25, 29],
+    model_path="/home/ec2-user/nta/results/greedy_infomax/experiments"
+               "/resnet_50_sparse_70_one_cycle_300/RemoteProcessTrainable_0_2021-10"
+               "-29_23-52-397grdrlb6/checkpoint_300/checkpoint",
+    lr_scheduler_args=dict(
+        max_lr=0.0001,
+        div_factor=10,
+        final_div_factor=100,
+        pct_start=3.0 / 30.0,
+        epochs=30,
+        anneal_strategy="linear",
+        max_momentum=1e-4,
+        cycle_momentum=False,
+    ),
+    ))
+
 
 RESNET_50_SPARSE_70_ONE_CYCLE_100 = deepcopy(RESNET_50_SPARSE_70_ONE_CYCLE_300)
 RESNET_50_SPARSE_70_ONE_CYCLE_100.update(dict(
@@ -275,7 +349,9 @@ CONFIGS = dict(
     resnet_50_sparse_80_one_cycle_lr_grid_search=RESNET_50_SPARSE_80_ONE_CYCLE_LR_GRID_SEARCH,
     resnet_50_one_cycle_lr_full=RESNET_50_ONE_CYCLE_LR_FULL,
     resnet_50_dense_one_cycle_300=RESNET_50_DENSE_ONE_CYCLE_300,
+    resnet_50_dense_two_cycle_300=RESNET_50_DENSE_TWO_CYCLE_300,
     resnet_50_sparse_70_one_cycle_300=RESNET_50_SPARSE_70_ONE_CYCLE_300,
+    resnet_50_sparse_70_two_cycle_300=RESNET_50_SPARSE_70_TWO_CYCLE_300,
     resnet_50_sparse_70_one_cycle_100=RESNET_50_SPARSE_70_ONE_CYCLE_100,
     resnet_50_sparse_80_one_cycle_300=RESNET_50_SPARSE_80_ONE_CYCLE_300,
 )

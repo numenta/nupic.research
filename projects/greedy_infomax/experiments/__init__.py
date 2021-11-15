@@ -27,6 +27,7 @@ from .block_wise_training import CONFIGS as BLOCK_WISE
 from .linear_classification import CONFIGS as LINEAR_CLASSIFICATION
 from .block_sparse_optimization import CONFIGS as BLOCK_SPARSE_OPTIMIZATION
 from .block_resnet50_optimization import CONFIGS as BLOCK_RESNET50
+from .new_model import CONFIGS as NEW_MODEL
 
 CONFIGS = dict()
 CONFIGS.update(DEFAULT_BASE)
@@ -37,3 +38,4 @@ CONFIGS.update(BLOCK_WISE)
 CONFIGS.update(LINEAR_CLASSIFICATION)
 CONFIGS.update(BLOCK_SPARSE_OPTIMIZATION)
 CONFIGS.update(BLOCK_RESNET50)
+CONFIGS.update(NEW_MODEL)

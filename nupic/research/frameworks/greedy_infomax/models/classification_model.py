@@ -123,7 +123,6 @@ class MultiClassifier(nn.Module):
         return [classifier(encoding)
                 for (classifier, encoding) in zip(self.classifiers, encodings)]
 
-
 class MultiFlattenClassifier(nn.Module):
     """
     A model which contains many FlattenClassifier models. Oftentimes, a Greedy InfoMax

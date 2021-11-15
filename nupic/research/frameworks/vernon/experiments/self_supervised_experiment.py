@@ -124,7 +124,7 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             raise ValueError("Must provide 'classifier_config' in config")
 
         self.encoder = self.model
-        self.classifier = self.create_model(classifier_config, self.device)
+        self.classifier = self.create_classifier_model(classifier_config, self.device)
         self.logger.debug(self.classifier)
         self.encoder_classifier = EncoderClassifier(self.encoder, self.classifier)
         self.encoder_classifier.to(self.device)
@@ -164,6 +164,9 @@ class SelfSupervisedExperiment(SupervisedExperiment):
         self.supervised_training_epochs_per_validation = config.get(
             "supervised_training_epochs_per_validation", 3
         )
+
+    def create_classifier_model(self, classifier_config, device):
+        return super().create_model(classifier_config, device)
 
     def create_loaders(self, config):
 

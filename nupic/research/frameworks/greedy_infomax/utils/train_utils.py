@@ -36,7 +36,7 @@ from .loss_utils import (
 )
 
 
-def train_block_model(
+def train_gim_model(
     model,
     loader,
     optimizer,
@@ -200,7 +200,7 @@ def train_block_model(
         loader.close()
 
 
-def evaluate_block_model(
+def evaluate_gim_model(
     model,
     loader,
     device,
@@ -343,7 +343,7 @@ def evaluate_block_model(
     return result
 
 
-def aggregate_eval_results_block(results):
+def aggregate_eval_results_gim(results):
     """Aggregate multiple results from evaluate_model into a single result.
 
     This function ignores fields that don't need aggregation. To get the

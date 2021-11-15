@@ -52,8 +52,29 @@ class EmitEncoding(nn.Identity):
         out = out.permute(0, 3, 1, 2).contiguous()
         return out
 
+class _PatchifyInputs(nn.Module):
+    """
+    This module is deprecated in favor of the newer PatchifyInputs module. The
+    difference between the two is that this one returns n_patches_x and n_patches_y
+    in the forward pass, whereas the other does not so it is more suitable for a
+    sequential model.
+    """
+    def __init__(self, patch_size=16, overlap=2):
+        super(_PatchifyInputs, self).__init__()
+        self.patch_size = patch_size
+        self.overlap = overlap
+
+    def forward(self, x):
+        x, n_patches_x, n_patches_y = data_utils.patchify_inputs(
+            x, self.patch_size, self.overlap
+        )
+        return x, n_patches_x, n_patches_y
 
 class PatchifyInputs(nn.Module):
+    """
+    This module takes a batch of images and returns a batch of image patches
+    parameterized by patch_size and overlap
+    """
     def __init__(self, patch_size=16, overlap=2):
         super(PatchifyInputs, self).__init__()
         self.patch_size = patch_size
@@ -63,7 +84,7 @@ class PatchifyInputs(nn.Module):
         x, n_patches_x, n_patches_y = data_utils.patchify_inputs(
             x, self.patch_size, self.overlap
         )
-        return x, n_patches_x, n_patches_y
+        return x
 
 
 class SparseConv2d(nn.Module):

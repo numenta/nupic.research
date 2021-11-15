@@ -35,8 +35,8 @@ from nupic.research.frameworks.greedy_infomax.models.full_model import (
     WrappedSuperGreedySmallSparseVisionModel,
 )
 from nupic.research.frameworks.greedy_infomax.utils.train_utils import (
-    evaluate_block_model,
-    train_block_model,
+    evaluate_gim_model,
+    train_gim_model,
 )
 from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptExperiment
 from nupic.research.frameworks.vernon.distributed import experiments, mixins
@@ -229,8 +229,8 @@ class MultiHeadedGreedyInfoMaxExperiment(
     def setup_experiment(self, config):
         num_channels = config["model_args"]["num_channels"]
         config["classifier_config"]["model_args"].update(in_channels=num_channels)
-        config["train_model_func"] = train_block_model
-        config["evaluate_model_func"] = evaluate_block_model
+        config["train_model_func"] = train_gim_model
+        config["evaluate_model_func"] = evaluate_gim_model
         super().setup_experiment(config)
 
 

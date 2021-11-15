@@ -37,7 +37,7 @@ from nupic.research.frameworks.greedy_infomax.models.resnet_encoder import (
 from nupic.research.frameworks.greedy_infomax.models.utility_layers import (
     EmitEncoding,
     GradientBlock,
-    PatchifyInputs,
+    _PatchifyInputs,
     SparseConv2d,
 )
 from nupic.torch.modules import SparseWeights2d
@@ -204,7 +204,7 @@ def full_sparse_model_blockwise_config(
     modules = []
     modules.append(
         dict(
-            model_class=PatchifyInputs,
+            model_class=_PatchifyInputs,
             model_args=dict(patch_size=patch_size, overlap=overlap),
             init_batch_norm=False,
             checkpoint_file=None,

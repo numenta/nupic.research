@@ -31,7 +31,7 @@ import torch.nn.functional as F
 from nupic.research.frameworks.greedy_infomax.models.bilinear_info import BilinearInfo
 from nupic.research.frameworks.greedy_infomax.models.utility_layers import (
     EmitEncoding,
-    PatchifyInputs,
+    _PatchifyInputs,
 )
 
 
@@ -51,7 +51,7 @@ class BlockModel(nn.Module):
         n_patches_x, n_patches_y = None, None
         log_f_module_list = []
         for module in self.module_list:
-            if isinstance(module, PatchifyInputs):
+            if isinstance(module, _PatchifyInputs):
                 x, n_patches_x, n_patches_y = module(x)
             elif isinstance(module, BilinearInfo):
                 out = F.adaptive_avg_pool2d(x, 1)
@@ -70,7 +70,7 @@ class BlockModel(nn.Module):
         n_patches_x, n_patches_y = None, None
         all_outputs = []
         for module in self.module_list:
-            if isinstance(module, PatchifyInputs):
+            if isinstance(module, _PatchifyInputs):
                 x, n_patches_x, n_patches_y = module(x)
             elif isinstance(module, EmitEncoding):
                 out = module.encode(x, n_patches_x, n_patches_y)

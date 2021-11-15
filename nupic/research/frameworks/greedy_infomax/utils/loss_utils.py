@@ -92,7 +92,7 @@ def all_module_losses(module_losses, targets, reduction="mean"):
     estimators, which was done in order to make the BlockModel work when wrapped under
     DataParallel.
     """
-    module_losses = torch.stack(module_losses, 1).view(-1, len(module_losses))  # g, n
+    module_losses = torch.stack(module_losses, -1).view(-1, len(module_losses))  # g, n
     module_losses = torch.mean(module_losses, 0)  # n
     return module_losses
 
