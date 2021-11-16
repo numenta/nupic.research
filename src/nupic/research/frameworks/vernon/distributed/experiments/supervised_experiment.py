@@ -48,8 +48,6 @@ class SupervisedExperiment(DistributedBase, SupervisedExperimentBase):
 
     def setup_experiment(self, config):
         super().setup_experiment(config)
-        print(f"self.distributed: {self.distributed}")
-        print(f"config distributed: {config.get('distributed', None)}")
         if self.distributed:
             self.model = DistributedDataParallel(
                 self.model,

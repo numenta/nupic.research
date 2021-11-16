@@ -208,8 +208,6 @@ class SupervisedExperiment(ExperimentBase):
 
         # Set train and validate methods.
         self.train_model = config.get("train_model_func", train_model)
-        self.train_model_supervised = config.get("train_model_supervised_func",
-                                                 train_model)
         self.evaluate_model = config.get("evaluate_model_func", evaluate_model)
 
         self.progress = config.get("progress", False)
