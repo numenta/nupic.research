@@ -1,0 +1,19 @@
+# Install nupic.research in development mode with dev tools extras enabled
+-e .[dev]
+
+# Install nupic.research frameworks
+-e packages/ray
+-e packages/dendrites
+-e packages/sigopt
+-e packages/wandb
+-e packages/dynamic_sparse
+-e packages/backprop_structure
+-e packages/greedy_infomax
+-e packages/self_supervised_learning
+-e packages/continual_learning
+
+# Install projects extra dependency
+# See `setup.cfg` for available extras.
+# -e .[imagenet]
+# -e .[gsc]
+# -e .[transformers]

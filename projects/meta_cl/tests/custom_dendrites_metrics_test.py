@@ -31,7 +31,10 @@ from nupic.research.frameworks.dendrites import (
     DendriticAbsoluteMaxGate1d,
     plot_winning_segment_distributions,
 )
-from nupic.research.frameworks.vernon import MetaContinualLearningExperiment, mixins
+from nupic.research.frameworks.meta_continual_learning.experiments import (
+    MetaContinualLearningExperiment,
+)
+from nupic.research.frameworks.vernon import mixins
 from nupic.torch.modules import KWinners, SparseWeights
 
 
@@ -112,7 +115,7 @@ simple_metacl_config = dict(
     plot_dendrite_metrics_args=dict(
         include_modules=[DendriticAbsoluteMaxGate1d],
         winning_segments=dict(
-            plot_func=plot_winning_segment_distributions,
+            plot_func=plot_winning_segment_distributions_,
             plot_freq=2,
             plot_args=get_plot_args,
             max_samples_to_track=10000,

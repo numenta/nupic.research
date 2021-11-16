@@ -17,14 +17,7 @@ dependencies:
       # Assume libraries were cloned into ${HOME}/nta folder
       - -e ${HOME}/nta/nupic.torch
 
-      # Install nupic.research in development mode with dev tools extras enabled
-      - -e ".[dev]"
+      # Install nupic.research and its dependencies 
+      - -r requirements.txt
 
-      # Install projects extra dependency
-      # See `setup.cfg` for available extras.
-      # - -e ".[vernon]"
-      # - -e ".[imagenet]"
-      # - -e ".[gsc]"
-      # - -e ".[dendrites]"
-      # - -e ".[transformers]"
 

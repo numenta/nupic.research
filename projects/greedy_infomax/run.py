@@ -23,11 +23,14 @@ import copy
 import ray  # noqa: F401
 
 from experiments import CONFIGS
-from nupic.research.frameworks.vernon.parser_utils import DEFAULT_PARSERS, process_args
-from nupic.research.frameworks.vernon.run_with_raytune import run
+from nupic.research.frameworks.ray.run_with_raytune import run
+from nupic.research.frameworks.vernon.parser_utils import (
+    get_default_parsers,
+    process_args,
+)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(parents=DEFAULT_PARSERS)
+    parser = argparse.ArgumentParser(parents=get_default_parsers())
     parser.add_argument(
         "-e",
         "--experiment",

@@ -32,6 +32,9 @@ from nupic.research.frameworks.dendrites import (
     AbsoluteMaxGatingDendriticLayer,
     DendriticAbsoluteMaxGate1d,
     DendriticGate1d,
+)
+from nupic.research.frameworks.dendrites import mixins as dendrites_mixins
+from nupic.research.frameworks.dendrites import (
     plot_dendrite_activations_by_unit,
     plot_dendrite_overlap_matrix,
     plot_entropy_distribution,
@@ -43,16 +46,17 @@ from nupic.research.frameworks.dendrites import (
     plot_representation_overlap_matrix,
 )
 from nupic.research.frameworks.dendrites.routing import generate_context_vectors
-from nupic.research.frameworks.vernon import SupervisedExperiment, mixins
+from nupic.research.frameworks.vernon import SupervisedExperiment
+from nupic.research.frameworks.vernon import mixins as vernon_mixins
 from nupic.torch.modules import KWinners, SparseWeights
 
 
 # ------ Dendrites experiment classes
-class DendritesSupermaskExperiment(mixins.PlotRepresentationOverlap,
-                                   mixins.PlotHiddenActivations,
-                                   mixins.TrackRepresentationSparsity,
-                                   mixins.PlotDendriteMetrics,
-                                   mixins.RezeroWeights,
+class DendritesSupermaskExperiment(dendrites_mixins.PlotRepresentationOverlap,
+                                   dendrites_mixins.PlotHiddenActivations,
+                                   vernon_mixins.TrackRepresentationSparsity,
+                                   dendrites_mixins.PlotDendriteMetrics,
+                                   vernon_mixins.RezeroWeights,
                                    SupervisedExperiment):
     pass
 

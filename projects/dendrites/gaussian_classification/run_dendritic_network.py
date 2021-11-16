@@ -38,8 +38,11 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+from nupic.research.frameworks.continual_learning.experiments import (
+    ContinualLearningExperiment,
+)
 from nupic.research.frameworks.dendrites.modules import DendriticMLP
-from nupic.research.frameworks.vernon import ContinualLearningExperiment, mixins
+from nupic.research.frameworks.vernon import mixins
 from nupic.torch.duty_cycle_metrics import max_entropy
 from projects.dendrites.gaussian_classification.gaussian import GaussianDataset
 

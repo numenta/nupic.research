@@ -38,8 +38,9 @@ from nupic.research.frameworks.greedy_infomax.utils.train_utils import (
     evaluate_gim_model,
     train_gim_model,
 )
+from nupic.research.frameworks.self_supervised_learning.distributed import experiments
 from nupic.research.frameworks.sigopt.sigopt_experiment import SigOptExperiment
-from nupic.research.frameworks.vernon.distributed import experiments, mixins
+from nupic.research.frameworks.vernon.distributed import mixins
 from nupic.torch.modules import SparseWeights2d
 
 from .default_base import CONFIGS as DEFAULT_BASE_CONFIGS

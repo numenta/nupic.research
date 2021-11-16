@@ -30,18 +30,19 @@ import ray.tune as tune
 import torch
 import torch.nn.functional as F
 
+from nupic.research.frameworks.continual_learning import mixins as cl_mixins
 from nupic.research.frameworks.dendrites import DendriticMLP
 from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
 )
 from nupic.research.frameworks.dendrites.mixins import InputAsContext
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
-from nupic.research.frameworks.vernon import mixins
+from nupic.research.frameworks.vernon import mixins as vernon_mixins
 
 
 class SimpleExperiment(InputAsContext,
-                       mixins.RezeroWeights,
-                       mixins.PermutedMNISTTaskIndices,
+                       vernon_mixins.RezeroWeights,
+                       cl_mixins.PermutedMNISTTaskIndices,
                        DendriteContinualLearningExperiment):
     pass
 
@@ -61,7 +62,7 @@ INPUT_AS_CONTEXT_10 = dict(
         seed=42,
     ),
 
-    model_class=DendriticMLP,  # CentroidDendriticMLP does not affect accuracy..??
+    model_class=DendriticMLP,
     model_args=dict(
         input_size=784,
         output_size=10,  # Single output head shared by all tasks
