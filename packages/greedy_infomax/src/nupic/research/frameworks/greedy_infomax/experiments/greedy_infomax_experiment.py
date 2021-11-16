@@ -19,28 +19,23 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from copy import deepcopy
-from pprint import pformat
+import copy
 
-import matplotlib.pyplot as plt
-import numpy as np
 import torch
-import torch.nn as nn
+from torch.utils.data import DataLoader
 
-from nupic.research.frameworks.pytorch.model_utils import filter_modules
-from nupic.research.frameworks.greedy_infomax.models.gim_block import \
-    GreedyInfoMaxBlock, InfoEstimateAggregator, EncodingAggregator
-from nupic.research.frameworks.greedy_infomax.models.utility_layers import _PatchifyInputs
 from nupic.research.frameworks.greedy_infomax.models.gim_model import GreedyInfoMaxModel
 from nupic.research.frameworks.greedy_infomax.utils.data_utils import patchify_inputs
-from nupic.research.frameworks.vernon import mixins, SelfSupervisedExperiment
-from torch.utils.data import DataLoader
 from nupic.research.frameworks.greedy_infomax.utils.train_utils import (
     aggregate_eval_results_gim,
     evaluate_gim_model,
     train_gim_model,
 )
-import copy
+from nupic.research.frameworks.pytorch.model_utils import filter_modules
+from nupic.research.frameworks.self_supervised_learning.experiments import (
+    SelfSupervisedExperiment,
+)
+from nupic.research.frameworks.vernon import mixins
 
 
 class GreedyInfoMaxExperiment(
@@ -67,9 +62,9 @@ class GreedyInfoMaxExperiment(
                 - include_modules: (optional) a list of module types to track
                 - include_names: (optional) a list of module names to track e.g.
                                  "features.stem"
-                - include_patterns: (optional) a list of regex patterns to compare to the
-                                    names; for instance, all feature parameters in ResNet
-                                    can be included through "features.*"
+                - include_patterns: (optional) a list of regex patterns to compare to
+                                    names; for instance, all feature parameters in
+                                    the model can be included through "features.*"
             - info_estimate_args: a dict containing the following
                 - k_predictions: the number of predictions to use or each info
                 estimate block (defautls to 5)
@@ -108,7 +103,6 @@ class GreedyInfoMaxExperiment(
         self.train_model = self.train_model_supervised = train_gim_model
         self.multiple_module_loss_history = []
 
-
     def create_model(self, config, device):
         sample_data = self.get_sample_data(config)
         model = super().create_model(config, device)
@@ -140,13 +134,14 @@ class GreedyInfoMaxExperiment(
             in_channels=list(modules_and_channel_sizes.values())
         )
 
-        n_patches_x, n_patches_y = get_patch_dimensions(sample_data, **patchify_inputs_args)
+        n_patches_x, n_patches_y = get_patch_dimensions(sample_data,
+                                                        **patchify_inputs_args)
 
         greedy_infomax_model = GreedyInfoMaxModel(model,
-                                        modules_and_channel_sizes,
-                                        **info_estimate_args,
-                                        n_patches_x=n_patches_x,
-                                        n_patches_y=n_patches_y)
+                                                  modules_and_channel_sizes,
+                                                  **info_estimate_args,
+                                                  n_patches_x=n_patches_x,
+                                                  n_patches_y=n_patches_y)
 
         return greedy_infomax_model
 
@@ -208,7 +203,8 @@ class GreedyInfoMaxExperiment(
         eo["setup_experiment"].append("GreedyInfoMaxExperiment: initialize")
         eo["post_batch"].append("GreedyInfoMaxExperiment: record losses")
         eo["run_epoch"].append("GreedyInfoMaxExperiment: to result dict")
-        eo["expand_result_to_time_series"].append("GreedyInfoMaxExperiment: module_losses")
+        eo["expand_result_to_time_series"].append(
+            "GreedyInfoMaxExperiment: module_losses")
         return eo
 
 
@@ -218,17 +214,18 @@ def get_channel_sizes(model, named_modules, sample_data):
     dictionary of the form {module_name: output_size}
     """
     modules_and_channel_sizes = {}
-    for module_name, module in named_modules.items():
+    for _module_name, module in named_modules.items():
         # attach a hook to each module in the model that needs a size calculated
-        def module_size_hook(module, input, output):
-            modules_and_channel_sizes[module] = output.size()[1] # b,c,h,w
+        def module_size_hook(module, input, output):  # noqa: A002
+            modules_and_channel_sizes[module] = output.size()[1]  # b,c,h,w
         module.register_forward_hook(module_size_hook)
     # do a single forward pass through the model
     model(sample_data)
-    # detach the hook
+    #  detach the hook
     for module in named_modules.values():
         module._forward_hooks.clear()
     return modules_and_channel_sizes
+
 
 def get_patch_dimensions(sample_data, patch_size=16, overlap=2):
     """

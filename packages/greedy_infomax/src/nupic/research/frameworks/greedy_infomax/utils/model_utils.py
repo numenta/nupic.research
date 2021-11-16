@@ -25,7 +25,6 @@
 # ----------------------------------------------------------------------
 
 import torch.nn as nn
-from copy import deepcopy
 
 from nupic.research.frameworks.greedy_infomax.models.bilinear_info import (
     SparseBilinearInfo,
@@ -37,8 +36,8 @@ from nupic.research.frameworks.greedy_infomax.models.resnet_encoder import (
 from nupic.research.frameworks.greedy_infomax.models.utility_layers import (
     EmitEncoding,
     GradientBlock,
-    _PatchifyInputs,
     SparseConv2d,
+    _PatchifyInputs,
 )
 from nupic.torch.modules import SparseWeights2d
 
@@ -165,6 +164,7 @@ def _make_layer_config(
         )
     return layer_config
 
+
 def full_sparse_model_blockwise_config(
     negative_samples=16,
     k_predictions=5,
@@ -269,61 +269,58 @@ def full_sparse_model_blockwise_config(
         ))
     return modules
 
-#sparsity settings
-resnet_34_sparse_70_sparsity=dict(
-        conv1=0.01,  # dense
-        encoder1=dict(
-            block1=dict(conv1=0.7, conv2=0.7),
-            block2=dict(conv1=0.7, conv2=0.7),
-            block3=dict(conv1=0.7, conv2=0.7),
-            bilinear_info=0.1,  # dense weights
-        ),
-        encoder2=dict(
-            block1=dict(conv1=0.7, conv2=0.7, shortcut=0.01),
-            block2=dict(conv1=0.7, conv2=0.7),
-            block3=dict(conv1=0.7, conv2=0.7),
-            block4=dict(conv1=0.7, conv2=0.7),
-            bilinear_info=0.01,
-        ),
-        encoder3=dict(
-            block1=dict(conv1=0.7, conv2=0.7, shortcut=0.01),  # dense
-            block2=dict(conv1=0.7, conv2=0.7),
-            block3=dict(conv1=0.7, conv2=0.7),
-            block4=dict(conv1=0.7, conv2=0.7),
-            block5=dict(conv1=0.7, conv2=0.7),
-            block6=dict(conv1=0.7, conv2=0.7),
-            bilinear_info=0.01,  # dense
-        ),
+
+resnet_34_sparse_70_sparsity = dict(
+    conv1=0.01,  # dense
+    encoder1=dict(
+        block1=dict(conv1=0.7, conv2=0.7),
+        block2=dict(conv1=0.7, conv2=0.7),
+        block3=dict(conv1=0.7, conv2=0.7),
+        bilinear_info=0.1,  # dense weights
     ),
-resnet_34_sparse_80_sparsity=dict(
-        conv1=0.01,  # dense
-        encoder1=dict(
-            block1=dict(conv1=0.8, conv2=0.8),
-            block2=dict(conv1=0.8, conv2=0.8),
-            block3=dict(conv1=0.8, conv2=0.8),
-            bilinear_info=0.1,  # dense weights
-        ),
-        encoder2=dict(
-            block1=dict(conv1=0.8, conv2=0.8, shortcut=0.01),
-            block2=dict(conv1=0.8, conv2=0.8),
-            block3=dict(conv1=0.8, conv2=0.8),
-            block4=dict(conv1=0.8, conv2=0.8),
-            bilinear_info=0.01,
-        ),
-        encoder3=dict(
-            block1=dict(conv1=0.8, conv2=0.8, shortcut=0.01),  # dense
-            block2=dict(conv1=0.8, conv2=0.8),
-            block3=dict(conv1=0.8, conv2=0.8),
-            block4=dict(conv1=0.8, conv2=0.8),
-            block5=dict(conv1=0.8, conv2=0.8),
-            block6=dict(conv1=0.8, conv2=0.8),
-            bilinear_info=0.01,  # dense
-        ),
+    encoder2=dict(
+        block1=dict(conv1=0.7, conv2=0.7, shortcut=0.01),
+        block2=dict(conv1=0.7, conv2=0.7),
+        block3=dict(conv1=0.7, conv2=0.7),
+        block4=dict(conv1=0.7, conv2=0.7),
+        bilinear_info=0.01,
     ),
+    encoder3=dict(
+        block1=dict(conv1=0.7, conv2=0.7, shortcut=0.01),  # dense
+        block2=dict(conv1=0.7, conv2=0.7),
+        block3=dict(conv1=0.7, conv2=0.7),
+        block4=dict(conv1=0.7, conv2=0.7),
+        block5=dict(conv1=0.7, conv2=0.7),
+        block6=dict(conv1=0.7, conv2=0.7),
+        bilinear_info=0.01,  # dense
+    ),
+),
+resnet_34_sparse_80_sparsity = dict(
+    conv1=0.01,  # dense
+    encoder1=dict(
+        block1=dict(conv1=0.8, conv2=0.8),
+        block2=dict(conv1=0.8, conv2=0.8),
+        block3=dict(conv1=0.8, conv2=0.8),
+        bilinear_info=0.1,  # dense weights
+    ),
+    encoder2=dict(
+        block1=dict(conv1=0.8, conv2=0.8, shortcut=0.01),
+        block2=dict(conv1=0.8, conv2=0.8),
+        block3=dict(conv1=0.8, conv2=0.8),
+        block4=dict(conv1=0.8, conv2=0.8),
+        bilinear_info=0.01,
+    ),
+    encoder3=dict(
+        block1=dict(conv1=0.8, conv2=0.8, shortcut=0.01),  # dense
+        block2=dict(conv1=0.8, conv2=0.8),
+        block3=dict(conv1=0.8, conv2=0.8),
+        block4=dict(conv1=0.8, conv2=0.8),
+        block5=dict(conv1=0.8, conv2=0.8),
+        block6=dict(conv1=0.8, conv2=0.8),
+        bilinear_info=0.01,  # dense
+    ),
+),
 
-
-
-# predefined configs
 full_resnet_50 = full_sparse_model_blockwise_config(resnet_50=True)
 full_resnet = full_sparse_model_blockwise_config(resnet_50=False)
 small_resnet = full_sparse_model_blockwise_config()[:8]
@@ -440,7 +437,7 @@ full_resnet_50_sparse_70 = full_sparse_model_blockwise_config(
             bilinear_info=0.01,
         ),
     ),
-    num_channels=[116, 116*2, 116*4]
+    num_channels=[116, 116 * 2, 116 * 4]
 )
 
 full_resnet_50_sparse_80 = full_sparse_model_blockwise_config(
@@ -470,7 +467,7 @@ full_resnet_50_sparse_80 = full_sparse_model_blockwise_config(
             bilinear_info=0.01,
         ),
     ),
-    num_channels=[143, 143*2, 143*4]
+    num_channels=[143, 143 * 2, 143 * 4]
 )
 
 full_resnet_50_greedy = full_sparse_model_blockwise_config(resnet_50=True,

@@ -19,12 +19,14 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+import io
+import pickle
 from copy import deepcopy
 
 import ray.tune as tune
 import torch
 
-from nupic.research.frameworks.greedy_infomax.mixins.data_parallel_block_model_experiment import (  # noqa E501
+from nupic.research.frameworks.greedy_infomax.experiments.data_parallel_block_model_experiment import (  # noqa E501
     DataParallelBlockModelExperiment,
 )
 from nupic.research.frameworks.greedy_infomax.models.block_model import BlockModel
@@ -35,8 +37,13 @@ from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
     all_module_losses,
     multiple_cross_entropy_supervised,
 )
-from nupic.research.frameworks.greedy_infomax.utils.model_utils import \
-    full_resnet_50, full_resnet_50_sparse_70, full_resnet_50_sparse_80
+from nupic.research.frameworks.greedy_infomax.utils.model_utils import (
+    full_resnet_50,
+    full_resnet_50_sparse_70,
+    full_resnet_50_sparse_80,
+)
+from nupic.research.frameworks.pytorch.model_utils import deserialize_state_dict
+from nupic.research.frameworks.vernon.network_utils import get_compatible_state_dict
 from projects.greedy_infomax.experiments.block_wise_training import (
     CONFIGS as BLOCK_WISE_CONFIGS,
 )
@@ -115,7 +122,7 @@ RESNET_50_ONE_CYCLE_LR_GRID_SEARCH.update(
     )
 )
 
-RESNET_50_SPARSE_70_ONE_CYCLE_LR_GRID_SEARCH= deepcopy(
+RESNET_50_SPARSE_70_ONE_CYCLE_LR_GRID_SEARCH = deepcopy(
     RESNET_50_ONE_CYCLE_LR_GRID_SEARCH)
 RESNET_50_SPARSE_70_ONE_CYCLE_LR_GRID_SEARCH.update(dict(
     wandb_args=dict(
@@ -137,7 +144,7 @@ RESNET_50_SPARSE_70_ONE_CYCLE_LR_GRID_SEARCH.update(dict(
     ),
 ))
 
-RESNET_50_SPARSE_80_ONE_CYCLE_LR_GRID_SEARCH= deepcopy(
+RESNET_50_SPARSE_80_ONE_CYCLE_LR_GRID_SEARCH = deepcopy(
     RESNET_50_ONE_CYCLE_LR_GRID_SEARCH)
 RESNET_50_SPARSE_80_ONE_CYCLE_LR_GRID_SEARCH.update(dict(
     wandb_args=dict(
@@ -163,14 +170,14 @@ NUM_EPOCHS = 100
 RESNET_50_ONE_CYCLE_LR_FULL = deepcopy(RESNET_50_ONE_CYCLE_LR_GRID_SEARCH)
 RESNET_50_ONE_CYCLE_LR_FULL.update(dict(
     wandb_args=dict(
-            project="greedy_infomax_full_resnet_onecycle",
-            name=f"onecycle_full",
+        project="greedy_infomax_full_resnet_onecycle",
+        name=f"onecycle_full",
     ),
     epochs=NUM_EPOCHS,
     epochs_to_validate=[50, 100, 150, 200, 290, 295, 299],
     supervised_training_epochs_per_validation=100,
     lr_scheduler_args=dict(
-        max_lr=0.0013, #found through grid search
+        max_lr=0.0013,  # found through grid search
         div_factor=100,  # initial_lr = 0.01
         final_div_factor=1000,  # min_lr = 0.0000025
         pct_start=3.0 / 10.0,
@@ -181,18 +188,18 @@ RESNET_50_ONE_CYCLE_LR_FULL.update(dict(
     ),
 ))
 
-NUM_EPOCHS=300
+NUM_EPOCHS = 300
 RESNET_50_DENSE_ONE_CYCLE_300 = deepcopy(RESNET_50_ONE_CYCLE_LR_FULL)
 RESNET_50_DENSE_ONE_CYCLE_300.update(dict(
     wandb_args=dict(
-            project="greedy_infomax_full_resnet_300",
-            name=f"dense",
+        project="greedy_infomax_full_resnet_300",
+        name=f"dense",
     ),
     epochs=NUM_EPOCHS,
     epochs_to_validate=[10, 25, 50, 100, 150, 200, 290, 295, 299],
     supervised_training_epochs_per_validation=50,
     lr_scheduler_args=dict(
-        max_lr=0.0013, #found through grid search
+        max_lr=0.0013,  # found through grid search
         div_factor=100,  # initial_lr = 0.01
         final_div_factor=1000,  # min_lr = 0.0000025
         pct_start=2.0 / 300.0,
@@ -203,14 +210,7 @@ RESNET_50_DENSE_ONE_CYCLE_300.update(dict(
     ),
 ))
 
-import pickle
-import io
-from nupic.research.frameworks.pytorch.model_utils import (
-    deserialize_state_dict,
-)
-from nupic.research.frameworks.vernon.network_utils import (
-    get_compatible_state_dict,
-)
+
 class LoadBlockModelExperiment(DataParallelBlockModelExperiment):
     def setup_experiment(self, config):
         super(LoadBlockModelExperiment, self).setup_experiment(config)
@@ -228,18 +228,19 @@ class LoadBlockModelExperiment(DataParallelBlockModelExperiment):
                 state_dict = get_compatible_state_dict(state_dict, model)
                 model.load_state_dict(state_dict)
 
+
 RESNET_50_DENSE_TWO_CYCLE_300 = deepcopy(RESNET_50_DENSE_ONE_CYCLE_300)
 RESNET_50_DENSE_TWO_CYCLE_300.update(dict(
     experiment_class=DataParallelBlockModelExperiment,
     wandb_args=dict(
-            project="greedy_infomax_full_resnet_300",
-            name=f"dense_two_cycle",
+        project="greedy_infomax_full_resnet_300",
+        name=f"dense_two_cycle",
     ),
     epochs=30,
     epochs_to_validate=[0, 5, 10, 15, 20, 25, 29],
     checkpoint_file="/home/ec2-user/nta/results/greedy_infomax/experiments"
-               "/resnet_50_dense_one_cycle_300/RemoteProcessTrainable_0_2021-10-28_18"
-               "-07-034z8mwnuw/checkpoint_300/checkpoint",
+                    "/resnet_50_dense_one_cycle_300/RemoteProcessTrainable_0_2021-10"
+                    "-28_18-07-034z8mwnuw/checkpoint_300/checkpoint",
     lr_scheduler_args=dict(
         max_lr=0.0001,
         div_factor=10,
@@ -255,12 +256,12 @@ RESNET_50_DENSE_TWO_CYCLE_300.update(dict(
 RESNET_50_SPARSE_70_ONE_CYCLE_300 = deepcopy(RESNET_50_DENSE_ONE_CYCLE_300)
 RESNET_50_SPARSE_70_ONE_CYCLE_300.update(dict(
     wandb_args=dict(
-            project="greedy_infomax_full_resnet_300",
-            name=f"sparse_70",
+        project="greedy_infomax_full_resnet_300",
+        name=f"sparse_70",
     ),
     model_args=block_wise_full_resnet_50_sparse_70_args,
     lr_scheduler_args=dict(
-        max_lr=0.001, #found through grid search
+        max_lr=0.001,  # found through grid search
         div_factor=100,  # initial_lr = 0.01
         final_div_factor=1000,  # min_lr = 0.0000025
         pct_start=2.0 / 300.0,
@@ -275,8 +276,8 @@ RESNET_50_SPARSE_70_TWO_CYCLE_300 = deepcopy(RESNET_50_SPARSE_70_ONE_CYCLE_300)
 RESNET_50_SPARSE_70_TWO_CYCLE_300.update(dict(
     experiment_class=LoadBlockModelExperiment,
     wandb_args=dict(
-            project="greedy_infomax_full_resnet_300",
-            name=f"sparse_70_two_cycle",
+        project="greedy_infomax_full_resnet_300",
+        name=f"sparse_70_two_cycle",
     ),
     epochs=30,
     epochs_to_validate=[0, 5, 10, 15, 20, 25, 29],
@@ -292,19 +293,19 @@ RESNET_50_SPARSE_70_TWO_CYCLE_300.update(dict(
         anneal_strategy="linear",
         max_momentum=1e-4,
         cycle_momentum=False,
-    ),
     ))
+)
 
 
 RESNET_50_SPARSE_70_ONE_CYCLE_100 = deepcopy(RESNET_50_SPARSE_70_ONE_CYCLE_300)
 RESNET_50_SPARSE_70_ONE_CYCLE_100.update(dict(
     wandb_args=dict(
-            project="greedy_infomax_full_resnet_100",
-            name=f"sparse_70",
+        project="greedy_infomax_full_resnet_100",
+        name=f"sparse_70",
     ),
     epochs=100,
     lr_scheduler_args=dict(
-        max_lr=0.001, #found through grid search
+        max_lr=0.001,  # found through grid search
         div_factor=100,  # initial_lr = 0.01
         final_div_factor=1000,  # min_lr = 0.0000025
         pct_start=3.0 / 100.0,
@@ -315,21 +316,18 @@ RESNET_50_SPARSE_70_ONE_CYCLE_100.update(dict(
     ),
 ))
 
-
-
-
-RESNET_50_SPARSE_80_ONE_CYCLE_300= deepcopy(RESNET_50_SPARSE_70_ONE_CYCLE_300)
+RESNET_50_SPARSE_80_ONE_CYCLE_300 = deepcopy(RESNET_50_SPARSE_70_ONE_CYCLE_300)
 RESNET_50_SPARSE_80_ONE_CYCLE_300.update(dict(
     wandb_args=dict(
-            project="greedy_infomax_full_resnet_300",
-            name=f"sparse_80",
+        project="greedy_infomax_full_resnet_300",
+        name=f"sparse_80",
     ),
     model_args=block_wise_full_resnet_50_sparse_80_args,
     epochs=NUM_EPOCHS,
     epochs_to_validate=[100, 200, 290, 295, 299],
     supervised_training_epochs_per_validation=100,
     lr_scheduler_args=dict(
-        max_lr=0.0013, #found through grid search
+        max_lr=0.0013,  # found through grid search
         div_factor=100,  # initial_lr = 0.01
         final_div_factor=1000,  # min_lr = 0.0000025
         pct_start=2.0 / 300.0,
@@ -337,16 +335,13 @@ RESNET_50_SPARSE_80_ONE_CYCLE_300.update(dict(
         anneal_strategy="linear",
         max_momentum=1e-4,
         cycle_momentum=False,
-    ),
     ))
-
-
-
+)
 
 CONFIGS = dict(
     resnet_50_one_cycle_lr_grid_search=RESNET_50_ONE_CYCLE_LR_GRID_SEARCH,
-    resnet_50_sparse_70_one_cycle_lr_grid_search=RESNET_50_SPARSE_70_ONE_CYCLE_LR_GRID_SEARCH,
-    resnet_50_sparse_80_one_cycle_lr_grid_search=RESNET_50_SPARSE_80_ONE_CYCLE_LR_GRID_SEARCH,
+    resnet_50_sparse_70_one_cycle_lr_grid_search=RESNET_50_SPARSE_70_ONE_CYCLE_LR_GRID_SEARCH,  # noqa: E501
+    resnet_50_sparse_80_one_cycle_lr_grid_search=RESNET_50_SPARSE_80_ONE_CYCLE_LR_GRID_SEARCH,  # noqa: E501
     resnet_50_one_cycle_lr_full=RESNET_50_ONE_CYCLE_LR_FULL,
     resnet_50_dense_one_cycle_300=RESNET_50_DENSE_ONE_CYCLE_300,
     resnet_50_dense_two_cycle_300=RESNET_50_DENSE_TWO_CYCLE_300,

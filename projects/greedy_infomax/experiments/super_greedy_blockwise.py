@@ -24,7 +24,7 @@ from copy import deepcopy
 import ray.tune as tune
 import torch
 
-from nupic.research.frameworks.greedy_infomax.mixins.block_model_experiment import (
+from nupic.research.frameworks.greedy_infomax.experiments.block_model_experiment import (  # noqa: E501
     BlockModelExperiment,
 )
 from nupic.research.frameworks.greedy_infomax.models.block_model import BlockModel
@@ -37,9 +37,9 @@ from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
 )
 from nupic.research.frameworks.greedy_infomax.utils.model_utils import (
     full_resnet,
-    full_sparse_resnet,
+    full_resnet_50_sparse_70,
     small_resnet,
-    small_sparse_resnet,
+    small_sparse_70_resnet,
 )
 
 from .block_wise_training import CONFIGS as BLOCKWISE_CONFIGS
@@ -51,9 +51,9 @@ BATCH_SIZE = 32
 NUM_EPOCHS = 10
 
 block_wise_small_resnet_args = {"module_args": small_resnet}
-block_wise_small_sparse_resnet_args = {"module_args": small_sparse_resnet}
+block_wise_small_sparse_resnet_args = {"module_args": small_sparse_70_resnet}
 block_wise_full_resnet_args = {"module_args": full_resnet}
-block_wise_full_sparse_resnet_args = {"module_args": full_sparse_resnet}
+block_wise_full_sparse_resnet_args = {"module_args": full_resnet_50_sparse_70}
 
 DENSE_BLOCKWISE = deepcopy(SMALL_BLOCK)
 DENSE_BLOCKWISE.update(

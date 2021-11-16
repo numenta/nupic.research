@@ -24,10 +24,9 @@
 # https://arxiv.org/abs/1905.11786
 # ----------------------------------------------------------------------
 
-import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from .gim_block import GreedyInfoMaxBlock, InfoEstimateAggregator, EncodingAggregator
+
+from .gim_block import EncodingAggregator, GreedyInfoMaxBlock, InfoEstimateAggregator
 from .utility_layers import PatchifyInputs
 
 
@@ -81,7 +80,6 @@ class GreedyInfoMaxModel(nn.Sequential):
                                negative_samples,
                                n_patches_x, n_patches_y)
 
-
     def forward(self, x):
         """
         Forward pass for unsupervised training. Attaches the GIM blocks to the model
@@ -117,11 +115,11 @@ class GreedyInfoMaxModel(nn.Sequential):
         """
         self.gim_blocks = {}
         for module, in_channels in modules_and_output_sizes.items():
-            self.gim_blocks[module] = GreedyInfoMaxBlock(in_channels,
-                                                         estimate_info_aggregator=self.info_estimate_aggregator,
-                                                         encoding_aggregator=self.encoding_aggregator,
-                                                         k_predictions=k_predictions,
-                                                         negative_samples=negative_samples,
-                                                         n_patches_x=n_patches_x,
-                                                         n_patches_y=n_patches_y)
-
+            self.gim_blocks[module] = GreedyInfoMaxBlock(
+                in_channels,
+                estimate_info_aggregator=self.info_estimate_aggregator,
+                encoding_aggregator=self.encoding_aggregator,
+                k_predictions=k_predictions,
+                negative_samples=negative_samples,
+                n_patches_x=n_patches_x,
+                n_patches_y=n_patches_y)

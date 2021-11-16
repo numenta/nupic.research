@@ -29,9 +29,9 @@ import torch.nn.functional as F
 
 from nupic.research.frameworks.backprop_structure.modules import VDropConv2d
 from nupic.research.frameworks.greedy_infomax.models.bilinear_info import (
-    _BilinearInfo,
     SparseBilinearInfo,
     VDropSparseBilinearInfo,
+    _BilinearInfo,
 )
 from nupic.torch.modules import KWinners2d, SparseWeights2d
 

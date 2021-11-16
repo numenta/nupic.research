@@ -31,7 +31,10 @@ from nupic.research.frameworks.greedy_infomax.utils.train_utils import (
     evaluate_gim_model,
     train_gim_model,
 )
-from nupic.research.frameworks.vernon import SelfSupervisedExperiment, mixins
+from nupic.research.frameworks.self_supervised_learning.experiments import (
+    SelfSupervisedExperiment,
+)
+from nupic.research.frameworks.vernon import mixins
 from nupic.research.frameworks.vernon.network_utils import create_model
 
 
@@ -42,6 +45,55 @@ class BlockModelExperiment(
     mixins.RezeroWeights,
     SelfSupervisedExperiment,
 ):
+    """
+    The BlockModel experiment class is used in the GreedyInfoMax context. It only
+    supports the use of the BlockModel which is essentially a more sophisticated
+    version of nn.Sequential. Modules are specified in the config and can be
+    loaded independently, but this only supports models which follow a strictly
+    sequential computation graph. It was for this reason that the BlockModel and the
+    BlockModelExperiment have been deprecated in favor of the more general
+    GreedyInfoMax experiment.
+
+    Because logging is generally always included in Greedy InfoMax experiments,
+    this experiment class inherits from standard logging mixins and extends their
+    functionality to log the losses and accuracies of multiple modules.
+
+    The BlockModel is entirely defined in the config, as opposed to a standard model
+    whose structure is designed in a single class. This gives the BlockModel a
+    certain amount of flexibility as modules are saved and loaded independently. An
+    example config might look like:
+
+    ```
+    config = dict(
+        model_class="BlockModel",
+        model_args=dict(
+            module_args=[
+                dict(
+                    module_class="nn.Linear",
+                    module_args=dict(
+                        in_features=784,
+                        out_features=128,
+                    ),
+                ),
+                dict(
+                    module_class="nn.ReLU",
+                ),
+                dict(
+                    module_class="BilinearInfo",
+                    module_args=dict( *BilinearInfoArgs*)
+                ),
+            ]
+        ),
+
+    This BlockModel would have the following structure:
+    nn.Linear(784, 128)
+    nn.ReLU()
+    BilinearInfo()
+
+    This can get to be very complicated for things like large ResNets, so the default
+    set of ResNets with various sparsity levels have been pre-defined in
+    greedy_infomax/utils/model_utils.py.
+    """
     def setup_experiment(self, config):
         if config.get("cuda_launch_blocking", False):
             os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
@@ -60,6 +112,13 @@ class BlockModelExperiment(
 
     @classmethod
     def create_model(cls, config, device):
+        """
+        Creates the BlockModel. The config should specify the model class as
+        BlockModel, and then the model_args should contain a "module_args" parameter
+        which contains a list of dictionaries that specify submodules. A simple
+        example might look like this:
+
+        """
         if config["model_class"] != BlockModel:
             return super().create_model(config, device)
         model_args = config.get("model_args", {})

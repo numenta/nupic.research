@@ -50,7 +50,6 @@ class BlockModel(nn.Module):
         super(BlockModel, self).__init__()
         self.module_list = nn.ModuleList(modules)
 
-
     def forward(self, x):
         """
         The forward method only emits BilinearInfo estimations.
@@ -75,7 +74,6 @@ class BlockModel(nn.Module):
             else:
                 x = module(x)
         return log_f_module_list
-
 
     def encode(self, x):
         """

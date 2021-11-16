@@ -54,6 +54,7 @@ class EmitEncoding(nn.Identity):
         out = out.permute(0, 3, 1, 2).contiguous()
         return out
 
+
 class _PatchifyInputs(nn.Module):
     """
     This module is deprecated in favor of the newer PatchifyInputs module. The
@@ -71,6 +72,7 @@ class _PatchifyInputs(nn.Module):
             x, self.patch_size, self.overlap
         )
         return x, n_patches_x, n_patches_y
+
 
 class PatchifyInputs(nn.Module):
     """

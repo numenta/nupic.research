@@ -24,11 +24,12 @@
 # https://arxiv.org/abs/1905.11786
 # ----------------------------------------------------------------------
 
-import torch
 import torch.nn as nn
-from .bilinear_info import SparseBilinearInfo, BilinearInfo
-from .utility_layers import SparseWeights2d, EmitEncoding, GradientBlock
 import torch.nn.functional as F
+
+from .bilinear_info import BilinearInfo, SparseBilinearInfo
+from .utility_layers import EmitEncoding, GradientBlock
+
 
 class InfoEstimateAggregator(nn.Identity):
     """
@@ -50,6 +51,7 @@ class InfoEstimateAggregator(nn.Identity):
     def clear_outputs(self):
         self.info_estimates = []
 
+
 class EncodingAggregator(nn.Identity):
     """
     Gathers all of the outputs of the EmitEncoding layers in the model into a single
@@ -69,6 +71,7 @@ class EncodingAggregator(nn.Identity):
 
     def clear_outputs(self):
         self.encodings = []
+
 
 class GreedyInfoMaxBlock(nn.Module):
     def __init__(self,
@@ -106,7 +109,6 @@ class GreedyInfoMaxBlock(nn.Module):
         self.gradient_block = GradientBlock()
         self.n_patches_x, self.n_patches_y = n_patches_x, n_patches_y
 
-
     def forward(self, x):
         out = F.adaptive_avg_pool2d(x, 1)
         out = out.reshape(-1, self.n_patches_x, self.n_patches_y, out.shape[1])
@@ -117,12 +119,11 @@ class GreedyInfoMaxBlock(nn.Module):
         return x_blocked
 
     """
-    During unsupervised training, this function will be linked to the forward hook 
+    During unsupervised training, this function will be linked to the forward hook
     for its corresponding module.
     """
-    def wrapped_forward(self, module, input, output):
+    def wrapped_forward(self, module, input, output):  # noqa: A002
         return self.forward(output)
-
 
     def encode(self, x):
         encoded = self.emit_encoding.encode(x, self.n_patches_x, self.n_patches_y)
@@ -132,8 +133,9 @@ class GreedyInfoMaxBlock(nn.Module):
     During supervised training, this function will be linked to the forward hook for
     its corresponding module.
     """
-    def wrapped_encode(self, module, input, output):
+    def wrapped_encode(self, module, input, output):  # noqa: A002
         return self.encode(output)
+
 
 class SparseGreedyInfoMaxBlock(GreedyInfoMaxBlock):
     """

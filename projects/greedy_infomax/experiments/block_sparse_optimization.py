@@ -25,7 +25,7 @@ from copy import deepcopy
 import ray.tune as tune
 import torch
 
-from nupic.research.frameworks.greedy_infomax.mixins.data_parallel_block_model_experiment import DataParallelBlockModelExperiment # noqa E501
+from nupic.research.frameworks.greedy_infomax.experiments.data_parallel_block_model_experiment import DataParallelBlockModelExperiment # noqa E501
 from nupic.research.frameworks.greedy_infomax.models.block_model import BlockModel
 from nupic.research.frameworks.greedy_infomax.models.classification_model import (
     MultiClassifier,

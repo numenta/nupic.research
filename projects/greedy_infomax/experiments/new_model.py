@@ -21,20 +21,19 @@
 
 from copy import deepcopy
 
-import ray.tune as tune
 import torch
 
-from nupic.research.frameworks.greedy_infomax.mixins.greedy_infomax_experiment import\
-    GreedyInfoMaxExperiment
-from nupic.research.frameworks.greedy_infomax.models.block_model import BlockModel
-from nupic.research.frameworks.greedy_infomax.models.classification_model import (
-    MultiClassifier
+from nupic.research.frameworks.greedy_infomax.experiments.greedy_infomax_experiment import (  # noqa: E501
+    GreedyInfoMaxExperiment,
 )
+from nupic.research.frameworks.greedy_infomax.models.classification_model import (
+    MultiClassifier,
+)
+from nupic.research.frameworks.greedy_infomax.models.resnets import ResNet7
 from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
     all_module_losses,
     multiple_cross_entropy_supervised,
 )
-from nupic.research.frameworks.greedy_infomax.models.resnets import ResNet7
 from projects.greedy_infomax.experiments.default_base import CONFIGS
 
 # model args for resnets
@@ -42,16 +41,11 @@ resnet_7_model_args = dict(
     channels=64,
 )
 
-
-DEFAULT_BASE= CONFIGS["default_base"]
+DEFAULT_BASE = CONFIGS["default_base"]
 
 # 10 epochs optimization
 NUM_EPOCHS = 10
 NUM_GPUS = 1
-
-import torch.nn as nn
-import torch.nn.functional as F
-
 
 RESNET_7_TESTING = deepcopy(DEFAULT_BASE)
 RESNET_7_TESTING.update(
@@ -118,8 +112,6 @@ RESNET_7_TESTING.update(
         ),
     )
 )
-
-
 
 CONFIGS = dict(
     resnet_7_testing=RESNET_7_TESTING,
