@@ -27,6 +27,7 @@ from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader
 
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
+from nupic.research.frameworks.pytorch.model_utils import train_model
 from nupic.research.frameworks.self_supervised_learning.utils import EncoderClassifier
 from nupic.research.frameworks.vernon.experiments.supervised_experiment import (
     SupervisedExperiment,
@@ -116,6 +117,8 @@ class SelfSupervisedExperiment(SupervisedExperiment):
                                                          validation loop
             - reuse_unsupervised_dataset: if True, will reuse the unsupervised
                                           dataset during supervised training
+            - train_model_supervised_func: function to train the EncoderClassifier
+            for supervised training. Defaults to the standard train_model function.
         """
 
         super().setup_experiment(config)
@@ -133,7 +136,8 @@ class SelfSupervisedExperiment(SupervisedExperiment):
         self.classifier_optimizer = self.create_optimizer(
             classifier_config, self.classifier
         )
-
+        self.train_model_supervised = config.get("train_model_supervised_func",
+                                                 train_model)
         self._loss_function_unsupervised = self._loss_function = config.get(
             "loss_function_unsupervised", config.get("loss_function", F.mse_loss)
         )
