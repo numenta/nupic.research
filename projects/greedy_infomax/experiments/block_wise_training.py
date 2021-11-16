@@ -24,7 +24,7 @@ from copy import deepcopy
 import ray.tune as tune
 import torch
 
-from nupic.research.frameworks.greedy_infomax.experiments.block_model_experiment import BlockModelExperiment  # noqa: E501, I001
+from nupic.research.frameworks.greedy_infomax.experiments.block_model_experiment import BlockModelExperiment  # noqa: E501, I001,
 from nupic.research.frameworks.greedy_infomax.experiments.data_parallel_block_model_experiment import DataParallelBlockModelExperiment  # noqa: E501, I001
 from nupic.research.frameworks.greedy_infomax.models.block_model import BlockModel
 from nupic.research.frameworks.greedy_infomax.models.classification_model import (
@@ -43,9 +43,8 @@ from nupic.research.frameworks.greedy_infomax.utils.model_utils import (
     small_resnet,
     small_sparse_70_resnet,
 )
-from projects.greedy_infomax.experiments.default_base import (
-    CONFIGS as DEFAULT_BASE_CONFIGS,
-)
+
+from .default_base import CONFIGS as DEFAULT_BASE_CONFIGS
 
 DEFAULT_BASE = DEFAULT_BASE_CONFIGS["default_base"]
 

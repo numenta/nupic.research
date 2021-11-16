@@ -25,7 +25,7 @@ from copy import deepcopy
 import ray.tune as tune
 import torch
 
-from nupic.research.frameworks.greedy_infomax.experiments.data_parallel_block_model_experiment import DataParallelBlockModelExperiment # noqa E501
+from nupic.research.frameworks.greedy_infomax.experiments.data_parallel_block_model_experiment import DataParallelBlockModelExperiment  # noqa E501
 from nupic.research.frameworks.greedy_infomax.models.block_model import BlockModel
 from nupic.research.frameworks.greedy_infomax.models.classification_model import (
     MultiClassifier,
@@ -39,9 +39,8 @@ from nupic.research.frameworks.greedy_infomax.utils.model_utils import (
     small_sparse_70_resnet,
     small_sparse_80_resnet,
 )
-from projects.greedy_infomax.experiments.block_wise_training import (
-    CONFIGS as BLOCK_WISE_CONFIGS,
-)
+
+from .block_wise_training import CONFIGS as BLOCK_WISE_CONFIGS
 
 FULL_RESNET_50 = BLOCK_WISE_CONFIGS["full_resnet_50"]
 

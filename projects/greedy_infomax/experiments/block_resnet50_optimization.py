@@ -44,9 +44,8 @@ from nupic.research.frameworks.greedy_infomax.utils.model_utils import (
 )
 from nupic.research.frameworks.pytorch.model_utils import deserialize_state_dict
 from nupic.research.frameworks.vernon.network_utils import get_compatible_state_dict
-from projects.greedy_infomax.experiments.block_wise_training import (
-    CONFIGS as BLOCK_WISE_CONFIGS,
-)
+
+from .block_wise_training import CONFIGS as BLOCK_WISE_CONFIGS
 
 FULL_RESNET_50 = BLOCK_WISE_CONFIGS["full_resnet_50"]
 

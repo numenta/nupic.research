@@ -34,7 +34,8 @@ from nupic.research.frameworks.greedy_infomax.utils.loss_utils import (
     all_module_losses,
     multiple_cross_entropy_supervised,
 )
-from projects.greedy_infomax.experiments.default_base import CONFIGS
+
+from .default_base import CONFIGS
 
 # model args for resnets
 resnet_7_model_args = dict(
