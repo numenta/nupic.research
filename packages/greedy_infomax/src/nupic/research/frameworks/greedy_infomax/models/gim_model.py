@@ -44,8 +44,9 @@ class GreedyInfoMaxModel(nn.Sequential):
     ----------
     model: nn.Module
         The model to wrap
-    named_modules: a list of (str, nn.Module) tuples
-        The modules to which forward hooks to GIM blocks should be added
+    modules_and_output_sizes: a list of (nn.Module, int) tuples
+        The modules and their output sizes for which forward hooks to GIM blocks
+        should be added
     k_predictions: int
         The number of prediction steps
     negative_samples: int
