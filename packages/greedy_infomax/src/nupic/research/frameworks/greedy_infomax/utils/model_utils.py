@@ -24,269 +24,453 @@
 # https://arxiv.org/abs/1905.11786
 # ----------------------------------------------------------------------
 
-import sys
-import time
+import torch.nn as nn
 
-import torch
-import torch.nn.functional as F
-
-
-def gen_orthgonal(dim):
-    a = torch.zeros((dim, dim)).normal_(0, 1)
-    q, r = torch.qr(a)
-    d = torch.diag(r, 0).sign()
-    diag_size = d.size(0)
-    d_exp = d.view(1, diag_size).expand(diag_size, diag_size)
-    q.mul_(d_exp)
-    return q
-
-
-def make_delta_orthogonal(weights, gain):
-    rows = weights.size(0)
-    cols = weights.size(1)
-    if rows > cols:
-        print("In_filters should not be greater than out_filters.")
-    weights.data.fill_(0)
-    dim = max(rows, cols)
-    q = gen_orthgonal(dim)
-    mid1 = weights.size(2) // 2
-    mid2 = weights.size(3) // 2
-    with torch.no_grad():
-        weights[:, :, mid1, mid2] = q[: weights.size(0), : weights.size(1)]
-        weights.mul_(gain)
+from nupic.research.frameworks.greedy_infomax.models.bilinear_info import (
+    SparseBilinearInfo,
+)
+from nupic.research.frameworks.greedy_infomax.models.resnet_encoder import (
+    SparsePreActBlockNoBN,
+    SparsePreActBottleneckNoBN,
+)
+from nupic.research.frameworks.greedy_infomax.models.utility_layers import (
+    EmitEncoding,
+    GradientBlock,
+    SparseConv2d,
+    _PatchifyInputs,
+)
+from nupic.torch.modules import SparseWeights2d
 
 
-def patchify_inputs(x, patch_size, overlap):
-    x = (
-        x.unfold(2, patch_size, patch_size // overlap)
-        .unfold(3, patch_size, patch_size // overlap)
-        .permute(0, 2, 3, 1, 4, 5)  # b, p_x, p_y, c, x, y
-    )
-    n_patches_x = x.shape[1]
-    n_patches_y = x.shape[2]
-    x = x.reshape(
-        x.shape[0] * x.shape[1] * x.shape[2], x.shape[3], x.shape[4], x.shape[5]
-    )
-    return x, n_patches_x, n_patches_y
-
-
-def train_gim_model(
-    model,
-    loader,
-    optimizer,
-    device,
-    criterion=F.nll_loss,
-    complexity_loss_fn=None,
-    batches_in_epoch=sys.maxsize,
-    active_classes=None,
-    pre_batch_callback=None,
-    post_batch_callback=None,
-    transform_to_device_fn=None,
-    progress_bar=None,
-):
-    """Train the given model by iterating through mini batches. An epoch ends
-    after one pass through the training set, or if the number of mini batches
-    exceeds the parameter "batches_in_epoch".
-
-    :param model: pytorch model to be trained
-    :type model: torch.nn.Module
-    :param loader: train dataset loader
-    :type loader: :class:`torch.utils.data.DataLoader`
-    :param optimizer: Optimizer object used to train the model.
-           This function will train the model on every batch using this optimizer
-           and the :func:`torch.nn.functional.nll_loss` function
-    :param device: device to use ('cpu' or 'cuda')
-    :type device: :class:`torch.device
-    :param criterion: loss function to use
-    :type criterion: function
-    :param complexity_loss_fn: a regularization term for the loss function
-    :type complexity_loss_fn: function
-    :param batches_in_epoch: Max number of mini batches to test on
-    :type batches_in_epoch: int
-    :param active_classes: a list of indices of the heads that are active for a given
-                           task; only relevant if this function is being used in a
-                           continual learning scenario
-    :param pre_batch_callback: Callback function to be called before every batch
-                               with the following parameters: model, batch_idx
-    :type pre_batch_callback: function
-    :param post_batch_callback: Callback function to be called after every batch
-                                with the following parameters: model, batch_idx
-    :type post_batch_callback: function
-    :param transform_to_device_fn: Function for sending data and labels to the
-                                   device. This provides an extensibility point
-                                   for performing any final transformations on
-                                   the data or targets, and determining what
-                                   actually needs to get sent to the device.
-    :type transform_to_device_fn: function
-    :param progress_bar: Unused
-    :param active_classes: Unused
-    :return: mean loss for epoch
-    :rtype: float
-    """
-    model.train()
-    # Use asynchronous GPU copies when the memory is pinned
-    # See https://pytorch.org/docs/master/notes/cuda.html
-    async_gpu = loader.pin_memory
-    t0 = time.time()
-    for batch_idx, (data, target) in enumerate(loader):
-        if batch_idx >= batches_in_epoch:
-            break
-
-        num_images = len(target)
-        if transform_to_device_fn is None:
-            data = data.to(device, non_blocking=async_gpu)
-            target = target.to(device, non_blocking=async_gpu)
-        else:
-            data, target = transform_to_device_fn(
-                data, target, device, non_blocking=async_gpu
-            )
-        t1 = time.time()
-
-        if pre_batch_callback is not None:
-            pre_batch_callback(model=model, batch_idx=batch_idx)
-
-        optimizer.zero_grad()
-        # Output will be a list of list of tensors:
-        # output[x][k] = bilinear_module_x, prediction_step_k: tensor
-        output = model(data)
-
-        # Module specific losses will be a tensor of dimension num modules
-        # module_specific_losses[x] = loss from bilinear_module_x
-        module_specific_losses = criterion(output, target)
-        error_loss = module_specific_losses.sum()
-
-        del data, target, output
-
-        t2 = time.time()
-        error_loss.backward()
-        t3 = time.time()
-
-        # Compute and backpropagate the complexity loss. This happens after
-        # error loss has backpropagated, freeing its computation graph, so the
-        # two loss functions don't compete for memory.
-        complexity_loss = (
-            complexity_loss_fn(model) if complexity_loss_fn is not None else None
-        )
-        if complexity_loss is not None:
-            complexity_loss.backward()
-
-        t4 = time.time()
-        optimizer.step()
-        t5 = time.time()
-
-        if post_batch_callback is not None:
-            time_string = (
-                "Data: {:.3f}s, forward: {:.3f}s, backward: {:.3f}s,"
-                "complexity loss forward/backward: {:.3f}s," + "weight update: {:.3f}s"
-            ).format(t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4)
-            post_batch_callback(
-                model=model,
-                error_loss=error_loss.detach(),
-                complexity_loss=(
-                    complexity_loss.detach() if complexity_loss is not None else None
+def _make_layer_config(
+        block,
+        num_blocks,
+        planes,
+        in_planes,
+        stride=1,
+        sparse_weights_class=SparseWeights2d,
+        sparsity=None,
+        percent_on=None,
+        greedy=False,
+        negative_samples=16,
+        k_predictions=5,):
+    layer_config = []
+    strides = [stride] + [1] * (num_blocks - 1)
+    if sparsity is None:
+        sparsity = {}
+    if percent_on is None:
+        percent_on = {}
+    for i, stride in enumerate(strides):
+        layer_config.append(
+            dict(
+                model_class=block,
+                model_args=dict(
+                    in_planes=in_planes,
+                    planes=planes,
+                    stride=stride,
+                    sparse_weights_class=sparse_weights_class,
+                    sparsity=sparsity.get(f"block{i + 1}", None),
+                    percent_on=percent_on.get(f"block{i + 1}", None),
                 ),
-                batch_idx=batch_idx,
-                num_images=num_images,
-                time_string=time_string,
+                init_batch_norm=False,
+                checkpoint_file=None,
+                load_checkpoint_args=None,
+                train=True,
+                save_checkpoint_file=None,
             )
-        del error_loss, complexity_loss, module_specific_losses
-        t0 = time.time()
-
-
-def evaluate_gim_model(
-    model,
-    loader,
-    device,
-    batches_in_epoch=sys.maxsize,
-    criterion=F.nll_loss,
-    complexity_loss_fn=None,
-    active_classes=None,
-    progress=None,
-    post_batch_callback=None,
-    transform_to_device_fn=None,
-):
-    """Evaluate pre-trained model using given test dataset loader.
-
-    :param model: Pretrained pytorch model
-    :type model: torch.nn.Module
-    :param loader: test dataset loader
-    :type loader: :class:`torch.utils.data.DataLoader`
-    :param device: device to use ('cpu' or 'cuda')
-    :type device: :class:`torch.device`
-    :param batches_in_epoch: Max number of mini batches to test on
-    :type batches_in_epoch: int
-    :param criterion: loss function to use
-    :type criterion: function
-    :param complexity_loss_fn: a regularization term for the loss function
-    :type complexity_loss_fn: function
-    :param active_classes: a list of indices of the heads that are active for a given
-                           task; only relevant if this function is being used in a
-                           continual learning scenario
-    :type active_classes: list of int or None
-    :param post_batch_callback: Callback function to be called after every batch
-                                with the following parameters:
-                                batch_idx, target, output, pred
-    :type post_batch_callback: function
-    :param transform_to_device_fn: Function for sending data and labels to the
-                                   device. This provides an extensibility point
-                                   for performing any final transformations on
-                                   the data or targets, and determining what
-                                   actually needs to get sent to the device.
-    :type transform_to_device_fn: function
-    :param progress: Unused
-
-
-    :return: dictionary with computed "mean_accuracy", "mean_loss", "total_correct".
-    :rtype: dict
-    """
-    model.eval()
-    total = 0
-
-    # Perform accumulation on device, avoid paying performance cost of .item()
-    loss = torch.tensor(0.0, device=device)
-    correct = torch.tensor(0, device=device)
-
-    async_gpu = loader.pin_memory
-    with torch.no_grad():
-        for batch_idx, (data, target) in enumerate(loader):
-            if batch_idx >= batches_in_epoch:
-                break
-
-            if transform_to_device_fn is None:
-                data = data.to(device, non_blocking=async_gpu)
-                target = target.to(device, non_blocking=async_gpu)
-            else:
-                data, target = transform_to_device_fn(
-                    data, target, device, non_blocking=async_gpu
-                )
-
-            output = model(data)
-            if active_classes is not None:
-                output = output[:, active_classes]
-            loss += criterion(output, target, reduction="sum")
-            pred = output.max(1, keepdim=True)[1]
-            correct += pred.eq(target.view_as(pred)).sum()
-            total += len(data)
-
-            if post_batch_callback is not None:
-                post_batch_callback(
-                    batch_idx=batch_idx, target=target, output=output, pred=pred
-                )
-
-        complexity_loss = (
-            complexity_loss_fn(model) if complexity_loss_fn is not None else None
         )
-    correct = correct.item()
-    loss = loss.item()
+        if greedy:
+            layer_config.append(
+                dict(
+                    model_class=SparseBilinearInfo,
+                    model_args=dict(
+                        in_channels=planes * block.expansion,
+                        out_channels=planes * block.expansion,
+                        negative_samples=negative_samples,
+                        k_predictions=k_predictions,
+                        sparse_weights_class=sparse_weights_class,
+                        sparsity=0.1,
+                    ),
+                    init_batch_norm=False,
+                    checkpoint_file=None,
+                    load_checkpoint_args=None,
+                    train=True,
+                    save_checkpoint_file=None,
+                )
+            )
+            layer_config.append(
+                dict(
+                    model_class=EmitEncoding,
+                    model_args=dict(channels=planes * block.expansion),
+                    init_batch_norm=False,
+                    checkpoint_file=None,
+                    load_checkpoint_args=None,
+                    train=False,
+                    save_checkpoint_file=None,
+                )
+            )
+            layer_config.append(
+                dict(
+                    model_class=GradientBlock,
+                    model_args=dict(),
+                    init_batch_norm=False,
+                    checkpoint_file=None,
+                    load_checkpoint_args=None,
+                    train=False,
+                    save_checkpoint_file=None,
+                )
+            )
+        in_planes = planes * block.expansion
+    if not greedy:
+        layer_config.append(
+            dict(
+                model_class=SparseBilinearInfo,
+                model_args=dict(
+                    in_channels=planes * block.expansion,
+                    out_channels=planes * block.expansion,
+                    negative_samples=negative_samples,
+                    k_predictions=k_predictions,
+                    sparse_weights_class=sparse_weights_class,
+                    sparsity=0.1,
+                ),
+                init_batch_norm=False,
+                checkpoint_file=None,
+                load_checkpoint_args=None,
+                train=True,
+                save_checkpoint_file=None,
+            )
+        )
+        layer_config.append(
+            dict(
+                model_class=EmitEncoding,
+                model_args=dict(channels=planes * block.expansion),
+                init_batch_norm=False,
+                checkpoint_file=None,
+                load_checkpoint_args=None,
+                train=False,
+                save_checkpoint_file=None,
+            )
+        )
+        layer_config.append(
+            dict(
+                model_class=GradientBlock,
+                model_args=dict(),
+                init_batch_norm=False,
+                checkpoint_file=None,
+                load_checkpoint_args=None,
+                train=False,
+                save_checkpoint_file=None,
+            )
+        )
+    return layer_config
 
-    result = {
-        "total_correct": correct,
-        "total_tested": total,
-        "mean_loss": loss / total if total > 0 else 0,
-        "mean_accuracy": correct / total if total > 0 else 0,
-    }
 
-    if complexity_loss is not None:
-        result["complexity_loss"] = complexity_loss.item()
+def full_sparse_model_blockwise_config(
+    negative_samples=16,
+    k_predictions=5,
+    resnet_50=False,
+    block_dims=None,
+    num_channels=None,
+    grayscale=True,
+    sparse_weights_class=SparseWeights2d,
+    patch_size=16,
+    overlap=2,
+    sparsity=None,
+    percent_on=None,
+    greedy=False,
+):
+    if block_dims is None:
+        block_dims = [3, 4, 6]
+    if num_channels is None:
+        num_channels = [64, 128, 256]
 
-    return result
+    if resnet_50:
+        block = SparsePreActBottleneckNoBN
+    else:
+        block = SparsePreActBlockNoBN
+
+    if grayscale:
+        input_dims = 1
+    else:
+        input_dims = 3
+
+    if sparsity is None:
+        # reverts to dense weights
+        sparsity = {"conv1": 0.01, "encoder1": None, "encoder2": None, "encoder3": None}
+    if percent_on is None:
+        # reverts to relu
+        percent_on = {"encoder1": None, "encoder2": None, "encoder3": None}
+
+    modules = []
+    modules.append(
+        dict(
+            model_class=_PatchifyInputs,
+            model_args=dict(patch_size=patch_size, overlap=overlap),
+            init_batch_norm=False,
+            checkpoint_file=None,
+            load_checkpoint_args=None,
+            train=True,
+            save_checkpoint_file=None,
+        )
+    )
+
+    conv1_class = nn.Conv2d
+    conv1_args = dict(
+        in_channels=input_dims,
+        out_channels=num_channels[0],
+        kernel_size=5,
+        stride=1,
+        padding=2,
+    )
+    if sparsity["conv1"] > 0.3:
+        conv1_class = SparseConv2d
+        conv1_args.update(
+            dict(
+                sparse_weights_class=sparse_weights_class,
+                sparsity=sparsity["conv1"],
+                allow_extremes=True,
+            )
+        )
+    modules.append(
+        dict(
+            model_class=conv1_class,
+            model_args=conv1_args,
+            init_batch_norm=False,
+            checkpoint_file=None,
+            load_checkpoint_args=None,
+            train=True,
+            save_checkpoint_file=None,
+        )
+    )
+    for idx in range(len(block_dims)):
+        # args
+        num_blocks = block_dims[idx]
+        filters = num_channels[idx]
+        previous_input_dim = num_channels[0] if idx == 0 else num_channels[idx - 1]
+        first_stride = 1 if idx == 0 else 2
+        encoder_sparsity = sparsity[f"encoder{idx + 1}"]
+        encoder_percent_on = percent_on[f"encoder{idx + 1}"]
+        if idx == 0:
+            in_planes = previous_input_dim
+        else:
+            in_planes = previous_input_dim * block.expansion
+        modules.extend(_make_layer_config(
+            block,
+            num_blocks,
+            filters,
+            in_planes,
+            sparse_weights_class=SparseWeights2d,
+            sparsity=encoder_sparsity,
+            percent_on=encoder_percent_on,
+            stride=first_stride,
+            greedy=greedy,
+            k_predictions=k_predictions,
+            negative_samples=negative_samples,
+        ))
+    return modules
+
+
+resnet_34_sparse_70_sparsity = dict(
+    conv1=0.01,  # dense
+    encoder1=dict(
+        block1=dict(conv1=0.7, conv2=0.7),
+        block2=dict(conv1=0.7, conv2=0.7),
+        block3=dict(conv1=0.7, conv2=0.7),
+        bilinear_info=0.1,  # dense weights
+    ),
+    encoder2=dict(
+        block1=dict(conv1=0.7, conv2=0.7, shortcut=0.01),
+        block2=dict(conv1=0.7, conv2=0.7),
+        block3=dict(conv1=0.7, conv2=0.7),
+        block4=dict(conv1=0.7, conv2=0.7),
+        bilinear_info=0.01,
+    ),
+    encoder3=dict(
+        block1=dict(conv1=0.7, conv2=0.7, shortcut=0.01),  # dense
+        block2=dict(conv1=0.7, conv2=0.7),
+        block3=dict(conv1=0.7, conv2=0.7),
+        block4=dict(conv1=0.7, conv2=0.7),
+        block5=dict(conv1=0.7, conv2=0.7),
+        block6=dict(conv1=0.7, conv2=0.7),
+        bilinear_info=0.01,  # dense
+    ),
+),
+resnet_34_sparse_80_sparsity = dict(
+    conv1=0.01,  # dense
+    encoder1=dict(
+        block1=dict(conv1=0.8, conv2=0.8),
+        block2=dict(conv1=0.8, conv2=0.8),
+        block3=dict(conv1=0.8, conv2=0.8),
+        bilinear_info=0.1,  # dense weights
+    ),
+    encoder2=dict(
+        block1=dict(conv1=0.8, conv2=0.8, shortcut=0.01),
+        block2=dict(conv1=0.8, conv2=0.8),
+        block3=dict(conv1=0.8, conv2=0.8),
+        block4=dict(conv1=0.8, conv2=0.8),
+        bilinear_info=0.01,
+    ),
+    encoder3=dict(
+        block1=dict(conv1=0.8, conv2=0.8, shortcut=0.01),  # dense
+        block2=dict(conv1=0.8, conv2=0.8),
+        block3=dict(conv1=0.8, conv2=0.8),
+        block4=dict(conv1=0.8, conv2=0.8),
+        block5=dict(conv1=0.8, conv2=0.8),
+        block6=dict(conv1=0.8, conv2=0.8),
+        bilinear_info=0.01,  # dense
+    ),
+),
+
+full_resnet_50 = full_sparse_model_blockwise_config(resnet_50=True)
+full_resnet = full_sparse_model_blockwise_config(resnet_50=False)
+small_resnet = full_sparse_model_blockwise_config()[:8]
+full_sparse_resnet_34 = full_sparse_model_blockwise_config(
+    sparsity=dict(
+        conv1=0.01,  # dense
+        encoder1=dict(
+            block1=dict(conv1=0.7, conv2=0.7),
+            block2=dict(conv1=0.7, conv2=0.7),
+            block3=dict(conv1=0.7, conv2=0.7),
+            bilinear_info=0.1,  # dense weights
+        ),
+        encoder2=dict(
+            block1=dict(conv1=0.7, conv2=0.7, shortcut=0.01),
+            block2=dict(conv1=0.7, conv2=0.7),
+            block3=dict(conv1=0.7, conv2=0.7),
+            block4=dict(conv1=0.7, conv2=0.7),
+            bilinear_info=0.01,
+        ),
+        encoder3=dict(
+            block1=dict(conv1=0.7, conv2=0.7, shortcut=0.01),  # dense
+            block2=dict(conv1=0.7, conv2=0.7),
+            block3=dict(conv1=0.7, conv2=0.7),
+            block4=dict(conv1=0.7, conv2=0.7),
+            block5=dict(conv1=0.7, conv2=0.7),
+            block6=dict(conv1=0.7, conv2=0.7),
+            bilinear_info=0.01,  # dense
+        ),
+    ),
+    num_channels=[117, 1, 1],
+)
+small_sparse_70_resnet = full_sparse_model_blockwise_config(
+    sparsity=dict(
+        conv1=0.01,  # dense
+        encoder1=dict(
+            block1=dict(conv1=0.7, conv2=0.7),
+            block2=dict(conv1=0.7, conv2=0.7),
+            block3=dict(conv1=0.7, conv2=0.7),
+            bilinear_info=0.1,  # dense weights
+        ),
+        encoder2=dict(
+            block1=dict(conv1=0.7, conv2=0.7, shortcut=0.01),
+            block2=dict(conv1=0.7, conv2=0.7),
+            block3=dict(conv1=0.7, conv2=0.7),
+            block4=dict(conv1=0.7, conv2=0.7),
+            bilinear_info=0.01,
+        ),
+        encoder3=dict(
+            block1=dict(conv1=0.7, conv2=0.7, shortcut=0.01),  # dense
+            block2=dict(conv1=0.7, conv2=0.7),
+            block3=dict(conv1=0.7, conv2=0.7),
+            block4=dict(conv1=0.7, conv2=0.7),
+            block5=dict(conv1=0.7, conv2=0.7),
+            block6=dict(conv1=0.7, conv2=0.7),
+            bilinear_info=0.01,  # dense
+        ),
+    ),
+    num_channels=[117, 1, 1],
+)[:8]
+
+small_sparse_80_resnet = full_sparse_model_blockwise_config(
+    sparsity=dict(
+        conv1=0.01,  # dense
+        encoder1=dict(
+            block1=dict(conv1=0.8, conv2=0.8),
+            block2=dict(conv1=0.8, conv2=0.8),
+            block3=dict(conv1=0.8, conv2=0.8),
+            bilinear_info=0.1,  # dense weights
+        ),
+        encoder2=dict(
+            block1=dict(conv1=0.8, conv2=0.8, shortcut=0.01),
+            block2=dict(conv1=0.8, conv2=0.8),
+            block3=dict(conv1=0.8, conv2=0.8),
+            block4=dict(conv1=0.8, conv2=0.8),
+            bilinear_info=0.01,
+        ),
+        encoder3=dict(
+            block1=dict(conv1=0.8, conv2=0.8, shortcut=0.01),  # dense
+            block2=dict(conv1=0.8, conv2=0.8),
+            block3=dict(conv1=0.8, conv2=0.8),
+            block4=dict(conv1=0.8, conv2=0.8),
+            block5=dict(conv1=0.8, conv2=0.8),
+            block6=dict(conv1=0.8, conv2=0.8),
+            bilinear_info=0.01,  # dense
+        ),
+    ),
+    num_channels=[143, 1, 1],
+)[:8]
+
+full_resnet_50_sparse_70 = full_sparse_model_blockwise_config(
+    resnet_50=True,
+    sparsity=dict(
+        conv1=0.01,  # dense
+        encoder1=dict(
+            block1=dict(conv1=0.7, conv2=0.7, conv3=0.7, shortcut=0.01),
+            block2=dict(conv1=0.7, conv2=0.7, conv3=0.7),
+            block3=dict(conv1=0.7, conv2=0.7, conv3=0.7),
+            bilinear_info=0.01,
+        ),
+        encoder2=dict(
+            block1=dict(conv1=0.7, conv2=0.7, conv3=0.7, shortcut=0.01),
+            block2=dict(conv1=0.7, conv2=0.7, conv3=0.7,),
+            block3=dict(conv1=0.7, conv2=0.7, conv3=0.7,),
+            block4=dict(conv1=0.7, conv2=0.7, conv3=0.7,),
+            bilinear_info=0.01,
+        ),
+        encoder3=dict(
+            block1=dict(conv1=0.7, conv2=0.7, conv3=0.7, shortcut=0.01),
+            block2=dict(conv1=0.7, conv2=0.7, conv3=0.7,),
+            block3=dict(conv1=0.7, conv2=0.7, conv3=0.7,),
+            block4=dict(conv1=0.7, conv2=0.7, conv3=0.7,),
+            block5=dict(conv1=0.7, conv2=0.7, conv3=0.7,),
+            block6=dict(conv1=0.7, conv2=0.7, conv3=0.7,),
+            bilinear_info=0.01,
+        ),
+    ),
+    num_channels=[116, 116 * 2, 116 * 4]
+)
+
+full_resnet_50_sparse_80 = full_sparse_model_blockwise_config(
+    resnet_50=True,
+    sparsity=dict(
+        conv1=0.01,  # dense
+        encoder1=dict(
+            block1=dict(conv1=0.8, conv2=0.8, conv3=0.8, shortcut=0.01),
+            block2=dict(conv1=0.8, conv2=0.8, conv3=0.8),
+            block3=dict(conv1=0.8, conv2=0.8, conv3=0.8),
+            bilinear_info=0.01,
+        ),
+        encoder2=dict(
+            block1=dict(conv1=0.8, conv2=0.8, conv3=0.8, shortcut=0.01),
+            block2=dict(conv1=0.8, conv2=0.8, conv3=0.8,),
+            block3=dict(conv1=0.8, conv2=0.8, conv3=0.8,),
+            block4=dict(conv1=0.8, conv2=0.8, conv3=0.8,),
+            bilinear_info=0.01,
+        ),
+        encoder3=dict(
+            block1=dict(conv1=0.8, conv2=0.8, conv3=0.8, shortcut=0.01),
+            block2=dict(conv1=0.8, conv2=0.8, conv3=0.8,),
+            block3=dict(conv1=0.8, conv2=0.8, conv3=0.8,),
+            block4=dict(conv1=0.8, conv2=0.8, conv3=0.8,),
+            block5=dict(conv1=0.8, conv2=0.8, conv3=0.8,),
+            block6=dict(conv1=0.8, conv2=0.8, conv3=0.8,),
+            bilinear_info=0.01,
+        ),
+    ),
+    num_channels=[143, 143 * 2, 143 * 4]
+)
+
+full_resnet_50_greedy = full_sparse_model_blockwise_config(resnet_50=True,
+                                                           greedy=True)
+# full_resnet_50_sparse_70 = full_sparse_model_blockwise_config(resnet_50=True,
+#                                                               sparsity=False)

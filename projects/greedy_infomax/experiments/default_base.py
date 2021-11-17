@@ -96,7 +96,7 @@ aug = {"randcrop": 64, "flip": True, "bw_mean": [0.4120], "bw_std": [0.2570]}
 transform_unsupervised = get_transforms(val=False, aug=aug)
 transform_validation = transform_supervised = get_transforms(val=True, aug=aug)
 
-base_dataset_args = dict(root="~/nta/data/STL10/", download=False)
+base_dataset_args = dict(root="/mnt/datasets/STL10/", download=False)
 # base_dataset_args = dict(root="~/nta/data/STL10/stl10_binary", download=False)
 unsupervised_dataset_args = deepcopy(base_dataset_args)
 unsupervised_dataset_args.update(

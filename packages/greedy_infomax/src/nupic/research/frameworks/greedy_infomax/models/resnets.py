@@ -18,24 +18,18 @@
 #
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
+import torch.nn as nn
 
-from .block_resnet50_optimization import CONFIGS as BLOCK_RESNET50
-from .block_sparse_optimization import CONFIGS as BLOCK_SPARSE_OPTIMIZATION
-from .block_wise_training import CONFIGS as BLOCK_WISE
-from .default_base import CONFIGS as DEFAULT_BASE
-from .linear_classification import CONFIGS as LINEAR_CLASSIFICATION
-from .new_model import CONFIGS as NEW_MODEL
-from .sigopt_experiments import CONFIGS as SIGOPT_EXPERIMENTS
-from .small_sparse import CONFIGS as SMALL_SPARSE
-from .sparse_resnets import CONFIGS as SPARSE_RESNETS
+from nupic.research.frameworks.greedy_infomax.models.resnet_encoder import (
+    PreActBlockNoBN,
+)
 
-CONFIGS = dict()
-CONFIGS.update(DEFAULT_BASE)
-CONFIGS.update(SPARSE_RESNETS)
-CONFIGS.update(SIGOPT_EXPERIMENTS)
-CONFIGS.update(SMALL_SPARSE)
-CONFIGS.update(BLOCK_WISE)
-CONFIGS.update(LINEAR_CLASSIFICATION)
-CONFIGS.update(BLOCK_SPARSE_OPTIMIZATION)
-CONFIGS.update(BLOCK_RESNET50)
-CONFIGS.update(NEW_MODEL)
+
+class ResNet7(nn.Sequential):
+    def __init__(self,
+                 channels=64,):
+        super(ResNet7, self).__init__()
+        self.conv1 = nn.Conv2d(1, channels, kernel_size=5, stride=1, padding=2)
+        self.sparse_preact_1 = PreActBlockNoBN(channels, channels)
+        self.sparse_preact_2 = PreActBlockNoBN(channels, channels)
+        self.sparse_preact_3 = PreActBlockNoBN(channels, channels)

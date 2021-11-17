@@ -29,9 +29,9 @@ import torch.nn.functional as F
 
 from nupic.research.frameworks.backprop_structure.modules import VDropConv2d
 from nupic.research.frameworks.greedy_infomax.models.bilinear_info import (
-    BilinearInfo,
     SparseBilinearInfo,
     VDropSparseBilinearInfo,
+    _BilinearInfo,
 )
 from nupic.torch.modules import KWinners2d, SparseWeights2d
 
@@ -268,15 +268,15 @@ class SparsePreActBottleneckNoBN(PreActBottleneckNoBN):
                 in_planes, percent_on=percent_on["nonlinearity1"]
             )
         if percent_on["nonlinearity2"] >= 0.5:
-            self.nonlinearity1 = F.relu
+            self.nonlinearity2 = F.relu
         else:
-            self.nonlinearity1 = KWinners2d(
+            self.nonlinearity2 = KWinners2d(
                 in_planes, percent_on=percent_on["nonlinearity2"]
             )
         if percent_on["nonlinearity3"] >= 0.5:
-            self.nonlinearity1 = F.relu
+            self.nonlinearity3 = F.relu
         else:
-            self.nonlinearity1 = KWinners2d(
+            self.nonlinearity3 = KWinners2d(
                 in_planes, percent_on=percent_on["nonlinearity3"]
             )
 
@@ -403,7 +403,7 @@ class ResNetEncoder(nn.Module):
             )
             self.first_stride = 2
 
-        self.bilinear_model = BilinearInfo(
+        self.bilinear_model = _BilinearInfo(
             in_channels=self.in_planes,
             out_channels=self.in_planes,
             negative_samples=negative_samples,
@@ -427,8 +427,8 @@ class ResNetEncoder(nn.Module):
 
     def forward(self, x, n_patches_x, n_patches_y):
         z, out = self.encode(x, n_patches_x, n_patches_y)
-        log_f_list, true_f_list = self.bilinear_model(out, out)
-        return log_f_list, true_f_list, z
+        log_f_list = self.bilinear_model.estimate_info(out, out)
+        return log_f_list, z
 
 
 class SparseResNetEncoder(ResNetEncoder):

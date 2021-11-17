@@ -25,6 +25,7 @@ testpaths = [
     'packages/self_supervised_learning/tests',
     'packages/dendrites/tests',
     'packages/dynamic_sparse/tests',
+    'packages/greedy_infomax/tests'
 ]
 filterwarnings = [
     'ignore:.*:DeprecationWarning'

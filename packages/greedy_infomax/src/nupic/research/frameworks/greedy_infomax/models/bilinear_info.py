@@ -26,15 +26,201 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from nupic.research.frameworks.backprop_structure.modules import VDropConv2d
 from nupic.torch.modules import SparseWeights2d
 
 
-class BilinearInfo(nn.Module):
+class BilinearInfo(nn.Identity):
     """
+    A module which estimates the mutual information between patches in its input
+    in a contrastive setting. Patch-level representations are evaluated on the amount
+    of information they convey about nearby (spatially coherent) patches. The
+    positive sample is compared to many negative samples, and the bilinear model
+    should be able to pick out the positive sample from the lineup (indicating high
+    mutual information).
+
+    Also, it computes the loss for the model in the forward pass as opposed to in the
+    loss function. This reflects the original codebase, and is important for
+    compatibility with DataParallel.
+
+    This inherits from nn.Identity because it is used in the
+    BlockModel setting. This module should be estimating the information content
+    of the patches during the unsupervised training portion of the experiment, i.e.
+    estimate_info(), but should pass through for the supervised training and
+    validation loops. See BlockModel for reference. Note that the BlockModel has been
+    deprecated in favor of the more general GreedyInfoMaxModel, but the BilinearInfo
+    module can be used in both cases.
+
+    """
+    def __init__(self, in_channels, out_channels, negative_samples=16, k_predictions=5):
+        super().__init__()
+        self.negative_samples = negative_samples
+        self.k_predictions = k_predictions
+
+        # 1x1 convolutions to sample from the channel dimension
+        # representations converted from in_channels to out_channels dimensions
+        self.W_k = nn.ModuleList(
+            nn.Conv2d(in_channels, out_channels, 1, bias=False)
+            for _ in range(self.k_predictions)
+        )
+
+    def estimate_info(self, z, c, skip_step=1):
+        """
+        :param z: positive samples z_{t} (used to create z_{t+k} for each k)
+        :param c: context (reference samples). In audio experiments, this is an
+                  autoregressive representation which captures the entire temporal
+                  history up until time t. In vision experiments, this is simply
+                  z_{t}, which is the same as parameter z.
+        :param skip_step: Number of steps to skip between the reference sample and
+                          the positive samples. Defaults to 1, as in the paper.
+                          Skipping 1 step prevents overlapping samples from being
+                          compared with the default overlap. This parameter should
+                          probably be increased for larger overlap values.
+        """
+        # For each k in k_predictions, store a set of log_fk and true_f values
+        device = z.device
+        total_loss = torch.tensor(0.0, requires_grad=True)
+        for k in range(1, self.k_predictions + 1):
+            # Compute log f(c_t, x_{t+k}) = z^T_{t+k} W_k c_t
+
+            # First half of bilinear model, compute z^T_{t+k} W_k:
+            ztwk = (
+                self.W_k[k - 1]  # 1x1 convolution
+                .forward(z[:, :, (k + skip_step) :, :])  # Bx, C , H , W
+                .permute(2, 3, 0, 1)  # H, W, Bx, C
+                .contiguous()
+            ).to(device)  # y, x, b, c
+
+            # Take random samples from z_{t+k} W_k as contrastive samples
+            ztwk_shuf = ztwk.view(
+                ztwk.shape[0] * ztwk.shape[1] * ztwk.shape[2], ztwk.shape[3]
+            )  # y * x * batch, c
+            rand_index = torch.randint(
+                ztwk_shuf.shape[0],  # y * x * batch
+                (ztwk_shuf.shape[0] * self.negative_samples, 1),
+                dtype=torch.long,
+                device=device,
+                requires_grad=False,
+            )
+            rand_index = rand_index.repeat(1, ztwk_shuf.shape[1])
+            ztwk_shuf = torch.gather(
+                ztwk_shuf, dim=0, index=rand_index, out=None
+            )  # y * x * b * n, c
+            ztwk_shuf = ztwk_shuf.view(
+                ztwk.shape[0],
+                ztwk.shape[1],
+                ztwk.shape[2],
+                self.negative_samples,
+                ztwk.shape[3],
+            ).permute(0, 1, 2, 4, 3)  # y, x, b, c, n
+
+            # Multiply ztwk and context for full bilinear model
+            context = (
+                c[:, :, : -(k + skip_step), :].permute(2, 3, 0, 1).unsqueeze(-2)
+            ).to(device)  # y, x, b, 1, c
+
+            log_fk_main = torch.matmul(context, ztwk.unsqueeze(-1)).squeeze(
+                -2
+            )  # y, x, b, 1
+
+            log_fk_shuf = torch.matmul(context, ztwk_shuf).squeeze(-2)  # y, x, b, n
+
+            # Stack negative samples below positive samples
+            log_fk = torch.cat((log_fk_main, log_fk_shuf), 3)  # y, x, b, 1+n
+            log_fk = log_fk.permute(2, 3, 0, 1)  # b, 1+n, y, x
+
+            softmax_fk = torch.softmax(log_fk, dim=1)
+            log_softmax_fk = torch.log(softmax_fk + 1e-11)
+
+            # Positive samples are at index 0
+            true_fk = torch.zeros(
+                (log_fk.shape[0], log_fk.shape[-2], log_fk.shape[-1]),
+                dtype=torch.long,
+                device=device,
+                requires_grad=False,
+            )
+
+            k_step_loss = torch.div(F.nll_loss(
+                log_softmax_fk, true_fk, reduction="mean"
+            ), self.k_predictions)
+
+            total_loss = torch.add(total_loss, k_step_loss)
+
+        return total_loss
+
+
+class SparseBilinearInfo(BilinearInfo):
+    """
+    A mutual information estimator which operates the same as the above BilinearInfo
+    class, but instead uses sparse convolutional layers in place of the dense
+    convolutional layers.
+
+    :param sparse_weights_class: the class which will wrap the dense convolutional
+                                 layers and induce sparsity
+    :param sparsity: the static sparsity of the weights for each estimator W[k]
+    """
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        negative_samples=16,
+        k_predictions=5,
+        sparse_weights_class=SparseWeights2d,
+        sparsity=0.0,
+    ):
+        super(SparseBilinearInfo, self).__init__(
+            in_channels, out_channels, negative_samples, k_predictions
+        )
+        if sparsity > 0.3:
+            for i in range(len(self.W_k)):
+                self.W_k[i] = sparse_weights_class(self.W_k[i], sparsity=sparsity)
+
+
+class VDropSparseBilinearInfo(BilinearInfo):
+    """
+    Another sparse weights implementation of the above BilinearInfo mutual information
+    estimator, except using variational dropout convolutional layers instead of static
+    sparse convolutional layers.
+
+    :param central_data: As in other VDrop models, a VDropCentralData instance used by
+                         the variational dropout optimization process
+    """
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        negative_samples=16,
+        k_predictions=5,
+        central_data=None,
+    ):
+        super(VDropSparseBilinearInfo, self).__init__(
+            in_channels, out_channels, negative_samples, k_predictions
+        )
+        self.W_k = nn.ModuleList(
+            VDropConv2d(
+                in_channels,
+                out_channels,
+                kernel_size=1,
+                central_data=central_data,
+                bias=False,
+            )
+            for _ in range(self.k_predictions)
+        )
+
+
+class _BilinearInfo(nn.Module):
+    """
+    NOTE: This class is deprecated.
+
     From the Greedy InfoMax paper, a module which estimates the mutual information
-    between two representations through a bilinear model.
+    between two representations through a bilinear model. This is now named
+    "_BilinearInfo" because it was used in older GreedyInfoMax experiments and is now
+    deprecated. There are two differences between the versions; first this one
+    inherits from nn.Module, whereas the more recent implementation inherits from
+    nn.Identity. Second, this model does not compute the full loss in the forward
+    pass, whereas the newer implementation does compute the loss in the forward pass.
 
     Recall the loss for Greedy InfoMax:
 
@@ -51,7 +237,7 @@ class BilinearInfo(nn.Module):
 
     After computing this value for all necessary positive and contrastive samples,
     the positive examples are at index 0 and the rest are indices 1:n, where n is
-    the number of contrastive samples per positive sample. Therefore, the loss
+    the number of contrastive samples per positive sample. Therefore, the the loss
     simply becomes nn.CrossEntropy with the "class" index set to 0:
 
         loss(x,class)= −log( exp(x[class] / (∑_j exp(x[j]) )
@@ -123,7 +309,9 @@ class BilinearInfo(nn.Module):
                 ztwk.shape[2],
                 self.negative_samples,
                 ztwk.shape[3],
-            ).permute(0, 1, 2, 4, 3)  # y, x, b, c, n
+            ).permute(
+                0, 1, 2, 4, 3
+            )  # y, x, b, c, n
 
             # Multiply ztwk and context for full bilinear model
             context = (
@@ -152,62 +340,3 @@ class BilinearInfo(nn.Module):
             true_f_list.append(true_fk)
 
         return log_f_list, true_f_list
-
-
-class SparseBilinearInfo(BilinearInfo):
-    """
-    A mutual information estimator which operates the same as the above BilinearInfo
-    class, but instead uses sparse convolutional layers in place of the dense
-    convolutional layers.
-
-    :param sparse_weights_class: the class which will wrap the dense convolutional
-                                 layers and induce sparsity
-    :param sparsity: the static sparsity of the weights for each estimator W[k]
-    """
-    def __init__(
-        self,
-        in_channels,
-        out_channels,
-        negative_samples=16,
-        k_predictions=5,
-        sparse_weights_class=SparseWeights2d,
-        sparsity=0.0,
-    ):
-        super(SparseBilinearInfo, self).__init__(
-            in_channels, out_channels, negative_samples, k_predictions
-        )
-        if sparsity > 0.3:
-            for i in range(len(self.W_k)):
-                self.W_k[i] = sparse_weights_class(self.W_k[i], sparsity=sparsity)
-
-
-class VDropSparseBilinearInfo(BilinearInfo):
-    """
-    Another sparse weights implementation of the above BilinearInfo mutual information
-    estimator, except using variational dropout convolutional layers instead of static
-    sparse convolutional layers.
-
-    :param central_data: As in other VDrop models, a VDropCentralData instance used by
-                         the variational dropout optimization process
-    """
-    def __init__(
-        self,
-        in_channels,
-        out_channels,
-        negative_samples=16,
-        k_predictions=5,
-        central_data=None,
-    ):
-        super(VDropSparseBilinearInfo, self).__init__(
-            in_channels, out_channels, negative_samples, k_predictions
-        )
-        self.W_k = nn.ModuleList(
-            VDropConv2d(
-                in_channels,
-                out_channels,
-                kernel_size=1,
-                central_data=central_data,
-                bias=False,
-            )
-            for _ in range(self.k_predictions)
-        )

@@ -57,7 +57,7 @@ def worker(rank, world_size, dist_url, config, queue):
 
     # Setup imagenet experiment for this process
     experiment_class = config.get("experiment_class", ImagenetExperiment)
-    assert issubclass(experiment_class, ImagenetExperiment)
+    # assert issubclass(experiment_class, ImagenetExperiment)
     exp = experiment_class()
     exp.setup_experiment(config)
 

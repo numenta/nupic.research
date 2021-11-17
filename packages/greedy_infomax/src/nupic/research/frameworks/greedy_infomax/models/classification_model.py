@@ -24,6 +24,7 @@
 # https://arxiv.org/abs/1905.11786
 # ----------------------------------------------------------------------
 
+import torch
 import torch.nn as nn
 
 
@@ -37,7 +38,6 @@ class Classifier(nn.Module):
     :param in_channels: The dimensionality of the input to this model
     :param num_classes: The dimensionality of the output (the number of possible
     class labels)
-
     """
     def __init__(self, in_channels=256, num_classes=10):
         super().__init__()
@@ -49,11 +49,52 @@ class Classifier(nn.Module):
         )
 
     def forward(self, x):
+        # detach x just in case it's still connected to active parts
+        # of the computation graph
+        batch_size = x.shape[0]
+        x = x.detach()
+        x = self.avg_pool(x).squeeze()
+        x = self.model(x).squeeze()
+        return x.view(batch_size, -1)
+
+
+class FlattenClassifier(nn.Module):
+    """
+    A simple multilayer perceptron classification head which outputs a distribution
+    over possible class labels. This is used in the supervised phase of Greedy
+    InfoMax experiments to tell how "useful" a given encoding is by proxy of how
+    well an encoding can be mapped to the correct class label.
+
+    In GreedyInfoMax, the encodings are at the patch level. The standard behavior in
+    the paper is to average the encodings over all of the patches in the image in
+    order to get a representation of the image. In contrast, this FlattenClassifier
+    simply flattens and appends all of the encodings to a single vector resulting in
+    a representation of size (num_patches * patch_representation_dim) per image.
+
+    :param in_channels: The dimensionality of the input to this model
+    :param num_classes: The dimensionality of the output (the number of possible
+    class labels)
+
+    """
+    def __init__(self, in_channels=256, num_patches=49, num_classes=10):
+        super().__init__()
+        self.in_channels = in_channels
+        self.num_patches = num_patches
+        self.model = nn.Sequential()
+        self.model.add_module(
+            "flatten", nn.Flatten(),
+        )
+        self.model.add_module(
+            "layer1", nn.Linear(self.in_channels * self.num_patches,
+                                num_classes,
+                                bias=True)
+        )
+
+    def forward(self, x):
         # detach x just in case it's still connected to active parts of the
         # computation graph
         batch_size = x.shape[0]
         x = x.detach()
-        x = self.avg_pool(x).squeeze()
         x = self.model(x).squeeze()
         return x.view(batch_size, -1)
 
@@ -69,20 +110,56 @@ class MultiClassifier(nn.Module):
     """
     def __init__(self, in_channels=None, num_classes=10):
         super().__init__()
+        self.in_channels = in_channels
+        self.num_classes = num_classes
         if self.in_channels is None:
             raise Exception("In channels list is required")
         self.classifiers = nn.ModuleList(
             [
                 Classifier(
-                    in_channels=in_channels[i],
-                    num_classes=num_classes,
+                    in_channels=self.in_channels[i],
+                    num_classes=self.num_classes,
                 )
-                for i in range(len(in_channels))
+                for i in range(len(self.in_channels))
             ]
         )
 
     def forward(self, encodings):
-        return [
-            classifier(encoding)
-            for (classifier, encoding) in zip(self.classifiers, encodings)
-        ]
+        return [classifier(encoding)
+                for (classifier, encoding) in zip(self.classifiers, encodings)]
+
+
+class MultiFlattenClassifier(nn.Module):
+    """
+    A model which contains many FlattenClassifier models. Oftentimes, a Greedy InfoMax
+    experiment that uses the BlockModel will emit several different encodings,
+    one for each EmitEncoding layer. This model allows for a classifier to be
+    independently fit to each encoding layer, which shows how well each layer can be
+    used on a downstream task.
+
+    """
+    def __init__(self, in_channels=None, num_patches=49, num_classes=10):
+        super().__init__()
+        self.in_channels = in_channels
+        self.num_patches = num_patches
+        self.num_classes = num_classes
+        if self.in_channels is None:
+            raise Exception("In channels list is required")
+        self.classifiers = nn.ModuleList(
+            [
+                FlattenClassifier(
+                    in_channels=self.in_channels[i],
+                    num_patches=self.num_patches,
+                    num_classes=self.num_classes,
+                )
+                for i in range(len(self.in_channels))
+            ]
+        )
+
+    def forward(self, encodings):
+        return torch.stack(
+            [
+                classifier(encoding)
+                for (classifier, encoding) in zip(self.classifiers, encodings)
+            ]
+        )

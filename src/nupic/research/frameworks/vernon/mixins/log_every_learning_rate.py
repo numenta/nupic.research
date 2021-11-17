@@ -40,7 +40,7 @@ class LogEveryLearningRate(StepBasedLogging):
             # Get the lr and momentum from the first param group.
             for param_group in self.optimizer.param_groups:
                 lr = param_group["lr"]
-                momentum = param_group["momentum"]
+                momentum = param_group.get("momentum", 0)
                 break
 
             self.lr_history.append(lr)

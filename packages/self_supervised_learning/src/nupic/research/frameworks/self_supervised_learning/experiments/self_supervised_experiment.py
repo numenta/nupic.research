@@ -27,6 +27,7 @@ from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader
 
 from nupic.research.frameworks.pytorch.lr_scheduler import ComposedLRScheduler
+from nupic.research.frameworks.pytorch.model_utils import train_model
 from nupic.research.frameworks.self_supervised_learning.utils import EncoderClassifier
 from nupic.research.frameworks.vernon.experiments.supervised_experiment import (
     SupervisedExperiment,
@@ -116,6 +117,8 @@ class SelfSupervisedExperiment(SupervisedExperiment):
                                                          validation loop
             - reuse_unsupervised_dataset: if True, will reuse the unsupervised
                                           dataset during supervised training
+            - train_model_supervised_func: function to train the EncoderClassifier
+            for supervised training. Defaults to the standard train_model function.
         """
 
         super().setup_experiment(config)
@@ -124,7 +127,7 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             raise ValueError("Must provide 'classifier_config' in config")
 
         self.encoder = self.model
-        self.classifier = self.create_model(classifier_config, self.device)
+        self.classifier = self.create_classifier_model(classifier_config, self.device)
         self.logger.debug(self.classifier)
         self.encoder_classifier = EncoderClassifier(self.encoder, self.classifier)
         self.encoder_classifier.to(self.device)
@@ -133,7 +136,8 @@ class SelfSupervisedExperiment(SupervisedExperiment):
         self.classifier_optimizer = self.create_optimizer(
             classifier_config, self.classifier
         )
-
+        self.train_model_supervised = config.get("train_model_supervised_func",
+                                                 train_model)
         self._loss_function_unsupervised = self._loss_function = config.get(
             "loss_function_unsupervised", config.get("loss_function", F.mse_loss)
         )
@@ -158,12 +162,15 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             self.step_lr_every_batch_classifier = True
 
         self.reset_classifier_on_validate = classifier_config.get(
-            "reset_on_validate", False
+            "reset_on_validate", True
         )
 
         self.supervised_training_epochs_per_validation = config.get(
             "supervised_training_epochs_per_validation", 3
         )
+
+    def create_classifier_model(self, classifier_config, device):
+        return super().create_model(classifier_config, device)
 
     def create_loaders(self, config):
 
@@ -199,9 +206,10 @@ class SelfSupervisedExperiment(SupervisedExperiment):
                 "batch_size", config.get("unsupervised_batch_size", 1)
             ),
             shuffle=sampler is None,
+            # shuffle=True,
             num_workers=config.get("workers", 0),
             sampler=sampler,
-            pin_memory=torch.cuda.is_available(),
+            pin_memory=config.get("pin_memory", torch.cuda.is_available()),
             drop_last=config.get(
                 "train_loader_drop_last",
                 config.get("unsupervised_loader_drop_last", True),
@@ -225,7 +233,7 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             shuffle=sampler is None,
             num_workers=config.get("workers", 0),
             sampler=sampler,
-            pin_memory=torch.cuda.is_available(),
+            pin_memory=config.get("pin_memory", torch.cuda.is_available()),
             drop_last=config.get("supervised_loader_drop_last", True),
         )
 
@@ -244,7 +252,7 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             shuffle=False,
             num_workers=config.get("workers", 0),
             sampler=sampler,
-            pin_memory=torch.cuda.is_available(),
+            pin_memory=config.get("pin_memory", torch.cuda.is_available()),
         )
 
     @classmethod
@@ -313,7 +321,8 @@ class SelfSupervisedExperiment(SupervisedExperiment):
         pass
 
     def post_batch_supervised(
-        self, model, error_loss, complexity_loss, batch_idx, num_images, time_string
+        self, model, error_loss, complexity_loss, batch_idx, num_images, time_string,
+            **kwargs
     ):
         # Update 1cycle learning rate after every batch
         if self.step_lr_every_batch_classifier:
@@ -389,9 +398,8 @@ class SelfSupervisedExperiment(SupervisedExperiment):
             for layer in self.classifier.children():
                 if hasattr(layer, "reset_parameters"):
                     layer.reset_parameters()
-
         for _ in range(self.supervised_training_epochs_per_validation):
-            self.train_model(
+            self.train_model_supervised(
                 model=self.encoder_classifier,
                 loader=self.supervised_loader,
                 optimizer=self.classifier_optimizer,

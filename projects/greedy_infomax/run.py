@@ -53,6 +53,7 @@ if __name__ == "__main__":
 
     # Process args and modify config appropriately.
     config = process_args(args, config)
+
     if config is None:
         pass
     else:
