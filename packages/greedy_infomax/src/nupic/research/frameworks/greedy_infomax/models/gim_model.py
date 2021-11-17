@@ -70,7 +70,6 @@ class GreedyInfoMaxModel(nn.Sequential):
                  n_patches_x=None,
                  n_patches_y=None,):
         super(GreedyInfoMaxModel, self).__init__()
-        self.training_mode = "unsupervised"
         self.gim_blocks = {}  # dict of (module, gim_block) pairs
         self.patchify_inputs = PatchifyInputs(patch_size, overlap)
         self.model = model
@@ -80,6 +79,10 @@ class GreedyInfoMaxModel(nn.Sequential):
                                k_predictions,
                                negative_samples,
                                n_patches_x, n_patches_y)
+        for (module, gim_block) in self.gim_blocks.items():
+            module._forward_hooks.clear()
+            module.register_forward_hook(gim_block.wrapped_forward)
+        self.unsupervised_training = True
 
     def forward(self, x):
         """
@@ -87,9 +90,11 @@ class GreedyInfoMaxModel(nn.Sequential):
         using forward hooks, then collects the info estimates from the info estimate
         aggregator
         """
-        for (module, gim_block) in self.gim_blocks.items():
-            module._forward_hooks.clear()
-            module.register_forward_hook(gim_block.wrapped_forward)
+        if not self.unsupervised_training:
+            for (module, gim_block) in self.gim_blocks.items():
+                module._forward_hooks.clear()
+                module.register_forward_hook(gim_block.wrapped_forward)
+            self.unsupervised_training = True
         self.info_estimate_aggregator.clear_outputs()
         super().forward(x)
         return self.info_estimate_aggregator.get_outputs()
@@ -98,9 +103,11 @@ class GreedyInfoMaxModel(nn.Sequential):
         """
         Forward pass for supervised training.
         """
-        for (module, gim_block) in self.gim_blocks.items():
-            module._forward_hooks.clear()
-            module.register_forward_hook(gim_block.wrapped_encode)
+        if self.unsupervised_training:
+            for (module, gim_block) in self.gim_blocks.items():
+                module._forward_hooks.clear()
+                module.register_forward_hook(gim_block.wrapped_encode)
+            self.unsupervised_training = False
         self.encoding_aggregator.clear_outputs()
         super().forward(x)
         return self.encoding_aggregator.get_outputs()
