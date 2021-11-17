@@ -212,6 +212,8 @@ class VDropSparseBilinearInfo(BilinearInfo):
 
 class _BilinearInfo(nn.Module):
     """
+    NOTE: This class is deprecated.
+
     From the Greedy InfoMax paper, a module which estimates the mutual information
     between two representations through a bilinear model. This is now named
     "_BilinearInfo" because it was used in older GreedyInfoMax experiments and is now

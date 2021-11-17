@@ -20,7 +20,6 @@
 # ----------------------------------------------------------------------
 import copy
 import itertools
-import os
 
 import torch
 
@@ -46,6 +45,8 @@ class BlockModelExperiment(
     SelfSupervisedExperiment,
 ):
     """
+    NOTE: This experiment class is deprecated.
+
     The BlockModel experiment class is used in the GreedyInfoMax context. It only
     supports the use of the BlockModel which is essentially a more sophisticated
     version of nn.Sequential. Modules are specified in the config and can be
@@ -95,8 +96,6 @@ class BlockModelExperiment(
     greedy_infomax/utils/model_utils.py.
     """
     def setup_experiment(self, config):
-        if config.get("cuda_launch_blocking", False):
-            os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
         emit_encoding_channels = [
             x["model_args"]["channels"]
             for x in config["model_args"]["module_args"]

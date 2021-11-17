@@ -118,22 +118,22 @@ class GreedyInfoMaxBlock(nn.Module):
         x_blocked = self.gradient_block(x).clone()
         return x_blocked
 
-    """
-    During unsupervised training, this function will be linked to the forward hook
-    for its corresponding module.
-    """
     def wrapped_forward(self, module, input, output):  # noqa: A002
+        """
+        During unsupervised training, this function will be linked to the forward hook
+        for its corresponding module.
+        """
         return self.forward(output)
 
     def encode(self, x):
         encoded = self.emit_encoding.encode(x, self.n_patches_x, self.n_patches_y)
         self.encoding_aggregator.append(encoded)
 
-    """
-    During supervised training, this function will be linked to the forward hook for
-    its corresponding module.
-    """
     def wrapped_encode(self, module, input, output):  # noqa: A002
+        """
+        During supervised training, this function will be linked to the forward hook for
+        its corresponding module.
+        """
         return self.encode(output)
 
 
@@ -148,7 +148,7 @@ class SparseGreedyInfoMaxBlock(GreedyInfoMaxBlock):
                  in_channels,
                  negative_samples=16,
                  k_predictions=5,
-                 sparsity=None):
+                 sparsity=0.0):
         super(SparseGreedyInfoMaxBlock, self).__init__(estimator_outputs,
                                                        encoding_outputs,
                                                        in_channels,

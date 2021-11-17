@@ -65,6 +65,12 @@ class FlattenClassifier(nn.Module):
     InfoMax experiments to tell how "useful" a given encoding is by proxy of how
     well an encoding can be mapped to the correct class label.
 
+    In GreedyInfoMax, the encodings are at the patch level. The standard behavior in
+    the paper is to average the encodings over all of the patches in the image in
+    order to get a representation of the image. In contrast, this FlattenClassifier
+    simply flattens and appends all of the encodings to a single vector resulting in
+    a representation of size (num_patches * patch_representation_dim) per image.
+
     :param in_channels: The dimensionality of the input to this model
     :param num_classes: The dimensionality of the output (the number of possible
     class labels)

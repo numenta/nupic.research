@@ -45,6 +45,8 @@ class BlockModel(nn.Module):
     versus the encode pass. In the forward pass, the BilinearInfoModules are active
     and the EmitEncoding module is inactive. In the encode pass, the BilinearInfo
     modules are inactive and the EmitEncoding modules are active.
+
+    :param modules: A list of modules to be used in the forward pass.
     """
     def __init__(self, modules, **kwargs):
         super(BlockModel, self).__init__()

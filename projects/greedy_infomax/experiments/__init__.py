@@ -19,15 +19,15 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from .block_resnet50_optimization import CONFIGS as BLOCK_RESNET50
+from .block_sparse_optimization import CONFIGS as BLOCK_SPARSE_OPTIMIZATION
+from .block_wise_training import CONFIGS as BLOCK_WISE
 from .default_base import CONFIGS as DEFAULT_BASE
+from .linear_classification import CONFIGS as LINEAR_CLASSIFICATION
+from .new_model import CONFIGS as NEW_MODEL
 from .sigopt_experiments import CONFIGS as SIGOPT_EXPERIMENTS
 from .small_sparse import CONFIGS as SMALL_SPARSE
 from .sparse_resnets import CONFIGS as SPARSE_RESNETS
-from .block_wise_training import CONFIGS as BLOCK_WISE
-from .linear_classification import CONFIGS as LINEAR_CLASSIFICATION
-from .block_sparse_optimization import CONFIGS as BLOCK_SPARSE_OPTIMIZATION
-from .block_resnet50_optimization import CONFIGS as BLOCK_RESNET50
-from .new_model import CONFIGS as NEW_MODEL
 
 CONFIGS = dict()
 CONFIGS.update(DEFAULT_BASE)

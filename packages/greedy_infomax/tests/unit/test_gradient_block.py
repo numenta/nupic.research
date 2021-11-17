@@ -57,6 +57,29 @@ class TestGradientBlock(unittest.TestCase):
             self.assertIsNone(conv1_grads)
             self.assertIsNotNone(linear_grads)
 
+    def test_gradients_not_blocked(self):
+        """
+        Test that gradients are not blocked following the GradientBlock module.
+        """
+        data = FakeData(size=10, image_size=(1, 10, 10), num_classes=10,
+                        transform=ToTensor())
+        dataloader = DataLoader(data, batch_size=10)
+        model = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=1, kernel_size=3),
+            nn.Flatten(),
+            nn.Linear(64, 10)
+        )
+        optimizer = Adam(model.parameters(), lr=1e-4)
+        for data, targets in dataloader:
+            out = model(data)
+            error_loss = torch.nn.functional.cross_entropy(out, targets)
+            optimizer.zero_grad()
+            error_loss.backward()
+            conv1_grads = model._modules["0"].weight.grad
+            linear_grads = model._modules["2"].weight.grad
+            self.assertIsNotNone(conv1_grads)
+            self.assertIsNotNone(linear_grads)
+
 
 if __name__ == "__main__":
     unittest.main()
