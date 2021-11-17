@@ -96,6 +96,7 @@ def all_module_losses(module_losses, targets, reduction="mean"):
     module_losses = torch.mean(module_losses, 0)  # n
     return module_losses
 
+
 def all_module_losses_dataparallel(module_losses, targets, reduction="mean"):
     """
     This is used when training with a DataParallel BlockModel with multiple GPUs.
