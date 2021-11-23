@@ -118,7 +118,7 @@ class DendriteIntegrationTest(unittest.TestCase):
     with Vernon and Continual Learning
     """
 
-    def test_base_experiment(self):
+    def test_si_mixin(self):
         """
         Tests Synaptic Intelligence mixins integrations.
         """
