@@ -8,8 +8,6 @@ Biological neurons integrate their inputs on dendrites using a diverse range of 
 
 This repository contains the code originally used in the above paper. Since it contains our latest code for dendrites, there may be differences from the paper. To reproduce the charts and results presented in the paper, please go to [htmpapers](https://github.com/numenta/htmpapers/tree/master/biorxiv/going_beyond_the_point_neuron) for a versioned copy of the code.
 
-For the latest pytorch code for using the code in your own projects check the [nupic.research](https://github.com/numenta/nupic.research) and [nupic.torch](https://github.com/numenta/nupic.torch) repositories.
-
 Below are instructions for running the experiments presented in the paper. 
 
 ### Experiment configurations
