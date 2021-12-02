@@ -1,4 +1,4 @@
-# Going Beyond the Point Neuron: Active Dendrites and Sparse Representations for Continual Learning
+# [Going Beyond the Point Neuron: Active Dendrites and Sparse Representations for Continual Learning](https://www.biorxiv.org/content/10.1101/2021.10.25.465651v1)
 
 ## Abstract
 
@@ -6,9 +6,11 @@ Biological neurons integrate their inputs on dendrites using a diverse range of 
 
 ## Running experiments
 
-This repository contains versioned code used to replicate the experiments in the paper. For the latest pytorch code for using the code in your own projects check the [nupic.research](https://github.com/numenta/nupic.research) and [nupic.torch](https://github.com/numenta/nupic.torch) repositories.
+This repository contains the code originally used in the above paper. Since it contains our latest code for dendrites, there may be differences from the paper. To reproduce the charts and results presented in the paper, please go to [htmpapers](https://github.com/numenta/htmpapers/tree/master/biorxiv/going_beyond_the_point_neuron) for a versioned copy of the code.
 
-Below are instructions for reproducing all the charts and tables presented in the paper. There might be small differences due to randomness.
+For the latest pytorch code for using the code in your own projects check the [nupic.research](https://github.com/numenta/nupic.research) and [nupic.torch](https://github.com/numenta/nupic.torch) repositories.
+
+Below are instructions for running the experiments presented in the paper. 
 
 ### Experiment configurations
 
@@ -68,4 +70,5 @@ The notebook `permutedMNIST/figures/hidden_activations_per_task.ipynb` generates
 3. Run all code blocks in the notebook to generate a visualization similar to Figure 6.
 
 ----
-"Going Beyond the Point Neuron: Active Dendrites and Sparse Representations for Continual Learning"; [bioRxiv](https://www.biorxiv.org/content/10.1101/2021.10.25.465651v1).
+
+Karan Grewal, Jeremy Forest, Benjamin P. Cohen, and Subutai Ahmad. “Going Beyond the Point Neuron: Active Dendrites and Sparse Representations for Continual Learning”. In: *bioRxiv*(2021). doi:10.1101/2021.10.25.465651. url:[https://www.biorxiv.org/content/early/2021/10/26/2021.10.25.465651](ttps://www.biorxiv.org/content/10.1101/2021.10.25.465651v1).
