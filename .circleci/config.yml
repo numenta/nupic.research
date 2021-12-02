@@ -30,8 +30,10 @@ jobs:
     environment:
       - GIT_LFS_SKIP_SMUDGE: 1
     steps:
+      - run:
+          name: Check if this PR was create from a fork
+          command: test -n "${CIRCLE_PR_USERNAME}"
       - checkout
-
       # Cache git-lfs installation
       - restore_cache:
           key: git-lfs-bin-v2-key
