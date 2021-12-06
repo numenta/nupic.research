@@ -8,8 +8,6 @@ Biological neurons integrate their inputs on dendrites using a diverse range of 
 
 This repository contains the code originally used in the above paper. Since it contains our latest code for dendrites, there may be differences from the paper. To reproduce the charts and results presented in the paper, please go to [htmpapers](https://github.com/numenta/htmpapers/tree/master/biorxiv/going_beyond_the_point_neuron) for a versioned copy of the code.
 
-Below are instructions for running the experiments presented in the paper. 
-
 ### Experiment configurations
 
 Each individual experiment (which requires training a model on permutedMNIST for some number of tasks) has its own **experiment configuration**. An experiment configuration is simply a python dict defined in one of the files in `permutedMNIST/experiments/`. Each experiment configuration defines the model to train, its parameters and hyperparameters, the dataset, etc. For instance, the experiment configuration `PROTOTYPE_10` (defined in `permutedMNIST/experiments/prototype.py`) can be used to train an Active Dendrites Network on 10 permutedMNIST tasks while prototyping the context vector with the specified parameters.
