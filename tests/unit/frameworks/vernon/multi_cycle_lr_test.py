@@ -22,7 +22,6 @@
 import unittest
 
 import numpy as np
-from nupic.research.frameworks.vernon.mixins import multi_cycle_lr
 import torch
 from torchvision.datasets import FakeData
 from torchvision.transforms import ToTensor
@@ -149,15 +148,11 @@ class MultiCycleLRTest(unittest.TestCase):
                 cycle < len(supervised_experiment["multi_cycle_lr_args"])
                 and supervised_experiment["multi_cycle_lr_args"][cycle][0] == i
             ):
-                current_lr_conf = supervised_experiment["multi_cycle_lr_args"][
-                    cycle
-                ][1]
+                current_lr_conf = supervised_experiment["multi_cycle_lr_args"][cycle][1]
                 cycle += 1
                 # If new cycle is started, check that initial lr is
                 # max_lr/div_factor
-                initial_lr = (
-                    current_lr_conf["max_lr"] / current_lr_conf["div_factor"]
-                )
+                initial_lr = current_lr_conf["max_lr"] / current_lr_conf["div_factor"]
                 self.assertAlmostEqual(lr[0], initial_lr)
 
             # Check that lr of this epoch stays below max lr according to
