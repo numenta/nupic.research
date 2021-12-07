@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2020, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2021, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -111,12 +111,6 @@ supervised_experiment = dict(
 
 
 class MultiCycleLRTest(unittest.TestCase):
-    def setUp(self):
-        pass
-
-    def tearDown(self):
-        pass
-
     def test_supervised_experiment_with_cycle_lr(self):
 
         # Setup experiment and initialize model.
@@ -148,11 +142,15 @@ class MultiCycleLRTest(unittest.TestCase):
                 cycle < len(supervised_experiment["multi_cycle_lr_args"])
                 and supervised_experiment["multi_cycle_lr_args"][cycle][0] == i
             ):
-                current_lr_conf = supervised_experiment["multi_cycle_lr_args"][cycle][1]
+                current_lr_conf = supervised_experiment["multi_cycle_lr_args"][
+                    cycle
+                ][1]
                 cycle += 1
                 # If new cycle is started, check that initial lr is
                 # max_lr/div_factor
-                initial_lr = current_lr_conf["max_lr"] / current_lr_conf["div_factor"]
+                initial_lr = (
+                    current_lr_conf["max_lr"] / current_lr_conf["div_factor"]
+                )
                 self.assertAlmostEqual(lr[0], initial_lr)
 
             # Check that lr of this epoch stays below max lr according to
