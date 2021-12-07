@@ -155,10 +155,11 @@ class MultiCycleLRTest(unittest.TestCase):
 
             # Check that lr of this epoch stays below max lr according to
             # multiCycleLR schedule.
-            assert np.max(lr) <= current_lr_conf["max_lr"]
+            self.assertLessEqual(np.max(lr), current_lr_conf["max_lr"])
             # Check that lr of this epoch stays above min lr.
-            assert np.round(np.min(lr), 8) >= np.round(
-                initial_lr / current_lr_conf["final_div_factor"], 8
+            self.assertGreaterEqual(
+                np.round(np.min(lr), 8),
+                np.round(initial_lr / current_lr_conf["final_div_factor"], 8),
             )
 
 
