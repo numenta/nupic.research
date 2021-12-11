@@ -238,7 +238,7 @@ class CSVLoggerPlus(CSVLogger):
         self._file.flush()
 
 
-DEFAULT_LOGGERS = (JsonLogger, CSVLoggerPlus, TFLoggerPlus)
+DEFAULT_LOGGERS = (JsonLogger, CSVLoggerPlus)
 
 
 if __name__ == "__main__":
