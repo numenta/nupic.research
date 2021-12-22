@@ -23,10 +23,11 @@ Base GSC Experiment configuration.
 """
 
 import os
-from src import EnvDataset, DQN, OffPolicyReinforcementLearningExperiment
-from nupic.research.frameworks.ray.trainables import DebugTrainable
 
 import gym
+
+from nupic.research.frameworks.ray.trainables import DebugTrainable
+from src import DQN, EnvDataset, OffPolicyReinforcementLearningExperiment
 
 
 def gym_env(**env_args):

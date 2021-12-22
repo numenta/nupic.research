@@ -22,8 +22,8 @@
 import numpy as np
 import torch
 
-from .networks import DQNNetwork
 from .misc import Scheduler
+from .networks import DQNNetwork
 
 
 class AlgorithmBase():

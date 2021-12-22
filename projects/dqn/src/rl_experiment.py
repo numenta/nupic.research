@@ -20,10 +20,11 @@
 # ----------------------------------------------------------------------
 
 import io
-import numpy as np
 import time
-import torch
 from collections import Counter
+
+import numpy as np
+import torch
 from torch.backends import cudnn
 from torch.utils.data import DataLoader, SubsetRandomSampler
 

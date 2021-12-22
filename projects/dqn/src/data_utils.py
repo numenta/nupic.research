@@ -20,10 +20,9 @@
 # ----------------------------------------------------------------------
 
 
+from collections import deque, namedtuple
+
 from torch.utils.data import Dataset
-
-from collections import namedtuple, deque
-
 from torchvision import transforms
 
 Experience = namedtuple("Experience", (
