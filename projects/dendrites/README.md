@@ -75,4 +75,5 @@ The notebook `permutedMNIST/figures/hidden_activations_per_task.ipynb` generates
 
 Karan Grewal, Jeremy Forest, Benjamin P. Cohen, and Subutai Ahmad. “Going Beyond the Point Neuron: Active Dendrites and Sparse Representations for Continual Learning”. In: *bioRxiv*(2021). doi:10.1101/2021.10.25.465651. url:[https://www.biorxiv.org/content/early/2021/10/26/2021.10.25.465651](https://www.biorxiv.org/content/10.1101/2021.10.25.465651v1).
 
-Abhiram Iyer, Karan Grewal, Akash Velu, Lucas Oliveira Souza, Jeremy Forest, and Subutai Ahmad. "Avoiding Catastrophe: Active Dendrites Enable Multi-Task Learning in Dynamic Environments". In: *arXiv*(2021). arXiv:2201.00042 url:[https://arxiv.org/abs/2201.00042]
+Abhiram Iyer, Karan Grewal, Akash Velu, Lucas Oliveira Souza, Jeremy Forest, and Subutai Ahmad. "Avoiding Catastrophe: Active Dendrites Enable Multi-Task Learning in Dynamic Environments". In: *arXiv*(2021). arXiv:2201.00042 url:[https://arxiv.org/abs/2201.00042](
+https://arxiv.org/abs/2201.00042).
