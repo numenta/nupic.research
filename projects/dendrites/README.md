@@ -1,12 +1,18 @@
-# [Going Beyond the Point Neuron: Active Dendrites and Sparse Representations for Continual Learning](https://www.biorxiv.org/content/10.1101/2021.10.25.465651v1)
+# [Going Beyond the Point Neuron: Active Dendrites and Sparse Representations for Continual Learning](https://www.biorxiv.org/content/10.1101/2021.10.25.465651)
 
 ## Abstract
 
 Biological neurons integrate their inputs on dendrites using a diverse range of non-linear functions. However the majority of artificial neural networks (ANNs) ignore biological neurons' structural complexity and instead use simplified point neurons. Can dendritic properties add value to ANNs? In this paper we investigate this question in the context of continual learning, an area where ANNs suffer from *catastrophic forgetting* (i.e., ANNs are unable to learn new information without erasing what they previously learned). We propose that dendritic properties can help neurons learn context specific patterns and invoke highly sparse context-specific subnetworks. Within a continual learning scenario, these task-specific subnetworks interfere minimally with each other and, as a result, the network remembers previous tasks significantly better than standard ANNs. We then show that by combining dendritic networks with Synaptic Intelligence (a biologically motivated method for complex weights) we can achieve significant resilience to catastrophic forgetting, more than either technique can achieve on its own. Our neuron model is directly inspired by the biophysics of sustained depolarization following dendritic NMDA spikes. Our research sheds light on how biological properties of neurons can be used to solve scenarios that are typically impossible for traditional ANNs to solve.
 
+# [Avoiding Catastrophe: Active Dendrites Enable Multi-Task Learning in Dynamic Environments](https://arxiv.org/abs/2201.00042)
+
+## Abstract
+
+A key challenge for AI is to build embodied systems that operate in dynamically changing environments. Such systems must adapt to changing task contexts and learn continuously. Although standard deep learning systems achieve state of the art results on static benchmarks, they often struggle in dynamic scenarios. In these settings, error signals from multiple contexts can interfere with one another, ultimately leading to a phenomenon known as catastrophic forgetting. In this article we investigate biologically inspired architectures as solutions to these problems. Specifically, we show that the biophysical properties of dendrites and local inhibitory systems enable networks to dynamically restrict and route information in a context-specific manner. Our key contributions are as follows. First, we propose a novel artificial neural network architecture that incorporates active dendrites and sparse representations into the standard deep learning framework. Next, we study the performance of this architecture on two separate benchmarks requiring task-based adaptation: Meta-World, a multi-task reinforcement learning environment where a robotic agent must learn to solve a variety of manipulation tasks simultaneously; and a continual learning benchmark in which the model's prediction task changes throughout training. Analysis on both benchmarks demonstrates the emergence of overlapping but distinct and sparse subnetworks, allowing the system to fluidly learn multiple tasks with minimal forgetting. Our neural implementation marks the first time a single architecture has achieved competitive results on both multi-task and continual learning settings. Our research sheds light on how biological properties of neurons can inform deep learning systems to address dynamic scenarios that are typically impossible for traditional ANNs to solve.
+
 ## Running experiments
 
-This repository contains the code originally used in the above paper. Since it contains our latest code for dendrites, there may be differences from the paper. To reproduce the charts and results presented in the paper, please go to [htmpapers](https://github.com/numenta/htmpapers/tree/master/biorxiv/going_beyond_the_point_neuron) for a versioned copy of the code.
+This repository contains the code originally used in the above two papers. Since it contains our latest code for dendrites, there may be differences from the papers. To reproduce the charts and results presented in the first paper, please go to [htmpapers](https://github.com/numenta/htmpapers/tree/master/biorxiv/going_beyond_the_point_neuron) for a versioned copy of the code.
 
 ### Experiment configurations
 
@@ -67,4 +73,7 @@ The notebook `permutedMNIST/figures/hidden_activations_per_task.ipynb` generates
 
 ----
 
-Karan Grewal, Jeremy Forest, Benjamin P. Cohen, and Subutai Ahmad. “Going Beyond the Point Neuron: Active Dendrites and Sparse Representations for Continual Learning”. In: *bioRxiv*(2021). doi:10.1101/2021.10.25.465651. url:[https://www.biorxiv.org/content/early/2021/10/26/2021.10.25.465651](ttps://www.biorxiv.org/content/10.1101/2021.10.25.465651v1).
+Karan Grewal, Jeremy Forest, Benjamin P. Cohen, and Subutai Ahmad. “Going Beyond the Point Neuron: Active Dendrites and Sparse Representations for Continual Learning”. In: *bioRxiv*(2021). doi:10.1101/2021.10.25.465651. url:[https://www.biorxiv.org/content/early/2021/10/26/2021.10.25.465651](https://www.biorxiv.org/content/10.1101/2021.10.25.465651).
+
+Abhiram Iyer, Karan Grewal, Akash Velu, Lucas Oliveira Souza, Jeremy Forest, and Subutai Ahmad. "Avoiding Catastrophe: Active Dendrites Enable Multi-Task Learning in Dynamic Environments". In: *arXiv*(2021). arXiv:2201.00042 url:[https://arxiv.org/abs/2201.00042](
+https://arxiv.org/abs/2201.00042).
