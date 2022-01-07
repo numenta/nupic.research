@@ -48,6 +48,7 @@ Here we go in details about the configurations used to train a model for each of
 
   - `prototype_*` : the number of dendritic segments per neuron is equal to the number of continual learning tasks,
   - `prototype_*_segments_*` : the number of dendritic segments per neuron is always 10,
+  - `construct_prototype_*`: construct prototype vectors during training using a clustering procedure instead of task labels,
   - `si_prototype_*` : [Synaptic Intelligence (Zenke et al. (2017))](https://arxiv.org/abs/1703.04200) is used,
   - `active_dendrites_only_*` : ReLU is substituted for the [k-Winner-Take-All function (Ahmad & Scheinkman (2019))](https://arxiv.org/abs/1903.11257),
   - `sparse_representations_only_*` : neurons don't have dendritic segments.
