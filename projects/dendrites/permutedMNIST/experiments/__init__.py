@@ -22,6 +22,7 @@
 from .base import CONFIGS as BASE
 from .batch import CONFIGS as BATCH
 from .batch_mnist import CONFIGS as BATCH_MNIST
+from .cluster import CONFIGS as CLUSTER
 from .dendrites_xor_sparsity import CONFIGS as DENDRITES_XOR_SPARSITY
 from .gating import CONFIGS as GATING
 from .hyperparameter_search import CONFIGS as HYPERPARAMETERSEARCH
@@ -46,6 +47,7 @@ CONFIGS = dict()
 CONFIGS.update(BASE)
 CONFIGS.update(BATCH)
 CONFIGS.update(BATCH_MNIST)
+CONFIGS.update(CLUSTER)
 CONFIGS.update(DENDRITES_XOR_SPARSITY)
 CONFIGS.update(GATING)
 CONFIGS.update(HYPERPARAMETERSEARCH)
