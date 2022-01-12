@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 from copy import deepcopy
+
 import numpy as np
 import torch
 
@@ -27,10 +28,7 @@ from .misc import Scheduler
 from .networks import DQNNetwork
 
 
-class AlgorithmBase():
-    pass
-
-class DQN(AlgorithmBase):
+class DQN():
     """
     DQN algorithm implementation compatible with Vernon
     Parts of the code adapted from:

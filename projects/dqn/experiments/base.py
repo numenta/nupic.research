@@ -26,8 +26,9 @@ import os
 
 import gym
 
-from nupic.research.frameworks.ray.trainables import DebugTrainable
 from main import DQN, GymEnvDataset, OffPolicyReinforcementLearningExperiment
+from nupic.research.frameworks.ray.trainables import DebugTrainable
+
 
 def gym_env(**env_args):
     return gym.make(**env_args)
