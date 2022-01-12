@@ -21,6 +21,7 @@
 """
 Base RL Experiment configuration.
 """
+# noqa: I004
 
 import os
 
