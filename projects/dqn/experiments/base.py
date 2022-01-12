@@ -19,7 +19,7 @@
 #
 
 """
-Base GSC Experiment configuration.
+Base RL Experiment configuration.
 """
 
 import os
@@ -27,8 +27,7 @@ import os
 import gym
 
 from nupic.research.frameworks.ray.trainables import DebugTrainable
-from src import DQN, EnvDataset, OffPolicyReinforcementLearningExperiment
-
+from main import DQN, GymEnvDataset, OffPolicyReinforcementLearningExperiment
 
 def gym_env(**env_args):
     return gym.make(**env_args)
@@ -42,7 +41,7 @@ dqn_base = dict(
     ray_trainable=DebugTrainable,
     algorithm_class=DQN,
     experiment_class=OffPolicyReinforcementLearningExperiment,
-    dataset_class=EnvDataset,
+    dataset_class=GymEnvDataset,
     dataset_args=dict(
         env_init_func=gym_env,
         env_args=dict(

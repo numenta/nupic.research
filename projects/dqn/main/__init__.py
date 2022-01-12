@@ -23,4 +23,4 @@ from .rl_experiment import OffPolicyReinforcementLearningExperiment
 from .networks import DQNNetwork
 from .misc import Scheduler
 from .algorithms import DQN
-from .data_utils import Experience, EnvDataset, InteractiveDataLoader, ReplayBuffer
+from .data_utils import Experience, GymEnvDataset, InteractiveDataLoader, ReplayBuffer

@@ -30,7 +30,7 @@ Experience = namedtuple("Experience", (
 )
 
 
-class EnvDataset(Dataset):
+class GymEnvDataset(Dataset):
     """
     Based on gym
     TODO: implement env dataset wth stacking frames capability
@@ -88,7 +88,6 @@ class InteractiveDataLoader():
     def __init__(self, dataset, action_function):
         self.dataset = dataset
         self.action_function = action_function
-        self.reset()
 
     def reset(self):
         """Resets environment associated with dataloader"""
@@ -99,6 +98,7 @@ class InteractiveDataLoader():
         Note: first step should return all Nones except for observation, given it is the
         environment initialization
         """
+        self.reset()
         while not self.dataset.episode_complete:
             action = self.action_function(self.last_observation)
             next_observation, reward, done, info = self.dataset[action]
@@ -112,7 +112,6 @@ class InteractiveDataLoader():
             )
             self.last_observation = next_observation
             yield experience
-        self.reset()
 
 
 class ReplayBuffer(Dataset):

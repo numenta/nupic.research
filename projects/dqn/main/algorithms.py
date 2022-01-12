@@ -19,6 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from copy import deepcopy
 import numpy as np
 import torch
 
@@ -28,7 +29,6 @@ from .networks import DQNNetwork
 
 class AlgorithmBase():
     pass
-
 
 class DQN(AlgorithmBase):
     """
@@ -64,10 +64,7 @@ class DQN(AlgorithmBase):
             num_actions=num_actions
         )
         self.q_function.to(self.device)
-        self.target_q_function = q_function_network_class(
-            input_channels=input_channels,
-            num_actions=num_actions
-        )
+        self.target_q_function = deepcopy(self.q_function)
         self.target_q_function.to(self.device)
 
         # Initialize optimizer
@@ -92,7 +89,7 @@ class DQN(AlgorithmBase):
         self.q_function_optimizer.zero_grad()
         output, loss = self.compute_error(experiences)
         output.backward(loss)
-        self.q_function_optimizer.zero_grad()
+        self.q_function_optimizer.step()
         return loss.sum().item()
 
     def state_dict(self):
@@ -111,6 +108,10 @@ class DQN(AlgorithmBase):
             state_dict["exploration_rate_scheduler"])
 
     def get_next_action(self, last_observation):
+        """
+        e-greedy only to be used in training.
+        If evaluation is implemented, action should be the output of q_function
+        """
         if np.random.random() < self.exploration_rate_scheduler():
             return self.q_function.get_action(last_observation)
         else:
@@ -153,17 +154,18 @@ class DQN(AlgorithmBase):
         target_q_values = rew_batch + (self.discount_rate * next_q_values)
 
         # Compute Bellman error
-        bellman_error = target_q_values - current_q_values
+        td_error = target_q_values - current_q_values
         if self.clip_error:
-            bellman_error = bellman_error.clamp(-1, 1)
+            td_error = td_error.clamp(-1, 1)
 
         # Note: bellman_delta * -1 will be right gradient for minimization
-        loss = bellman_error * -1.0
+        loss = td_error * -1.0
 
         return current_q_values, loss
 
     def post_step(self, num_steps):
         self.update_target_function(num_steps)
+        self.exploration_rate_scheduler.step()
 
     def update_target_function(self, num_steps):
         if num_steps % self.target_function_update_frequency == 0:

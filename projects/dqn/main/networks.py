@@ -35,11 +35,15 @@ class DQNNetwork(nn.Module):
         super().__init__()
         self.features = nn.Sequential(
             nn.Conv2d(input_channels, 32, kernel_size=8, stride=4),
+            nn.ReLU(),
             nn.Conv2d(32, 64, kernel_size=4, stride=2),
+            nn.ReLU(),
             nn.Conv2d(64, 64, kernel_size=3, stride=1),
+            nn.ReLU(),
             nn.AdaptiveAvgPool2d((7, 7)),
             nn.Flatten(),
             nn.Linear(7 * 7 * 64, 512),
+            nn.ReLU(),
         )
         self.classifier = nn.Linear(512, num_actions)
 
