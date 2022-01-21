@@ -8,6 +8,10 @@ channels:
   - nvidia
   - conda-forge
 
+variables:
+  # Force x86 on Apple M1 laptops for now
+  CONDA_SUBDIR: osx-64
+
 dependencies:
   - python=3.8
   - pip
