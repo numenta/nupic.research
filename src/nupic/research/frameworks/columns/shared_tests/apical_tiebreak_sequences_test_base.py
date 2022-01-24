@@ -30,7 +30,7 @@ import numpy as np
 
 
 
-class ApicalTiebreakSequencesTestBase(object):
+class ApicalTiebreakSequencesTestBase(object, metaclass=ABCMeta):
   """
   Test that a Temporal Memory uses apical dendrites as part of sequence
   inference.
@@ -47,8 +47,6 @@ class ApicalTiebreakSequencesTestBase(object):
   minicolumn with basal support. In other words, they handle the situation where
   the previous input is bursting.
   """
-
-  __metaclass__ = ABCMeta
   columnCount = 2048
   w = 40
   apicalInputSize = 1000
@@ -58,12 +56,12 @@ class ApicalTiebreakSequencesTestBase(object):
 
     self.cellsPerColumn = None
 
-    print ("\n"
+    print(("\n"
            "======================================================\n"
            "Test: {0} \n"
            "{1}\n"
            "======================================================\n"
-    ).format(self.id(), self.shortDescription())
+    ).format(self.id(), self.shortDescription()))
 
 
   def testSequenceMemory_BasalInputRequiredForPredictions(self):
@@ -76,10 +74,10 @@ class ApicalTiebreakSequencesTestBase(object):
 
     self.init()
 
-    abcde = [self.randomColumnPattern() for _ in xrange(5)]
+    abcde = [self.randomColumnPattern() for _ in range(5)]
     feedback = self.randomApicalPattern()
 
-    for _ in xrange(4):
+    for _ in range(4):
       self.reset()
       for pattern in abcde:
         self.compute(pattern, apicalInput=feedback, learn=True)
@@ -99,7 +97,7 @@ class ApicalTiebreakSequencesTestBase(object):
 
     self.init()
 
-    bcd = [self.randomColumnPattern() for _ in xrange(3)]
+    bcd = [self.randomColumnPattern() for _ in range(3)]
     abcde = [self.randomColumnPattern()] + bcd + [self.randomColumnPattern()]
     xbcdy = [self.randomColumnPattern()] + bcd + [self.randomColumnPattern()]
     feedback1 = self.randomApicalPattern()
@@ -108,7 +106,7 @@ class ApicalTiebreakSequencesTestBase(object):
     # First learn the sequences without feedback. We need to let it work through
     # the common subsequence, choosing new cell SDRs for elements later in the
     # sequence, before allowing it to grow apical segments.
-    for _ in xrange(10):
+    for _ in range(10):
       self.reset()
       for pattern in abcde:
         self.compute(pattern, apicalInput=(), learn=True)
@@ -118,7 +116,7 @@ class ApicalTiebreakSequencesTestBase(object):
         self.compute(pattern, apicalInput=(), learn=True)
 
     # Learn the apical connections
-    for _ in xrange(2):
+    for _ in range(2):
       self.reset()
       for pattern in abcde:
         self.compute(pattern, apicalInput=feedback1, learn=True)
@@ -152,7 +150,7 @@ class ApicalTiebreakSequencesTestBase(object):
 
     self.init()
 
-    bcd = [self.randomColumnPattern() for _ in xrange(3)]
+    bcd = [self.randomColumnPattern() for _ in range(3)]
     abcde = [self.randomColumnPattern()] + bcd + [self.randomColumnPattern()]
     xbcdy = [self.randomColumnPattern()] + bcd + [self.randomColumnPattern()]
     feedback1 = self.randomApicalPattern()
@@ -161,7 +159,7 @@ class ApicalTiebreakSequencesTestBase(object):
     # First learn the sequences without feedback. We need to let it work through
     # the common subsequence, choosing new cell SDRs for elements later in the
     # sequence, before allowing it to grow apical segments.
-    for _ in xrange(10):
+    for _ in range(10):
       self.reset()
       for pattern in abcde:
         self.compute(pattern, apicalInput=(), learn=True)
@@ -171,7 +169,7 @@ class ApicalTiebreakSequencesTestBase(object):
         self.compute(pattern, apicalInput=(), learn=True)
 
     # Learn the apical connections
-    for _ in xrange(2):
+    for _ in range(2):
       self.reset()
       for pattern in abcde:
         self.compute(pattern, apicalInput=feedback1, learn=True)
@@ -201,7 +199,7 @@ class ApicalTiebreakSequencesTestBase(object):
 
     self.init()
 
-    bcd = [self.randomColumnPattern() for _ in xrange(3)]
+    bcd = [self.randomColumnPattern() for _ in range(3)]
     abcde = [self.randomColumnPattern()] + bcd + [self.randomColumnPattern()]
     xbcdy = [self.randomColumnPattern()] + bcd + [self.randomColumnPattern()]
     feedback1 = self.randomApicalPattern()
@@ -210,7 +208,7 @@ class ApicalTiebreakSequencesTestBase(object):
     # First learn the sequences without feedback. We need to let it work through
     # the common subsequence, choosing new cell SDRs for elements later in the
     # sequence, before allowing it to grow apical segments.
-    for _ in xrange(10):
+    for _ in range(10):
       self.reset()
       for pattern in abcde:
         self.compute(pattern, apicalInput=(), learn=True)
@@ -220,7 +218,7 @@ class ApicalTiebreakSequencesTestBase(object):
         self.compute(pattern, apicalInput=(), learn=True)
 
     # Learn the apical connections
-    for _ in xrange(2):
+    for _ in range(2):
       self.reset()
       for pattern in abcde:
         self.compute(pattern, apicalInput=feedback1, learn=True)
@@ -253,7 +251,7 @@ class ApicalTiebreakSequencesTestBase(object):
 
     self.init()
 
-    bcd = [self.randomColumnPattern() for _ in xrange(3)]
+    bcd = [self.randomColumnPattern() for _ in range(3)]
     abcde = [self.randomColumnPattern()] + bcd + [self.randomColumnPattern()]
     xbcdy = [self.randomColumnPattern()] + bcd + [self.randomColumnPattern()]
     mbcdn = [self.randomColumnPattern()] + bcd + [self.randomColumnPattern()]
@@ -264,7 +262,7 @@ class ApicalTiebreakSequencesTestBase(object):
     # First learn the sequences without feedback. We need to let it work through
     # the common subsequence, choosing new cell SDRs for elements later in the
     # sequence, before allowing it to grow apical segments.
-    for _ in xrange(20):
+    for _ in range(20):
       self.reset()
       for pattern in abcde:
         self.compute(pattern, apicalInput=(), learn=True)
@@ -278,7 +276,7 @@ class ApicalTiebreakSequencesTestBase(object):
         self.compute(pattern, apicalInput=(), learn=True)
 
     # Learn the apical connections
-    for _ in xrange(2):
+    for _ in range(2):
       self.reset()
       for pattern in abcde:
         self.compute(pattern, apicalInput=feedback1, learn=True)
@@ -345,26 +343,26 @@ class ApicalTiebreakSequencesTestBase(object):
 
 
   def getBurstingColumns(self):
-    predicted = set(cell / self.cellsPerColumn
+    predicted = set(cell // self.cellsPerColumn
                     for cell in  self.getPredictedCells())
-    active = set(cell / self.cellsPerColumn
+    active = set(cell // self.cellsPerColumn
                  for cell in  self.getActiveCells())
 
     return active - predicted
 
 
   def randomColumnPattern(self):
-    return set(random.sample(xrange(self.columnCount), self.w))
+    return set(random.sample(range(self.columnCount), self.w))
 
 
   def randomApicalPattern(self):
-    return set(random.sample(xrange(self.apicalInputSize), self.w))
+    return set(random.sample(range(self.apicalInputSize), self.w))
 
 
   def filterCellsByColumn(self, cells, columns):
     return [cell
             for cell in cells
-            if (cell / self.cellsPerColumn) in columns]
+            if (cell // self.cellsPerColumn) in columns]
 
 
   # ==============================

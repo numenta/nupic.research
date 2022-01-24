@@ -29,7 +29,7 @@ import unittest
 
 
 
-class SequenceMemoryTestBase(object):
+class SequenceMemoryTestBase(object, metaclass=ABCMeta):
   """
   ============================================================================
                   Basic First Order Sequences
@@ -190,8 +190,6 @@ class SequenceMemoryTestBase(object):
   when presented with the second A and B is different from the representation
   in the first presentation. [TODO]
   """
-
-  __metaclass__ = ABCMeta
   VERBOSITY = 1
   n = 2048
   w = 40
@@ -202,10 +200,10 @@ class SequenceMemoryTestBase(object):
     """Basic sequence learner.  M=1, N=100, P=1."""
     self.init({"cellsPerColumn": 1})
 
-    sequence = [self.randomPattern() for _ in xrange(100)]
+    sequence = [self.randomPattern() for _ in range(100)]
 
     # Learn
-    for _ in xrange(2):
+    for _ in range(2):
       for pattern in sequence:
         self.compute(pattern, learn=True)
 
@@ -225,10 +223,10 @@ class SequenceMemoryTestBase(object):
     """N=300, M=1, P=1. (See how high we can go with N)"""
     self.init({"cellsPerColumn": 1})
 
-    sequence = [self.randomPattern() for _ in xrange(300)]
+    sequence = [self.randomPattern() for _ in range(300)]
 
     # Learn
-    for _ in xrange(2):
+    for _ in range(2):
       for pattern in sequence:
         self.compute(pattern, learn=True)
 
@@ -247,11 +245,11 @@ class SequenceMemoryTestBase(object):
     """N=100, M=3, P=1. (See how high we can go with N*M)"""
     self.init({"cellsPerColumn": 1})
 
-    sequences = [[self.randomPattern() for _ in xrange(300)]
-                 for _ in xrange(3)]
+    sequences = [[self.randomPattern() for _ in range(300)]
+                 for _ in range(3)]
 
     # Learn
-    for _ in xrange(2):
+    for _ in range(2):
       for sequence in sequences:
         for pattern in sequence:
           self.compute(pattern, learn=True)
@@ -276,10 +274,10 @@ class SequenceMemoryTestBase(object):
 
     self.init()
 
-    sequence = [self.randomPattern() for _ in xrange(100)]
+    sequence = [self.randomPattern() for _ in range(100)]
 
     # Learn
-    for _ in xrange(2):
+    for _ in range(2):
       for pattern in sequence:
         self.compute(pattern, learn=True)
 
@@ -300,11 +298,11 @@ class SequenceMemoryTestBase(object):
 
     self.init()
 
-    sequences = [[self.randomPattern() for _ in xrange(300)]
-                 for _ in xrange(3)]
+    sequences = [[self.randomPattern() for _ in range(300)]
+                 for _ in range(3)]
 
     # Learn
-    for _ in xrange(2):
+    for _ in range(2):
       for sequence in sequences:
         for pattern in sequence:
           self.compute(pattern, learn=True)
@@ -343,10 +341,10 @@ class SequenceMemoryTestBase(object):
                "permanenceIncrement": 0.2,
                "cellsPerColumn": 1})
 
-    sequence = [self.randomPattern() for _ in xrange(100)]
+    sequence = [self.randomPattern() for _ in range(100)]
 
     # Learn
-    for _ in xrange(4):
+    for _ in range(4):
       for pattern in sequence:
         self.compute(pattern, learn=True)
 
@@ -369,10 +367,10 @@ class SequenceMemoryTestBase(object):
                "connectedPermanence": 0.7,
                "permanenceIncrement": 0.2})
 
-    sequence = [self.randomPattern() for _ in xrange(100)]
+    sequence = [self.randomPattern() for _ in range(100)]
 
     # Learn
-    for _ in xrange(4):
+    for _ in range(4):
       for pattern in sequence:
         self.compute(pattern, learn=True)
 
@@ -395,10 +393,10 @@ class SequenceMemoryTestBase(object):
                "connectedPermanence": 0.7,
                "permanenceIncrement": 0.2})
 
-    sequence = [self.randomPattern() for _ in xrange(100)]
+    sequence = [self.randomPattern() for _ in range(100)]
 
     # Learn
-    for _ in xrange(3):
+    for _ in range(3):
       for pattern in sequence:
         self.compute(pattern, learn=True)
 
@@ -419,10 +417,10 @@ class SequenceMemoryTestBase(object):
 
     self.init()
 
-    sequence = [self.randomPattern() for _ in xrange(100)]
+    sequence = [self.randomPattern() for _ in range(100)]
 
     # Learn
-    for _ in xrange(2):
+    for _ in range(2):
       for pattern in sequence:
         self.compute(pattern, learn=True)
 
@@ -450,15 +448,15 @@ class SequenceMemoryTestBase(object):
     self.init({"cellsPerColumn": 1})
 
     random.seed(37)
-    sharedSubsequence = [self.randomPattern() for _ in xrange(5)]
+    sharedSubsequence = [self.randomPattern() for _ in range(5)]
 
-    sequences = [[self.randomPattern() for _ in xrange(10)] +
+    sequences = [[self.randomPattern() for _ in range(10)] +
                  sharedSubsequence +
-                 [self.randomPattern() for _ in xrange(5)]
-                 for _ in xrange(2)]
+                 [self.randomPattern() for _ in range(5)]
+                 for _ in range(2)]
 
     # Learn
-    for _ in xrange(20):
+    for _ in range(20):
       for sequence in sequences:
         for pattern in sequence:
           self.compute(pattern, learn=True)
@@ -494,15 +492,15 @@ class SequenceMemoryTestBase(object):
     self.init()
 
     random.seed(38)
-    sharedSubsequence = [self.randomPattern() for _ in xrange(5)]
+    sharedSubsequence = [self.randomPattern() for _ in range(5)]
 
-    sequences = [[self.randomPattern() for _ in xrange(10)] +
+    sequences = [[self.randomPattern() for _ in range(10)] +
                  sharedSubsequence +
-                 [self.randomPattern() for _ in xrange(5)]
-                 for _ in xrange(2)]
+                 [self.randomPattern() for _ in range(5)]
+                 for _ in range(2)]
 
     # Learn
-    for _ in xrange(20):
+    for _ in range(20):
       for sequence in sequences:
         for pattern in sequence:
           self.compute(pattern, learn=True)
@@ -531,14 +529,14 @@ class SequenceMemoryTestBase(object):
     self.init()
 
     random.seed(39)
-    sharedSubsequence = [self.randomPattern() for _ in xrange(5)]
+    sharedSubsequence = [self.randomPattern() for _ in range(5)]
 
     sequences = [sharedSubsequence +
-                 [self.randomPattern() for _ in xrange(15)]
-                 for _ in xrange(2)]
+                 [self.randomPattern() for _ in range(15)]
+                 for _ in range(2)]
 
     # Learn
-    for _ in xrange(20):
+    for _ in range(20):
       for sequence in sequences:
         for pattern in sequence:
           self.compute(pattern, learn=True)
@@ -575,11 +573,11 @@ class SequenceMemoryTestBase(object):
     self.init()
 
     random.seed(40)
-    elements = [self.randomPattern() for _ in xrange(10)]
+    elements = [self.randomPattern() for _ in range(10)]
 
     while True:
       sequences = []
-      for _ in xrange(2):
+      for _ in range(2):
         sequence = list(elements)
         random.shuffle(sequence)
         sequences.append(sequence)
@@ -589,7 +587,7 @@ class SequenceMemoryTestBase(object):
         break
 
     # Learn
-    for _ in xrange(40):
+    for _ in range(40):
       for sequence in sequences:
         for pattern in sequence:
           self.compute(pattern, learn=True)
@@ -623,11 +621,11 @@ class SequenceMemoryTestBase(object):
     self.init()
 
     random.seed(41)
-    elements = [self.randomPattern() for _ in xrange(20)]
-    sharedSubsequence = [self.randomPattern() for _ in xrange(5)]
+    elements = [self.randomPattern() for _ in range(20)]
+    sharedSubsequence = [self.randomPattern() for _ in range(5)]
 
     sequences = []
-    for _ in xrange(2):
+    for _ in range(2):
       sublist = list(elements)
       random.shuffle(sublist)
       sequences.append(sublist[0:10] +
@@ -635,7 +633,7 @@ class SequenceMemoryTestBase(object):
                        sublist[10:])
 
     # Learn
-    for _ in xrange(80):
+    for _ in range(80):
       for sequence in sequences:
         for pattern in sequence:
           self.compute(pattern, learn=True)
@@ -670,15 +668,15 @@ class SequenceMemoryTestBase(object):
     self.init()
 
     random.seed(42)
-    sharedSubsequence = [self.randomPattern() for _ in xrange(5)]
+    sharedSubsequence = [self.randomPattern() for _ in range(5)]
 
-    sequences = [[self.randomPattern() for _ in xrange(10)] +
+    sequences = [[self.randomPattern() for _ in range(10)] +
                  sharedSubsequence +
-                 [self.randomPattern() for _ in xrange(5)]
-                 for _ in xrange(2)]
+                 [self.randomPattern() for _ in range(5)]
+                 for _ in range(2)]
 
     # Learn
-    for _ in xrange(20):
+    for _ in range(20):
       for sequence in sequences:
         for pattern in sequence:
           self.compute(pattern, learn=True)
@@ -712,17 +710,17 @@ class SequenceMemoryTestBase(object):
     """
 
     random.seed(43)
-    sharedSubsequence = [self.randomPattern() for _ in xrange(3)]
+    sharedSubsequence = [self.randomPattern() for _ in range(3)]
 
-    sequences = [[self.randomPattern() for _ in xrange(5)] +
+    sequences = [[self.randomPattern() for _ in range(5)] +
                  sharedSubsequence +
-                 [self.randomPattern() for _ in xrange(2)]
-                 for _ in xrange(2)]
+                 [self.randomPattern() for _ in range(2)]
+                 for _ in range(2)]
 
     # Add the same noise for both tests.
     allNoisySequences = [[[noisy(pattern, 2, self.n) for pattern in sequence]
                           for sequence in sequences]
-                         for _ in xrange(10)]
+                         for _ in range(10)]
 
     # Learn immediately so that we're sure there will be incorrect predictions.
 
@@ -810,12 +808,12 @@ class SequenceMemoryTestBase(object):
 
   def setUp(self):
 
-    print ("\n"
+    print(("\n"
            "======================================================\n"
            "Test: {0} \n"
            "{1}\n"
            "======================================================\n"
-    ).format(self.id(), self.shortDescription())
+    ).format(self.id(), self.shortDescription()))
 
 
   # ==============================
@@ -832,34 +830,34 @@ class SequenceMemoryTestBase(object):
 
 
   def getPredictedActiveColumns(self):
-    predicted = set(cell / self.cellsPerColumn
+    predicted = set(cell // self.cellsPerColumn
                     for cell in  self.getPredictedCells())
-    active = set(cell / self.cellsPerColumn
+    active = set(cell // self.cellsPerColumn
                  for cell in  self.getActiveCells())
 
     return active & predicted
 
 
   def getBurstingColumns(self):
-    predicted = set(cell / self.cellsPerColumn
+    predicted = set(cell // self.cellsPerColumn
                     for cell in  self.getPredictedCells())
-    active = set(cell / self.cellsPerColumn
+    active = set(cell // self.cellsPerColumn
                  for cell in  self.getActiveCells())
 
     return active - predicted
 
 
   def getPredictedInactiveColumns(self):
-    predicted = set(cell / self.cellsPerColumn
+    predicted = set(cell // self.cellsPerColumn
                     for cell in  self.getPredictedCells())
-    active = set(cell / self.cellsPerColumn
+    active = set(cell // self.cellsPerColumn
                  for cell in  self.getActiveCells())
 
     return predicted - active
 
 
   def randomPattern(self):
-    return random.sample(xrange(self.n), self.w)
+    return random.sample(range(self.n), self.w)
 
 
   # ==============================
@@ -936,7 +934,7 @@ def noisy(pattern, wFlip, n):
 
   noised.difference_update(random.sample(noised, wFlip))
 
-  for _ in xrange(wFlip):
+  for _ in range(wFlip):
     while True:
       v = random.randint(0, n - 1)
       if v not in pattern and v not in noised:
@@ -947,7 +945,7 @@ def noisy(pattern, wFlip, n):
 
 
 def containsSublist(list1, sublist):
-  for i in xrange(len(list1)):
+  for i in range(len(list1)):
     if list1[i:i+len(sublist)] == sublist:
       return True
 

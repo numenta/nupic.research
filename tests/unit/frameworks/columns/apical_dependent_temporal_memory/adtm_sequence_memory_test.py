@@ -28,9 +28,9 @@ import unittest
 
 import numpy as np
 
-from htmresearch.algorithms.apical_dependent_temporal_memory import (
+from nupic.research.frameworks.columns.apical_dependent_temporal_memory import (
   TripleMemory)
-from htmresearch.support.shared_tests.sequence_memory_test_base import(
+from nupic.research.frameworks.columns.shared_tests.sequence_memory_test_base import(
   SequenceMemoryTestBase)
 
 
@@ -51,7 +51,7 @@ class ApicalDependentTM_BasalSequenceMemoryTests(SequenceMemoryTestBase,
     # ApicalDependentTemporalMemory behave like traditional sequence memory.
     apicalInputSize = 1024
     self.constantApicalInput = np.array(
-      sorted(random.sample(xrange(apicalInputSize), 40)),
+      sorted(random.sample(list(range(apicalInputSize)), 40)),
       dtype="uint32")
 
     params = {
@@ -119,7 +119,7 @@ class ApicalDependentTM_ApicalSequenceMemoryTests(SequenceMemoryTestBase,
     # worth testing that the code is working as expected.
     basalInputSize = 1024
     self.constantBasalInput = np.array(
-      sorted(random.sample(xrange(basalInputSize), 40)),
+      sorted(random.sample(list(range(basalInputSize)), 40)),
       dtype="uint32")
 
     params = {

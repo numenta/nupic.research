@@ -23,9 +23,8 @@
 
 import numpy as np
 
-from htmresearch.support import numpy_helpers as np2
 from nupic.bindings.math import Random, SparseMatrixConnections
-
+from nupic.research.frameworks.columns import numpy_helpers as np2
 
 
 class ApicalDependentTemporalMemory(object):
@@ -253,7 +252,7 @@ class ApicalDependentTemporalMemory(object):
     # Calculate active cells
     (correctPredictedCells,
      burstingColumns) = np2.setCompare(self.predictedCells, activeColumns,
-                                       self.predictedCells / self.cellsPerColumn,
+                                       self.predictedCells // self.cellsPerColumn,
                                        rightMinusLeft=True)
 
     newActiveCells = np.concatenate((correctPredictedCells,
@@ -396,7 +395,7 @@ class ApicalDependentTemporalMemory(object):
 
     (matchingCellsInBurstingColumns,
      burstingColumnsWithNoMatch) = np2.setCompare(
-       matchingCells, burstingColumns, matchingCells / self.cellsPerColumn,
+       matchingCells, burstingColumns, matchingCells // self.cellsPerColumn,
        rightMinusLeft=True)
 
     (learningMatchingBasalSegments,
@@ -409,14 +408,14 @@ class ApicalDependentTemporalMemory(object):
     # Incorrectly predicted columns
     if self.basalPredictedSegmentDecrement > 0.0:
       correctMatchingBasalMask = np.in1d(
-        cellsForMatchingBasal / self.cellsPerColumn, activeColumns)
+        cellsForMatchingBasal // self.cellsPerColumn, activeColumns)
       basalSegmentsToPunish = matchingBasalSegments[~correctMatchingBasalMask]
     else:
       basalSegmentsToPunish = ()
 
     if self.apicalPredictedSegmentDecrement > 0.0:
       correctMatchingApicalMask = np.in1d(
-        cellsForMatchingApical / self.cellsPerColumn, activeColumns)
+        cellsForMatchingApical // self.cellsPerColumn, activeColumns)
       apicalSegmentsToPunish = matchingApicalSegments[~correctMatchingApicalMask]
     else:
       apicalSegmentsToPunish = ()
@@ -647,7 +646,7 @@ class ApicalDependentTemporalMemory(object):
     # casting to floor the result.
     (_,
      onePerColumnFilter,
-     numCandidatesInColumns) = np.unique(candidateCells / self.cellsPerColumn,
+     numCandidatesInColumns) = np.unique(candidateCells // self.cellsPerColumn,
                                          return_index=True, return_counts=True)
 
     offsetPercents = np.empty(len(columns), dtype="float32")

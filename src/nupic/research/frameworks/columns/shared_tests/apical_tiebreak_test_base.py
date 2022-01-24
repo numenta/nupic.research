@@ -29,7 +29,7 @@ import random
 
 
 
-class ApicalTiebreakTestBase(object):
+class ApicalTiebreakTestBase(object, metaclass=ABCMeta):
   """
   Test that a Temporal Memory successfully uses the following approach to basal
   and apical connections:
@@ -44,8 +44,6 @@ class ApicalTiebreakTestBase(object):
   minicolumn with basal support. In other words, they handle the situation where
   the basal input is a union.
   """
-
-  __metaclass__ = ABCMeta
   apicalInputSize = 1000
   basalInputSize = 1000
   columnCount = 2048
@@ -56,12 +54,12 @@ class ApicalTiebreakTestBase(object):
 
     self.cellsPerColumn = None
 
-    print ("\n"
+    print(("\n"
            "======================================================\n"
            "Test: {0} \n"
            "{1}\n"
            "======================================================\n"
-    ).format(self.id(), self.shortDescription())
+    ).format(self.id(), self.shortDescription()))
 
 
   def testBasalInputRequiredForPredictions(self):
@@ -77,13 +75,13 @@ class ApicalTiebreakTestBase(object):
     basalInput = self.randomBasalPattern()
     apicalInput = self.randomApicalPattern()
 
-    for _ in xrange(3):
+    for _ in range(3):
       self.compute(activeColumns, basalInput, apicalInput, learn=True)
 
     self.compute(activeColumns, basalInput=(), apicalInput=apicalInput,
                  learn=False)
 
-    self.assertEquals(set(activeColumns), self.getBurstingColumns())
+    self.assertEqual(set(activeColumns), self.getBurstingColumns())
 
 
   def testBasalPredictionsWithoutApical(self):
@@ -104,7 +102,7 @@ class ApicalTiebreakTestBase(object):
     apicalInput1 = self.randomApicalPattern()
     apicalInput2 = self.randomApicalPattern()
 
-    for _ in xrange(3):
+    for _ in range(3):
       self.compute(activeColumns, basalInput1, apicalInput1, learn=True)
       activeCells1 = set(self.getActiveCells())
       self.compute(activeColumns, basalInput2, apicalInput2, learn=True)
@@ -113,7 +111,7 @@ class ApicalTiebreakTestBase(object):
     self.compute(activeColumns, basalInput1 | basalInput2, apicalInput=(),
                  learn=False)
 
-    self.assertEquals(activeCells1 | activeCells2, set(self.getActiveCells()))
+    self.assertEqual(activeCells1 | activeCells2, set(self.getActiveCells()))
 
 
   def testApicalNarrowsThePredictions(self):
@@ -134,7 +132,7 @@ class ApicalTiebreakTestBase(object):
     apicalInput1 = self.randomApicalPattern()
     apicalInput2 = self.randomApicalPattern()
 
-    for _ in xrange(3):
+    for _ in range(3):
       self.compute(activeColumns, basalInput1, apicalInput1, learn=True)
       activeCells1 = set(self.getActiveCells())
       self.compute(activeColumns, basalInput2, apicalInput2, learn=True)
@@ -143,7 +141,7 @@ class ApicalTiebreakTestBase(object):
     self.compute(activeColumns, basalInput1 | basalInput2, apicalInput1,
                  learn=False)
 
-    self.assertEquals(activeCells1, set(self.getActiveCells()))
+    self.assertEqual(activeCells1, set(self.getActiveCells()))
 
 
   def testUnionOfFeedback(self):
@@ -167,7 +165,7 @@ class ApicalTiebreakTestBase(object):
     apicalInput2 = self.randomApicalPattern()
     apicalInput3 = self.randomApicalPattern()
 
-    for _ in xrange(3):
+    for _ in range(3):
       self.compute(activeColumns, basalInput1, apicalInput1, learn=True)
       activeCells1 = set(self.getActiveCells())
       self.compute(activeColumns, basalInput2, apicalInput2, learn=True)
@@ -178,7 +176,7 @@ class ApicalTiebreakTestBase(object):
     self.compute(activeColumns, basalInput1 | basalInput2 | basalInput3,
                  apicalInput1 | apicalInput2, learn=False)
 
-    self.assertEquals(activeCells1 | activeCells2, set(self.getActiveCells()))
+    self.assertEqual(activeCells1 | activeCells2, set(self.getActiveCells()))
 
 
 
@@ -219,24 +217,24 @@ class ApicalTiebreakTestBase(object):
 
 
   def getBurstingColumns(self):
-    predicted = set(cell / self.cellsPerColumn
+    predicted = set(cell // self.cellsPerColumn
                     for cell in  self.getPredictedCells())
-    active = set(cell / self.cellsPerColumn
+    active = set(cell // self.cellsPerColumn
                  for cell in  self.getActiveCells())
 
     return active - predicted
 
 
   def randomColumnPattern(self):
-    return set(random.sample(xrange(self.columnCount), self.w))
+    return set(random.sample(range(self.columnCount), self.w))
 
 
   def randomApicalPattern(self):
-    return set(random.sample(xrange(self.apicalInputSize), self.w))
+    return set(random.sample(range(self.apicalInputSize), self.w))
 
 
   def randomBasalPattern(self):
-    return set(random.sample(xrange(self.basalInputSize), self.w))
+    return set(random.sample(range(self.basalInputSize), self.w))
 
   # ==============================
   # Extension points

@@ -23,9 +23,8 @@
 
 import numpy as np
 
-from htmresearch.support import numpy_helpers as np2
 from nupic.bindings.math import Random, SparseMatrixConnections
-
+from nupic.research.frameworks.columns import numpy_helpers as np2
 
 
 class ApicalTiebreakTemporalMemory(object):
@@ -252,7 +251,7 @@ class ApicalTiebreakTemporalMemory(object):
     # Calculate active cells
     (correctPredictedCells,
      burstingColumns) = np2.setCompare(self.predictedCells, activeColumns,
-                                       self.predictedCells / self.cellsPerColumn,
+                                       self.predictedCells // self.cellsPerColumn,
                                        rightMinusLeft=True)
     newActiveCells = np.concatenate((correctPredictedCells,
                                      np2.getAllCellsInColumns(
@@ -379,7 +378,7 @@ class ApicalTiebreakTemporalMemory(object):
 
     (matchingCellsInBurstingColumns,
      burstingColumnsWithNoMatch) = np2.setCompare(
-       matchingCells, burstingColumns, matchingCells / self.cellsPerColumn,
+       matchingCells, burstingColumns, matchingCells // self.cellsPerColumn,
        rightMinusLeft=True)
 
     learningMatchingBasalSegments = self._chooseBestSegmentPerColumn(
@@ -396,7 +395,7 @@ class ApicalTiebreakTemporalMemory(object):
 
     # Incorrectly predicted columns
     correctMatchingBasalMask = np.in1d(
-      cellsForMatchingBasal / self.cellsPerColumn, activeColumns)
+      cellsForMatchingBasal // self.cellsPerColumn, activeColumns)
 
     basalSegmentsToPunish = matchingBasalSegments[~correctMatchingBasalMask]
 
@@ -465,7 +464,7 @@ class ApicalTiebreakTemporalMemory(object):
 
     # Incorrectly predicted columns
     correctMatchingApicalMask = np.in1d(
-      cellsForMatchingApical / self.cellsPerColumn, activeColumns)
+      cellsForMatchingApical // self.cellsPerColumn, activeColumns)
 
     apicalSegmentsToPunish = matchingApicalSegments[~correctMatchingApicalMask]
 
@@ -590,8 +589,8 @@ class ApicalTiebreakTemporalMemory(object):
     partlyDepolarizedCells = np.setdiff1d(cellsForBasalSegments,
                                           fullyDepolarizedCells)
 
-    inhibitedMask = np.in1d(partlyDepolarizedCells / self.cellsPerColumn,
-                            fullyDepolarizedCells / self.cellsPerColumn)
+    inhibitedMask = np.in1d(partlyDepolarizedCells // self.cellsPerColumn,
+                            fullyDepolarizedCells // self.cellsPerColumn)
     predictedCells = np.append(fullyDepolarizedCells,
                                partlyDepolarizedCells[~inhibitedMask])
 
@@ -747,9 +746,8 @@ class ApicalTiebreakTemporalMemory(object):
     # casting to floor the result.
     (_,
      onePerColumnFilter,
-     numCandidatesInColumns) = np.unique(candidateCells / cellsPerColumn,
+     numCandidatesInColumns) = np.unique(candidateCells // cellsPerColumn,
                                          return_index=True, return_counts=True)
-
     offsetPercents = np.empty(len(columns), dtype="float32")
     rng.initializeReal32Array(offsetPercents)
 
