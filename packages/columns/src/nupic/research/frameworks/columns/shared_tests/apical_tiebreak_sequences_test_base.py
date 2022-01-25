@@ -23,8 +23,8 @@
 Sequence memory tests that focus on the effects of feedback.
 """
 
-from abc import ABCMeta, abstractmethod
 import random
+from abc import ABCMeta, abstractmethod
 
 
 class ApicalTiebreakSequencesTestBase(object, metaclass=ABCMeta):

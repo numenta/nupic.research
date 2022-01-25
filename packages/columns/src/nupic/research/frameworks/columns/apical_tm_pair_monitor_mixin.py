@@ -23,16 +23,17 @@
 Apical Temporal Memory pair mixin that enables detailed monitoring of history.
 """
 
-from collections import defaultdict
-
 import copy
-
-from prettytable import PrettyTable
-
+from collections import defaultdict
 from nupic.algorithms.monitor_mixin.metric import Metric
 from nupic.algorithms.monitor_mixin.monitor_mixin_base import MonitorMixinBase
-from nupic.algorithms.monitor_mixin.trace import (IndicesTrace, CountsTrace,
-                                                  BoolsTrace, StringsTrace)
+from nupic.algorithms.monitor_mixin.trace import (
+    BoolsTrace,
+    CountsTrace,
+    IndicesTrace,
+    StringsTrace,
+)
+from prettytable import PrettyTable
 
 
 class ApicalTMPairMonitorMixin(MonitorMixinBase):

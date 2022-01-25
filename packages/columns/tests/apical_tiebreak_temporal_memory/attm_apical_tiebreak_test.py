@@ -23,14 +23,15 @@
 Run the apical tiebreak tests on the ApicalTiebreakTemporalMemory.
 """
 
+import numpy as np
 import unittest
 
-import numpy as np
-
 from nupic.research.frameworks.columns.apical_tiebreak_temporal_memory import (
-    ApicalTiebreakPairMemory)
+    ApicalTiebreakPairMemory,
+)
 from nupic.research.frameworks.columns.shared_tests.apical_tiebreak_test_base import (
-    ApicalTiebreakTestBase)
+    ApicalTiebreakTestBase,
+)
 
 
 class ApicalTiebreakTM_ApicalTiebreakTests(ApicalTiebreakTestBase,

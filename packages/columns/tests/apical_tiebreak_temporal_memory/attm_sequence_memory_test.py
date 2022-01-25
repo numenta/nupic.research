@@ -23,14 +23,15 @@
 Run the sequence memory tests on the ApicalTiebreakTemporalMemory
 """
 
+import numpy as np
 import unittest
 
-import numpy as np
-
 from nupic.research.frameworks.columns.apical_tiebreak_temporal_memory import (
-    ApicalTiebreakSequenceMemory)
+    ApicalTiebreakSequenceMemory,
+)
 from nupic.research.frameworks.columns.shared_tests.sequence_memory_test_base import (
-    SequenceMemoryTestBase)
+    SequenceMemoryTestBase,
+)
 
 
 class ApicalTiebreakTM_SequenceMemoryTests(SequenceMemoryTestBase,

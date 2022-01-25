@@ -23,15 +23,16 @@
 Run the sequence memory tests on the ApicalDependentTemporalMemory
 """
 
+import numpy as np
 import random
 import unittest
 
-import numpy as np
-
 from nupic.research.frameworks.columns.apical_dependent_temporal_memory import (
-    TripleMemory)
+    TripleMemory,
+)
 from nupic.research.frameworks.columns.shared_tests.sequence_memory_test_base import (
-    SequenceMemoryTestBase)
+    SequenceMemoryTestBase,
+)
 
 
 class ApicalDependentTM_BasalSequenceMemoryTests(SequenceMemoryTestBase,

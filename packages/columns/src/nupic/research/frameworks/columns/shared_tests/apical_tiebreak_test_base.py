@@ -24,8 +24,8 @@ Test the Temporal Memory with explicit basal and apical input. Test that it
 correctly uses the "apical tiebreak" approach to basal/apical input.
 """
 
-from abc import ABCMeta, abstractmethod
 import random
+from abc import ABCMeta, abstractmethod
 
 
 class ApicalTiebreakTestBase(object, metaclass=ABCMeta):
