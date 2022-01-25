@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2017, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2022, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -28,58 +28,54 @@ import unittest
 import numpy as np
 
 from nupic.research.frameworks.columns.apical_tiebreak_temporal_memory import (
-  ApicalTiebreakSequenceMemory)
-from nupic.research.frameworks.columns.shared_tests.apical_tiebreak_sequences_test_base import (
-  ApicalTiebreakSequencesTestBase)
+    ApicalTiebreakSequenceMemory)
+from nupic.research.frameworks.columns.shared_tests.apical_tiebreak_sequences_test_base import (  # NOQA:E501
+    ApicalTiebreakSequencesTestBase)
 
 
 class ApicalTiebreakTM_ApicalTiebreakSequencesTests(ApicalTiebreakSequencesTestBase,
                                                     unittest.TestCase):
-  """
-  Runs the "apical tiebreak sequences" tests on the ApicalTiebreakTemporalMemory
-  """
+    """
+    Runs the "apical tiebreak sequences" tests on the ApicalTiebreakTemporalMemory
+    """
 
-  def constructTM(self, columnCount, apicalInputSize, cellsPerColumn,
-                  initialPermanence, connectedPermanence, minThreshold,
-                  sampleSize, permanenceIncrement, permanenceDecrement,
-                  predictedSegmentDecrement, activationThreshold, seed):
+    def constructTM(self, columnCount, apicalInputSize, cellsPerColumn,
+                    initialPermanence, connectedPermanence, minThreshold,
+                    sampleSize, permanenceIncrement, permanenceDecrement,
+                    predictedSegmentDecrement, activationThreshold, seed):
 
-    params = {
-      "columnCount": columnCount,
-      "cellsPerColumn": cellsPerColumn,
-      "initialPermanence": initialPermanence,
-      "connectedPermanence": connectedPermanence,
-      "minThreshold": minThreshold,
-      "sampleSize": sampleSize,
-      "permanenceIncrement": permanenceIncrement,
-      "permanenceDecrement": permanenceDecrement,
-      "basalPredictedSegmentDecrement": predictedSegmentDecrement,
-      "apicalPredictedSegmentDecrement": 0.0,
-      "activationThreshold": activationThreshold,
-      "seed": seed,
-      "apicalInputSize": apicalInputSize,
-    }
+        params = {
+            "columnCount": columnCount,
+            "cellsPerColumn": cellsPerColumn,
+            "initialPermanence": initialPermanence,
+            "connectedPermanence": connectedPermanence,
+            "minThreshold": minThreshold,
+            "sampleSize": sampleSize,
+            "permanenceIncrement": permanenceIncrement,
+            "permanenceDecrement": permanenceDecrement,
+            "basalPredictedSegmentDecrement": predictedSegmentDecrement,
+            "apicalPredictedSegmentDecrement": 0.0,
+            "activationThreshold": activationThreshold,
+            "seed": seed,
+            "apicalInputSize": apicalInputSize,
+        }
 
-    self.tm = ApicalTiebreakSequenceMemory(**params)
+        self.tm = ApicalTiebreakSequenceMemory(**params)
 
+    def compute(self, activeColumns, apicalInput, learn):
+        activeColumns = np.array(sorted(activeColumns), dtype="uint32")
+        apicalInput = sorted(apicalInput)
 
-  def compute(self, activeColumns, apicalInput, learn):
-    activeColumns = np.array(sorted(activeColumns), dtype="uint32")
-    apicalInput = sorted(apicalInput)
+        self.tm.compute(activeColumns,
+                        apicalInput=apicalInput,
+                        apicalGrowthCandidates=apicalInput,
+                        learn=learn)
 
-    self.tm.compute(activeColumns,
-                    apicalInput=apicalInput,
-                    apicalGrowthCandidates=apicalInput,
-                    learn=learn)
+    def reset(self):
+        self.tm.reset()
 
+    def getActiveCells(self):
+        return self.tm.getActiveCells()
 
-  def reset(self):
-    self.tm.reset()
-
-
-  def getActiveCells(self):
-    return self.tm.getActiveCells()
-
-
-  def getPredictedCells(self):
-    return self.tm.getPredictedCells()
+    def getPredictedCells(self):
+        return self.tm.getPredictedCells()
