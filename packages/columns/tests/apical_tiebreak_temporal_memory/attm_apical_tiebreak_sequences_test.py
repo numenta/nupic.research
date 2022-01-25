@@ -23,8 +23,9 @@
 Run the 'apical tiebreak sequences' tests on the ApicalTiebreakTemporalMemory
 """
 
-import numpy as np
 import unittest
+
+import numpy as np
 
 from nupic.research.frameworks.columns.apical_tiebreak_temporal_memory import (
     ApicalTiebreakSequenceMemory,

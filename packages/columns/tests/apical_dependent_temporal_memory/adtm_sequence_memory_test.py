@@ -23,9 +23,10 @@
 Run the sequence memory tests on the ApicalDependentTemporalMemory
 """
 
-import numpy as np
 import random
 import unittest
+
+import numpy as np
 
 from nupic.research.frameworks.columns.apical_dependent_temporal_memory import (
     TripleMemory,
