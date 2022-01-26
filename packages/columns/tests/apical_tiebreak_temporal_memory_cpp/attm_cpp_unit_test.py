@@ -25,7 +25,7 @@ Unit tests for Extended Temporal Memory.
 
 import unittest
 
-from htmresearch_core.experimental import ApicalTiebreakPairMemory
+from nupic.bindings.algorithms import ApicalTiebreakPairMemory
 
 import numpy as np
 
@@ -151,7 +151,7 @@ class ExtendedTemporalMemoryUnitTest(unittest.TestCase):
 
     winnerCell = tm.getWinnerCells()[0]
     segments = list(tm.basalConnections.segmentsForCell(winnerCell))
-    self.assertEquals(len(segments), 1,
+    self.assertEqual(len(segments), 1,
                       "A basal segment should grow on the winner cell.")
 
     synapses = tm.basalConnections.synapsesForSegment(segments[0])
@@ -182,7 +182,7 @@ class ExtendedTemporalMemoryUnitTest(unittest.TestCase):
 
     winnerCell = tm.getWinnerCells()[0]
     segments = list(tm.apicalConnections.segmentsForCell(winnerCell))
-    self.assertEquals(len(segments), 1,
+    self.assertEqual(len(segments), 1,
                       "A apical segment should grow on the winner cell.")
 
     synapses = tm.apicalConnections.synapsesForSegment(segments[0])
@@ -218,7 +218,7 @@ class ExtendedTemporalMemoryUnitTest(unittest.TestCase):
     np.testing.assert_equal(tm.getActiveCells(), [4])
 
     segments = list(tm.basalConnections.segmentsForCell(4))
-    self.assertEquals(len(segments), 1,
+    self.assertEqual(len(segments), 1,
                       "There should still only be one segment.")
 
     synapses = tm.basalConnections.synapsesForSegment(segments[0])
@@ -263,7 +263,7 @@ class ExtendedTemporalMemoryUnitTest(unittest.TestCase):
     np.testing.assert_equal(tm.getActiveCells(), [4])
 
     segments = list(tm.apicalConnections.segmentsForCell(4))
-    self.assertEquals(len(segments), 1,
+    self.assertEqual(len(segments), 1,
                       "There should still only be one segment.")
 
     synapses = tm.apicalConnections.synapsesForSegment(segments[0])
