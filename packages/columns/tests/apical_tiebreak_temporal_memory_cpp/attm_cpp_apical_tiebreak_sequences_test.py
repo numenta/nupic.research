@@ -27,7 +27,7 @@ import unittest
 
 from nupic.bindings.algorithms import ApicalTiebreakSequenceMemory
 
-from nupic.research.frameworks.columns.shared_tests.apical_tiebreak_sequences_test_base import (  # NOQA: E501
+from nupic.research.frameworks.columns.shared_tests import (
     ApicalTiebreakSequencesTestBase,
 )
 

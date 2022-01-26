@@ -27,9 +27,7 @@ import unittest
 
 from nupic.bindings.algorithms import ApicalTiebreakPairMemory
 
-from nupic.research.frameworks.columns.shared_tests.apical_tiebreak_test_base import (
-    ApicalTiebreakTestBase,
-)
+from nupic.research.frameworks.columns.shared_tests import ApicalTiebreakTestBase
 
 
 class ExtendedTM_ApicalTiebreakTests(ApicalTiebreakTestBase,

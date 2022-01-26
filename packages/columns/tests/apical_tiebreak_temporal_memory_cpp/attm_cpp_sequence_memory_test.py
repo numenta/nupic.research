@@ -27,9 +27,7 @@ import unittest
 
 from nupic.bindings.algorithms import ApicalTiebreakSequenceMemory
 
-from nupic.research.frameworks.columns.shared_tests.sequence_memory_test_base import (
-    SequenceMemoryTestBase,
-)
+from nupic.research.frameworks.columns.shared_tests import SequenceMemoryTestBase
 
 
 class ExtendedTM_SequenceMemoryTests(SequenceMemoryTestBase,
