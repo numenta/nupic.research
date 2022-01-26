@@ -28,9 +28,7 @@ import unittest
 import numpy as np
 
 from nupic.research.frameworks.columns import ApicalTiebreakPairMemory
-from nupic.research.frameworks.columns.shared_tests import (
-    ApicalTiebreakTestBase,
-)
+from nupic.research.frameworks.columns.shared_tests import ApicalTiebreakTestBase
 
 
 class ApicalTiebreakTM_ApicalTiebreakTests(ApicalTiebreakTestBase,
