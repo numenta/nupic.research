@@ -28,10 +28,8 @@ import unittest
 
 import numpy as np
 
-from nupic.research.frameworks.columns.apical_dependent_temporal_memory import (
-    TripleMemory,
-)
-from nupic.research.frameworks.columns.shared_tests.sequence_memory_test_base import (
+from nupic.research.frameworks.columns import TripleMemory
+from nupic.research.frameworks.columns.shared_tests import (
     SequenceMemoryTestBase,
 )
 

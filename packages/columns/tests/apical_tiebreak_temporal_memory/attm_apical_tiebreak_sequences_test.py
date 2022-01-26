@@ -27,10 +27,8 @@ import unittest
 
 import numpy as np
 
-from nupic.research.frameworks.columns.apical_tiebreak_temporal_memory import (
-    ApicalTiebreakSequenceMemory,
-)
-from nupic.research.frameworks.columns.shared_tests.apical_tiebreak_sequences_test_base import (  # NOQA:E501
+from nupic.research.frameworks.columns import ApicalTiebreakSequenceMemory
+from nupic.research.frameworks.columns.shared_tests import (
     ApicalTiebreakSequencesTestBase,
 )
 

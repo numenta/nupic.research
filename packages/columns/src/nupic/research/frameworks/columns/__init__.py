@@ -19,7 +19,11 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-
-from .apical_tiebreak_sequences_test_base import ApicalTiebreakSequencesTestBase
-from .apical_tiebreak_test_base import ApicalTiebreakTestBase
-from .sequence_memory_test_base import SequenceMemoryTestBase
+from .apical_dependent_temporal_memory import (
+    ApicalDependentSequenceMemory,
+    TripleMemory,
+)
+from .apical_tiebreak_temporal_memory import (
+    ApicalTiebreakSequenceMemory,
+    ApicalTiebreakPairMemory,
+)
