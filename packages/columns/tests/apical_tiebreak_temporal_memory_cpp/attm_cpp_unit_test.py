@@ -26,7 +26,6 @@ Unit tests for Extended Temporal Memory.
 import unittest
 
 import numpy as np
-
 from nupic.bindings.algorithms import ApicalTiebreakPairMemory
 
 

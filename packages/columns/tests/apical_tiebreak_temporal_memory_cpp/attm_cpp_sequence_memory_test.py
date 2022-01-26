@@ -26,6 +26,7 @@ Run the sequence memory tests on the C++ ExtendedTemporalMemory.
 import unittest
 
 from nupic.bindings.algorithms import ApicalTiebreakSequenceMemory
+
 from nupic.research.frameworks.columns.shared_tests.sequence_memory_test_base import (
     SequenceMemoryTestBase,
 )
