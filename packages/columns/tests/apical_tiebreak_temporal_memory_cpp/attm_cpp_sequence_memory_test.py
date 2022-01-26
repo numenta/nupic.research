@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2016-2017, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2022, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -26,51 +26,47 @@ Run the sequence memory tests on the C++ ExtendedTemporalMemory.
 import unittest
 
 from nupic.bindings.algorithms import ApicalTiebreakSequenceMemory
-
 from nupic.research.frameworks.columns.shared_tests.sequence_memory_test_base import (
-  SequenceMemoryTestBase)
+    SequenceMemoryTestBase,
+)
 
 
 class ExtendedTM_SequenceMemoryTests(SequenceMemoryTestBase,
                                      unittest.TestCase):
-  """
-  Run the sequence memory tests on the C++ ExtendedTemporalMemory.
-  """
+    """
+    Run the sequence memory tests on the C++ ExtendedTemporalMemory.
+    """
 
-  def constructTM(self, columnCount, cellsPerColumn, initialPermanence,
-                  connectedPermanence, minThreshold, sampleSize,
-                  permanenceIncrement, permanenceDecrement,
-                  predictedSegmentDecrement, activationThreshold, seed):
+    def constructTM(self, columnCount, cellsPerColumn, initialPermanence,
+                    connectedPermanence, minThreshold, sampleSize,
+                    permanenceIncrement, permanenceDecrement,
+                    predictedSegmentDecrement, activationThreshold, seed):
 
-    params = {
-      "columnCount": columnCount,
-      "cellsPerColumn": cellsPerColumn,
-      "initialPermanence": initialPermanence,
-      "connectedPermanence": connectedPermanence,
-      "minThreshold": minThreshold,
-      "sampleSize": sampleSize,
-      "permanenceIncrement": permanenceIncrement,
-      "permanenceDecrement": permanenceDecrement,
-      "basalPredictedSegmentDecrement": predictedSegmentDecrement,
-      "activationThreshold": activationThreshold,
-      "seed": seed,
-      "learnOnOneCell": False,
-    }
+        params = {
+            "columnCount": columnCount,
+            "cellsPerColumn": cellsPerColumn,
+            "initialPermanence": initialPermanence,
+            "connectedPermanence": connectedPermanence,
+            "minThreshold": minThreshold,
+            "sampleSize": sampleSize,
+            "permanenceIncrement": permanenceIncrement,
+            "permanenceDecrement": permanenceDecrement,
+            "basalPredictedSegmentDecrement": predictedSegmentDecrement,
+            "activationThreshold": activationThreshold,
+            "seed": seed,
+            "learnOnOneCell": False,
+        }
 
-    self.tm = ApicalTiebreakSequenceMemory(**params)
+        self.tm = ApicalTiebreakSequenceMemory(**params)
 
+    def compute(self, activeColumns, learn):
+        self.tm.compute(sorted(activeColumns), learn=learn)
 
-  def compute(self, activeColumns, learn):
-    self.tm.compute(sorted(activeColumns), learn=learn)
+    def reset(self):
+        self.tm.reset()
 
+    def getActiveCells(self):
+        return self.tm.getActiveCells()
 
-  def reset(self):
-    self.tm.reset()
-
-
-  def getActiveCells(self):
-    return self.tm.getActiveCells()
-
-
-  def getPredictedCells(self):
-    return self.tm.getPredictedCells()
+    def getPredictedCells(self):
+        return self.tm.getPredictedCells()

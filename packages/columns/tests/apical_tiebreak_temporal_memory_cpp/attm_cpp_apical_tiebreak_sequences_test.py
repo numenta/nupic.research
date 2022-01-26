@@ -26,59 +26,55 @@ Run the apical tiebreak sequence tests on the ExtendedTemporalMemory.
 import unittest
 
 from nupic.bindings.algorithms import ApicalTiebreakSequenceMemory
-from nupic.research.frameworks.columns.shared_tests.apical_tiebreak_sequences_test_base import (
-  ApicalTiebreakSequencesTestBase)
-
+from nupic.research.frameworks.columns.shared_tests.apical_tiebreak_sequences_test_base import (  # NOQA: E501
+    ApicalTiebreakSequencesTestBase,
+)
 
 
 class ExtendedTM_ApicalTiebreakSequencesTests(ApicalTiebreakSequencesTestBase,
                                               unittest.TestCase):
-  """
-  Run the apical tiebreak sequence tests on the ExtendedTemporalMemory.
-  """
+    """
+    Run the apical tiebreak sequence tests on the ExtendedTemporalMemory.
+    """
 
-  def constructTM(self, columnCount, apicalInputSize, cellsPerColumn,
-                  initialPermanence, connectedPermanence, minThreshold,
-                  sampleSize, permanenceIncrement, permanenceDecrement,
-                  predictedSegmentDecrement, activationThreshold, seed):
+    def constructTM(self, columnCount, apicalInputSize, cellsPerColumn,
+                    initialPermanence, connectedPermanence, minThreshold,
+                    sampleSize, permanenceIncrement, permanenceDecrement,
+                    predictedSegmentDecrement, activationThreshold, seed):
 
-    params = {
-      "columnCount": columnCount,
-      "apicalInputSize": apicalInputSize,
-      "cellsPerColumn": cellsPerColumn,
-      "initialPermanence": initialPermanence,
-      "connectedPermanence": connectedPermanence,
-      "minThreshold": minThreshold,
-      "sampleSize": sampleSize,
-      "permanenceIncrement": permanenceIncrement,
-      "permanenceDecrement": permanenceDecrement,
-      "basalPredictedSegmentDecrement": predictedSegmentDecrement,
-      "activationThreshold": activationThreshold,
-      "seed": seed,
-      "learnOnOneCell": False,
-    }
+        params = {
+            "columnCount": columnCount,
+            "apicalInputSize": apicalInputSize,
+            "cellsPerColumn": cellsPerColumn,
+            "initialPermanence": initialPermanence,
+            "connectedPermanence": connectedPermanence,
+            "minThreshold": minThreshold,
+            "sampleSize": sampleSize,
+            "permanenceIncrement": permanenceIncrement,
+            "permanenceDecrement": permanenceDecrement,
+            "basalPredictedSegmentDecrement": predictedSegmentDecrement,
+            "activationThreshold": activationThreshold,
+            "seed": seed,
+            "learnOnOneCell": False,
+        }
 
-    self.tm = ApicalTiebreakSequenceMemory(**params)
+        self.tm = ApicalTiebreakSequenceMemory(**params)
 
+    def compute(self, activeColumns, apicalInput, learn):
 
-  def compute(self, activeColumns, apicalInput, learn):
+        activeColumns = sorted(activeColumns)
+        apicalInput = sorted(apicalInput)
 
-    activeColumns = sorted(activeColumns)
-    apicalInput = sorted(apicalInput)
+        self.tm.compute(activeColumns,
+                        apicalInput=apicalInput,
+                        apicalGrowthCandidates=apicalInput,
+                        learn=learn)
 
-    self.tm.compute(activeColumns,
-                    apicalInput=apicalInput,
-                    apicalGrowthCandidates=apicalInput,
-                    learn=learn)
+    def reset(self):
+        self.tm.reset()
 
+    def getActiveCells(self):
+        return self.tm.getActiveCells()
 
-  def reset(self):
-    self.tm.reset()
-
-
-  def getActiveCells(self):
-    return self.tm.getActiveCells()
-
-
-  def getPredictedCells(self):
-    return self.tm.getPredictedCells()
+    def getPredictedCells(self):
+        return self.tm.getPredictedCells()
