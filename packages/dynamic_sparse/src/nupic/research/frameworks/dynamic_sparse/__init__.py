@@ -19,6 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
+from .local_pruning import *
 from .global_pruning import *
 from .gmp_lr_scheduler import *
 from .prune_scheduler import *
