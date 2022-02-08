@@ -25,6 +25,12 @@ import itertools
 real_type = np.float32
 uint_type = np.uint32
 
+'''
+The HTM Spatial Pooler (SP) models how neurons learn feedforward connections and form efficient representations of the input. Converts arbitrary 
+binary input patterns into sparse distributed representations (SDRs) using competitive Hebbian learning and homeostatic excitability control. 
+
+For more information, refer to the paper: https://www.frontiersin.org/articles/10.3389/fncom.2017.00111/full
+'''
 class SpatialPooler():
     def __init__(self, 
                  input_dims=(32, 32),
@@ -136,6 +142,8 @@ class SpatialPooler():
 
         ''' global or local inhibition '''
         self.global_inhibition = global_inhibition
+
+        assert (isinstance(self.global_inhibition, bool))
 
 
         ''' defines extent of input that each minicolumn can potentially connect to '''
