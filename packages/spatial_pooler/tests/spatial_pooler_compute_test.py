@@ -20,7 +20,7 @@
 # ----------------------------------------------------------------------
 
 import numpy as np
-import time 
+import time
 import unittest
 
 from nupic.research.frameworks.spatial_pooler import SpatialPooler
@@ -30,19 +30,21 @@ uint_type = np.uint32
 
 
 class SpatialPoolerComputeTest(unittest.TestCase):
-    '''
+    """
     end-to-end test of the compute function
-    '''
+    """
 
     def basic_compute_loop(self, sp, input_size, minicolumn_dims):
-        '''
-        feed in some vectors and retrieve outputs. ensure the right number of minicolumns win and that we always get binary outputs. 
-        '''
+        """
+        feed in some vectors and retrieve outputs. ensure the right number of minicolumns win and that we always get binary outputs.
+        """
 
         num_records = 100
         generator = np.random.default_rng()
 
-        input_matrix = (generator.random((num_records, input_size)) > 0.8).astype(uint_type)
+        input_matrix = (generator.random((num_records, input_size)) > 0.8).astype(
+            uint_type
+        )
 
         y = np.zeros(minicolumn_dims, dtype=uint_type)
 
@@ -62,12 +64,11 @@ class SpatialPoolerComputeTest(unittest.TestCase):
             self.assertEqual(0, y.min())
             self.assertEqual(1, y.max())
 
-
     def test_basic_compute1(self):
-        '''
+        """
         run basic_compute_loop with mostly default parameters.
-        '''
-        
+        """
+
         input_size = 30
         minicolumn_dims = 50
 
@@ -86,19 +87,18 @@ class SpatialPoolerComputeTest(unittest.TestCase):
             min_percent_overlap_duty_cycles=0.001,
             duty_cycle_period=1000,
             boost_strength=0.0,
-            seed=int((time.time() % 10000)*10)
+            seed=int((time.time() % 10000) * 10),
         )
 
-        print('test_basic_compute1, SP seed set to:', sp.seed)
+        print("test_basic_compute1, SP seed set to:", sp.seed)
 
         self.basic_compute_loop(sp, input_size, minicolumn_dims)
-    
 
     def test_basic_compute2(self):
-        '''
-        run basic_compute_loop with learning turned off. 
-        '''
-        
+        """
+        run basic_compute_loop with learning turned off.
+        """
+
         input_size = 100
         minicolumn_dims = 100
 
@@ -117,13 +117,13 @@ class SpatialPoolerComputeTest(unittest.TestCase):
             min_percent_overlap_duty_cycles=0.001,
             duty_cycle_period=1000,
             boost_strength=0.0,
-            seed=int((time.time() % 10000)*10)
+            seed=int((time.time() % 10000) * 10),
         )
 
-        print('test_basic_compute2, SP seed set to:', sp.seed)
+        print("test_basic_compute2, SP seed set to:", sp.seed)
 
         self.basic_compute_loop(sp, input_size, minicolumn_dims)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
