@@ -32,17 +32,17 @@ SEED = int((time.time() % 10000) * 10)
 
 
 def compute_overlap(x, y):
-    '''
+    """
     compute overlap between 2 binary arrays
-    '''
+    """
 
-    return ((x+y) == 2).sum()
+    return ((x + y) == 2).sum()
 
 
 def sdrs_unique(sdrs_dict):
-    ''' 
+    """
     return True iff all SDRs in dict are unique
-    '''
+    """
 
     for k1, v1 in sdrs_dict.items():
         for k2, v2 in sdrs_dict.items():
@@ -52,9 +52,9 @@ def sdrs_unique(sdrs_dict):
 
 
 class SpatialPoolerBoostTest(unittest.TestCase):
-    '''
+    """
     Test boosting.
-  
+
     The test is constructed as follows: we construct a set of 5 known inputs. Two
     of the input patterns have 50% overlap while all other combinations have 0%
     overlap. Each input pattern has 20 bits on to ensure reasonable overlap with
@@ -85,25 +85,25 @@ class SpatialPoolerBoostTest(unittest.TestCase):
     Phase 3: Run one more batch on with learning on. Because of the artificially
     induced thrashing behavior in this test due to boosting, all the inputs should
     now have pretty distinct patterns.
-    
+
     Phase 4: Run spatial pooler with learning off. Make sure boosting factors
     do not change when learning is off.
-    '''
+    """
 
     def set_up(self):
-        '''
+        """
         set up various constraints. create input patterns and spatial pooler.
-        '''
+        """
 
         self.input_size = 90
         self.minicolumn_dims = 600
 
         self.x = np.zeros((5, self.input_size), dtype=uint_type)
-        self.x[0, 0:20] = 1     # pattern A
-        self.x[1, 10:30] = 1    # pattern A' (half of bits overlap with A)
-        self.x[2, 30:50] = 1    # pattern B (no overlap with others)
-        self.x[3, 50:70] = 1    # pattern C (no overlap with others)
-        self.x[4, 70:90] = 1    # pattern D (no overlap with others)
+        self.x[0, 0:20] = 1  # pattern A
+        self.x[1, 10:30] = 1  # pattern A' (half of bits overlap with A)
+        self.x[2, 30:50] = 1  # pattern B (no overlap with others)
+        self.x[3, 50:70] = 1  # pattern C (no overlap with others)
+        self.x[4, 70:90] = 1  # pattern D (no overlap with others)
 
         # for each minicolmn, this will contain the last iteration number where that column was a winner
         self.winning_iteration = np.zeros(self.minicolumn_dims)
@@ -126,30 +126,36 @@ class SpatialPoolerBoostTest(unittest.TestCase):
             min_percent_overlap_duty_cycles=0.001,
             duty_cycle_period=10,
             boost_strength=10.0,
-            seed=SEED
+            seed=SEED,
         )
 
-
     def verify_sdr_properties(self):
-        '''
+        """
         verify that all SDRs have properties desired for this test.
 
         the bounds fo checking overlap are loosely set since there is some variance due to randomness and the artificial parameters used in this test.
-        '''
+        """
 
         # verify that all SDRs are unique
-        self.assertTrue(sdrs_unique(self.last_sdr), 'all SDRs are unique')
+        self.assertTrue(sdrs_unique(self.last_sdr), "all SDRs are unique")
 
         # verify that first two SDRs have some overlap
-        self.assertGreater(compute_overlap(self.last_sdr[0], self.last_sdr[1]), 9, 'first two SDRs do not overlap much')
+        self.assertGreater(
+            compute_overlap(self.last_sdr[0], self.last_sdr[1]),
+            9,
+            "first two SDRs do not overlap much",
+        )
 
         # verify that last three SDRs have low overlap with everyone else
         for i in [2, 3, 4]:
             for j in range(5):
-                if (i != j):
-                    self.assertLess(compute_overlap(self.last_sdr[i], self.last_sdr[j]), 18, 'one of the last three SDRs has high overlap')
+                if i != j:
+                    self.assertLess(
+                        compute_overlap(self.last_sdr[i], self.last_sdr[j]),
+                        18,
+                        "one of the last three SDRs has high overlap",
+                    )
 
-    
     def boost_test_phase1(self):
         y = np.zeros(self.minicolumn_dims, dtype=uint_type)
 
@@ -160,17 +166,21 @@ class SpatialPoolerBoostTest(unittest.TestCase):
             self.winning_iteration[y.nonzero()[0]] = self.sp.get_iteration_learn_num()
             self.last_sdr[idx] = y.copy()
 
-        
         # boost factor for all minicolumns should be at 1
         boost = self.sp.get_boost_factors()
-        self.assertEqual((boost == 1).sum(), self.minicolumn_dims, 'boost factors are not all 1')
+        self.assertEqual(
+            (boost == 1).sum(), self.minicolumn_dims, "boost factors are not all 1"
+        )
 
         # at least half of minicolumns should have never been active
-        self.assertGreaterEqual((self.winning_iteration == 0).sum(), self.minicolumn_dims//2, 'more than half of all minicolumns have been active')
+        self.assertGreaterEqual(
+            (self.winning_iteration == 0).sum(),
+            self.minicolumn_dims // 2,
+            "more than half of all minicolumns have been active",
+        )
 
         self.verify_sdr_properties()
 
-    
     def boost_test_phase2(self):
         y = np.zeros(self.minicolumn_dims, dtype=uint_type)
 
@@ -179,24 +189,41 @@ class SpatialPoolerBoostTest(unittest.TestCase):
             for idx, v in enumerate(self.x):
                 y.fill(0)
                 self.sp.compute(v, True, y)
-                self.winning_iteration[y.nonzero()[0]] = self.sp.get_iteration_learn_num()
+                self.winning_iteration[
+                    y.nonzero()[0]
+                ] = self.sp.get_iteration_learn_num()
                 self.last_sdr[idx] = y.copy()
 
         # all never-active minicolumns should have duty cycle of 0
         duty_cycles = self.sp.get_active_duty_cycles()
-        self.assertEqual(duty_cycles[self.winning_iteration == 0].sum(), 0, 'inactive minicolumns have positive duty cycle')
+        self.assertEqual(
+            duty_cycles[self.winning_iteration == 0].sum(),
+            0,
+            "inactive minicolumns have positive duty cycle",
+        )
 
         boost = self.sp.get_boost_factors()
-        self.assertLessEqual(np.max(boost[np.where(duty_cycles > 0.1)]), 1.0, 'strongly active minicolumns have high boost factors')
-        self.assertGreaterEqual(np.min(boost[np.where(duty_cycles < 0.1)]), 1.0, 'weakly active columns have low boost factors')
+        self.assertLessEqual(
+            np.max(boost[np.where(duty_cycles > 0.1)]),
+            1.0,
+            "strongly active minicolumns have high boost factors",
+        )
+        self.assertGreaterEqual(
+            np.min(boost[np.where(duty_cycles < 0.1)]),
+            1.0,
+            "weakly active columns have low boost factors",
+        )
 
         # every minicolumn should have been sufficiently boosted to win at least once. number of minicolumns that have never won should be 0
         num_losers_after = (self.winning_iteration == 0).sum()
         self.assertEqual(num_losers_after, 0)
 
         # artificially induced thrashing --> even the first two patterns should have low overlap. verify this.
-        self.assertLess(compute_overlap(self.last_sdr[0], self.last_sdr[1]), 7, 'first two SDRs overlap significantly when they should not')
-
+        self.assertLess(
+            compute_overlap(self.last_sdr[0], self.last_sdr[1]),
+            7,
+            "first two SDRs overlap significantly when they should not",
+        )
 
     def boost_test_phase3(self):
         y = np.zeros(self.minicolumn_dims, dtype=uint_type)
@@ -213,12 +240,15 @@ class SpatialPoolerBoostTest(unittest.TestCase):
         self.assertEqual(num_losers_after, 0)
 
         # artificially induced thrashing --> even the first two patterns should have low overlap. verify this.
-        self.assertLess(compute_overlap(self.last_sdr[0], self.last_sdr[1]), 7, 'first two SDRs overlap significantly when they should not')
+        self.assertLess(
+            compute_overlap(self.last_sdr[0], self.last_sdr[1]),
+            7,
+            "first two SDRs overlap significantly when they should not",
+        )
 
-    
     def boost_test_phase4(self):
         y = np.zeros(self.minicolumn_dims, dtype=uint_type)
-        
+
         boost_at_beginning = self.sp.get_boost_factors()
 
         # one more training batch through input parameters with **learning OFF**
@@ -227,8 +257,11 @@ class SpatialPoolerBoostTest(unittest.TestCase):
             self.sp.compute(v, False, y)
 
             boost = self.sp.get_boost_factors()
-            self.assertEqual(boost.sum(), boost_at_beginning.sum(), 'boost factors changed when learning was off')
-    
+            self.assertEqual(
+                boost.sum(),
+                boost_at_beginning.sum(),
+                "boost factors changed when learning was off",
+            )
 
     def test_boost(self):
         self.set_up()
@@ -236,8 +269,8 @@ class SpatialPoolerBoostTest(unittest.TestCase):
         self.boost_test_phase1()
         self.boost_test_phase2()
         self.boost_test_phase3()
-        self.boost_test_phase4() 
+        self.boost_test_phase4()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
