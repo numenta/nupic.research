@@ -44,7 +44,7 @@ jobs:
             test -f ~/bin/git-lfs || (
             curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | sudo bash;
             sudo apt-get install git-lfs=2.13.3;
-            mkdir ~/bin; sudo mv /usr/bin/git-lfs ~/bin/git-lfs;)
+            mkdir -p ~/bin; sudo mv /usr/bin/git-lfs ~/bin/git-lfs;)
       - save_cache:
           key: git-lfs-bin-v2-key
           paths:
