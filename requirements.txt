@@ -11,7 +11,6 @@
 -e packages/greedy_infomax
 -e packages/self_supervised_learning
 -e packages/continual_learning
--e packages/spatial_pooler
 
 # Install projects extra dependency
 # See `setup.cfg` for available extras.
