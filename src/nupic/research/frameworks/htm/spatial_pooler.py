@@ -57,114 +57,139 @@ class SpatialPooler:
         seed=-1,
     ):
         """
-        input_dims:         dimensions of input vector.
-                            default ``(32, 32)``.
+        input_dims:                         dimensions of input vector.
+                                            default ``(32, 32)``.
 
-        minicolumn_dims:    dimensions of cortical minicolumns.
-                            default ``(64, 64)``.
+        minicolumn_dims:                    dimensions of cortical minicolumns.
+                                            default ``(64, 64)``.
 
-        active_
-        minicolumns_per_
-        inh_area:           sets number of minicolumns that remain
-                            on within a local inhibition area. as minicolumns learn and
-                            grow their effective receptive fields, the inhibition radius
-                            will also grow. when this happens, net density of the number
-                            of active minicolumns *decreases* if this method is used.
-                            default ``10.0``.
+        active_minicolumns_per_inh_area:    sets number of minicolumns that remain
+                                            on within a local inhibition area. as
+                                            minicolumns learn and grow their effective
+                                            receptive fields, the inhibition radius
+                                            will also grow. when this happens, net
+                                            density of the number of active minicolumns
+                                            *decreases* if this method is used.
+                                            default ``10.0``.
 
-        local_density:      sets desired density of active minicolumns within local
-                            inhibition area. ensures that at most N minicolumns remain
-                            on within a local inhibition area, where
-                            N = local_density * (# of minicolumns in inhibition area).
-                            density of active minicolumns stays the same regardless of
-                            size of minicolumns' receptive fields.
-                            default ``-1.0``.
+        local_density:                      sets desired density of active minicolumns
+                                            within local inhibition area. ensures that
+                                            at most N minicolumns remain on within a
+                                            local inhibition area, where
 
-        potential_radius:   number of input bits visible to each minicolumn. large
-                            enough value means that every minicolumn can potentially
-                            connect to every input bit. this parameter defines a
-                            square/hypercube area: a minicolumn will have a max square
-                            potential pool with side lengths (2 * potential_radius + 1).
-                            default ``16``.
+                                            N = local_density * (# of minicolumns in
+                                            inhibition area).
 
-        potential_percent:  percent of inputs within a minicolumn's potential_radius
-                            that a minicolumn can be connected to. if 1, minicolumn will
-                            be connected to every input within its potential radius. at
-                            initialization, we choose:
-                            ((2*potential_radius + 1)^(# input dims))*potential_percent
-                            input bits to comprise the minicolumn's potential pool.
-                            default ``0.5``.
+                                            density of active minicolumns stays the same
+                                            regardless of size of minicolumns' receptive
+                                            fields.
+                                            default ``-1.0``.
 
-        global_inhibition:  if True, then during inhibition the winning minicolumns are
-                            selected as the most active minicolumns from the region as a
-                            whole. else, winning minicolumns are selected w.r.t. their
-                            local neighborhoods.
-                            default ``False``.
+        potential_radius:                   number of input bits visible to each
+                                            minicolumn. large enough value means that
+                                            every minicolumn can potentially connect to
+                                            every input bit. this parameter defines a
+                                            square/hypercube area: a minicolumn will
+                                            have a max square potential pool with side
+                                            lengths:
 
-        stimulus_threshold: minimum number of synapses that must be on in order for a
-                            minicolumn to turn on. prevents noise from activating
-                            minicolumns. specified as a percent of a fully grown
-                            synapse.
-                            default ``0``.
+                                            (2 * potential_radius + 1).
 
-        synapse_perm_inc:   amount by which an active synapse is incremented in each
-                            round. specified as a percent of a fully grown synapse.
-                            default ``0.05``.
+                                            default ``16``.
 
-        synapse_perm_dec:   amount by which an inactive synapse is decremented in each
-                            round. specified as a percent of a fully grown synapse.
-                            default ``0.008``.
+        potential_percent:                  percent of inputs within a minicolumn's
+                                            potential_radius that a minicolumn can be
+                                            connected to. if 1, minicolumn will be
+                                            connected to every input within its
+                                            potential radius. at initialization, we
+                                            choose
 
-        synapse_perm_
-        connected:          default connected threshold. any synapse whose permanence
-                            value is above the connected threshold is a "connected
-                            synapse", meaning it can conribute to the cell's firing.
-                            default ``0.1``.
+                                            ((2*potential_radius + 1)^(# input dims)) *
+                                            potential_percent
 
-        min_percent_
-        overlap_duty_
-        cycles:             floor on how often a minicolumn should have at least
-                            stimulus_threshold active inputs. periodically,
-                            each minicolumn looks at the overlap duty cycle of all other
-                            minicolumns within its inhibition radius and sets its own
-                            internal minimal acceptable duty cycle to:
-                            (minimum percent duty cycle before inhibition) * max(other
-                            minicolumns' duty cycles).
-                            if any minicolumn whose overlap duty cycle falls below this,
-                            all permanence values get boosted by synapse_perm_inc.
-                            raising permanences before inhibition allows a cell to
-                            search for new inputs when either its previously learned
-                            inputs are no longer ever active or when vast majority of
-                            inputs are "hijacked" by other minicolumns.
-                            default ``0.001``.
+                                            # of input bits to comprise the minicolumn's
+                                            potential pool.
+                                            default ``0.5``.
 
-        duty_cycle_
-        period:             period used to calculate duty cycles. higher values means it
-                            takes longer to respond in changes in boosting or synapses
-                            per connected cell. shorter values make it more unstable
-                            and likely to oscillate.
-                            default ``1000``.
+        global_inhibition:                  if True, then during inhibition the winning
+                                            minicolumns are selected as the most active
+                                            minicolumns from the region as a whole.
+                                            else, winning minicolumns are selected
+                                            w.r.t. their local neighborhoods.
+                                            default ``False``.
 
-        boost_
-        strength:           a number >= 0.0 that is used to control the strength of
-                            boosting. boosting increases as a function of
-                            boost_strength. encourages minicolumns to have similar
-                            active duty cycles as their neighbors, which will lead to
-                            more efficient use of minicolumns. too much boosting may
-                            lead to instability of spatial pooler outputs.
-                            default ``0.0``.
+        stimulus_threshold:                 minimum number of synapses that must be on
+                                            in order for a minicolumn to turn on.
+                                            prevents noise from activating minicolumns.
+                                            specified as a percent of a fully grown
+                                            synapse.
+                                            default ``0``.
 
-        seed:               seed for numpy random generator.
+        synapse_perm_inc:                   amount by which an active synapse is
+                                            incremented in each round. specified as a
+                                            percent of a fully grown synapse.
+                                            default ``0.05``.
+
+        synapse_perm_dec:                   amount by which an inactive synapse is
+                                            decremented in each round. specified as a
+                                            percent of a fully grown synapse.
+                                            default ``0.008``.
+
+        synapse_perm_connected:             default connected threshold. any synapse
+                                            whose permanence value is above the
+                                            connected threshold is "connected", meaning
+                                            it can conribute to the cell's firing.
+                                            default ``0.1``.
+
+        min_percent_overlap_duty_cycles:    floor on how often a minicolumn should have
+                                            at least stimulus_threshold active inputs.
+                                            periodically, each minicolumn looks at the
+                                            overlap duty cycle of all other minicolumns
+                                            within its inhibition radius and sets its
+                                            own internal minimal acceptable duty cycle
+                                            to
+
+                                            (minimum % duty cycle before inhibition) *
+                                            max(other minicolumns' duty cycles).
+
+                                            if any minicolumn whose overlap duty cycle
+                                            falls below this, all permanence values get
+                                            boosted by synapse_perm_inc. raising
+                                            permanences before inhibition allows a cell
+                                            to search for new inputs when either its
+                                            previously learned inputs are no longer ever
+                                            active or when vast majority of inputs are
+                                            "hijacked" by other minicolumns.
+                                            default ``0.001``.
+
+        duty_cycle_period:                  period used to calculate duty cycles. higher
+                                            values means it takes longer to respond in
+                                            changes in boosting or synapses per
+                                            connected cell. shorter values make it more
+                                            unstable and likely to oscillate.
+                                            default ``1000``.
+
+        boost_strength:                     a number >= 0.0 that is used to control the
+                                            strength of boosting. boosting increases as
+                                            a function of boost_strength. encourages
+                                            minicolumns to have similar active duty
+                                            cycles as their neighbors, which will lead
+                                            to more efficient use of minicolumns. too
+                                            much boosting may lead to instability of
+                                            spatial pooler outputs.
+                                            default ``0.0``.
+
+        seed:                               seed for numpy random generator.
         """
 
-        """ controls # of minicolumns that are on within a local inhibition area """
+        # controls # of minicolumns that are on within a local inhibition area
         self.active_minicolumns_per_inh_area = int(active_minicolumns_per_inh_area)
         self.local_density = local_density
 
         assert (self.active_minicolumns_per_inh_area > 0) or \
                (0 < self.local_density <= 0.5)
 
-        """ input and and minicolumn dimensionality """
+        # input and and minicolumn dimensionality
         self.input_dims = np.array(input_dims, ndmin=1)
         self.minicolumn_dims = np.array(minicolumn_dims, ndmin=1)
         self.num_inputs = np.prod(self.input_dims)
@@ -173,16 +198,16 @@ class SpatialPooler:
         assert (self.num_inputs > 0) and (self.num_minicolumns > 0)
         assert self.input_dims.size == self.minicolumn_dims.size
 
-        """ global or local inhibition """
+        # global or local inhibition
         self.global_inhibition = global_inhibition
 
         assert isinstance(self.global_inhibition, bool)
 
-        """ defines extent of input that each minicolumn can potentially connect to """
+        # defines extent of input that each minicolumn can potentially connect to
         self.potential_percent = potential_percent
         self.potential_radius = int(min(potential_radius, self.num_inputs))
 
-        """ rules for synaptic connections """
+        # rules for synaptic connections
         self.stimulus_threshold = stimulus_threshold
         self.synapse_perm_inc = synapse_perm_inc
         self.synapse_perm_dec = synapse_perm_dec
@@ -195,35 +220,33 @@ class SpatialPooler:
 
         assert self.synapse_perm_trim_threshold < self.synapse_perm_connected
 
-        """ cycle period, update period, and iteration count """
+        # cycle period, update period, and iteration count
         self.duty_cycle_period = duty_cycle_period
         self.update_period = 50
         self.iteration_num = 0
         self.iteration_learn_num = 0
 
-        """
-        duty cycles + overlap metrics + boosting
-
-        - overlap_duty_cycles[i] shows the moving average of the number of inputs which
-          overlaps with minicolumn "i".
-
-        - active_duty_cycles[i] shows the moving average of the frequency of activation
-          for minicolumn "i".
-
-        - min_overlap_duty_cycles[i] is minimum duty cycles defining normal activity for
-          minicolumn "i". a minicolumn with active_duty_cycle below this threshold is
-          boosted.
-
-        - boost_factors[i] is the boost factor for minicolumn "i". used to increase the
-          overlap of inactive minicolumns to improve their chances of becoming active.
-          depends on active_duty_cycles via an exponential function.
-
-        - overlaps[i] determines overlap between minicolumn "i" and input vector.
-          overlap = number of connected synapses to input bits which are on.
-
-        - boosted_overlaps[i] = boost_factors[i] * overlaps[i] if spatial pooler is
-          learning, else boosted_overlaps[i] = overlaps[i]
-        """
+        # duty cycles + overlap metrics + boosting
+        #
+        # - overlap_duty_cycles[i] shows the moving average of the number of inputs
+        #   which overlaps with minicolumn "i".
+        #
+        # - active_duty_cycles[i] shows the moving average of the frequency of
+        #   activation for minicolumn "i".
+        #
+        # - min_overlap_duty_cycles[i] is minimum duty cycles defining normal activity
+        #   for minicolumn "i". a minicolumn with active_duty_cycle below this threshold
+        #   is boosted.
+        #
+        # - boost_factors[i] is the boost factor for minicolumn "i". used to increase
+        #   the overlap of inactive minicolumns to improve their chances of becoming
+        #   active. depends on active_duty_cycles via an exponential function.
+        #
+        # - overlaps[i] determines overlap between minicolumn "i" and input vector.
+        #   overlap = number of connected synapses to input bits which are on.
+        #
+        # - boosted_overlaps[i] = boost_factors[i] * overlaps[i] if spatial pooler is
+        #   learning, else boosted_overlaps[i] = overlaps[i]
         self.overlap_duty_cycles = np.zeros(self.num_minicolumns, dtype=real_type)
         self.active_duty_cycles = np.zeros(self.num_minicolumns, dtype=real_type)
         self.min_overlap_duty_cycles = np.zeros(self.num_minicolumns, dtype=real_type)
@@ -234,7 +257,7 @@ class SpatialPooler:
         self.overlaps = np.zeros(self.num_minicolumns, dtype=real_type)
         self.boosted_overlaps = np.zeros(self.num_minicolumns, dtype=real_type)
 
-        """ random seed """
+        # random seed
         if seed == -1:
             self.seed = np.random.randint(1e10)
         else:
@@ -242,22 +265,21 @@ class SpatialPooler:
 
         self.generator = np.random.default_rng(seed=self.seed)
 
-        """
-        rows of matrix represent minicolumns: i.e. map from input bits to minicolumns.
-        columns of matrix represent input bits: i.e. map from minicolumns to input bits.
-
-        - potential_pools[i][j] shows if input bit "j" is in the potential pool of
-          minicolumn "i". a minicolumn can only be connected to inputs in its potential
-          pool.
-
-        - permanences[i][j] shows the permanence for minicolumn "i" to input bit "j".
-
-        - connected_synapses[i][j] shows if minicolumn "i" is connnected to
-          input bit "j".
-
-        - connected_synapse_counts[i] shows the number of connected synapses for
-          minicolumn "i".
-        """
+        # rows of matrix represent minicolumns: i.e. map from input bits to minicolumns.
+        # columns of matrix represent input bits: i.e. map from minicolumns to input
+        # bits.
+        #
+        # - potential_pools[i][j] shows if input bit "j" is in the potential pool of
+        #   minicolumn "i". a minicolumn can only be connected to inputs in its
+        #   potential pool.
+        #
+        # - permanences[i][j] shows the permanence for minicolumn "i" to input bit "j".
+        #
+        # - connected_synapses[i][j] shows if minicolumn "i" is connnected to
+        #   input bit "j".
+        #
+        # - connected_synapse_counts[i] shows the number of connected synapses for
+        #   minicolumn "i".
         self.potential_pools = np.zeros((self.num_minicolumns, self.num_inputs),
                                         dtype=np.bool_)
 
@@ -830,7 +852,7 @@ class SpatialPooler:
             self.update_boost_factors_local()
 
     def update_boost_factors_global(self):
-        """'
+        """
         update boost factors when global inhibition is used. target_density is the
         sparsity of the spatial pooler.
         """
@@ -853,7 +875,7 @@ class SpatialPooler:
         )
 
     def update_boost_factors_local(self):
-        """'
+        """
         update boost factors when local inhibition is used. target_density is the
         average active_duty_cycles of the neighboring minicolumns of each minicolumn.
         """
@@ -905,9 +927,7 @@ class SpatialPooler:
                 self.min_percent_overlap_duty_cycles * max_overlap_duty
             )
 
-    """
-    getter methods
-    """
+    # getter methods
 
     def get_num_inputs(self):
         return self.num_inputs
@@ -945,9 +965,7 @@ class SpatialPooler:
     def get_min_overlap_duty_cycles(self):
         return self.min_overlap_duty_cycles
 
-    """
-    setter methods
-    """
+    # setter methods
 
     def set_inhibition_radius(self, radius):
         self.inhibition_radius = radius
