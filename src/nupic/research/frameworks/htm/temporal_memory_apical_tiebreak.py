@@ -271,8 +271,20 @@ class TemporalMemoryApicalTiebreak():
         basal_reinforce_candidates (torch.Tensor) is a list of bits that the active 
         cells may reinforce basal synapses to.
 
-        apical_reinforce_candidates (torch.Tensor) is a list of bits that 
+        apical_reinforce_candidates (torch.Tensor) is a list of bits that the active
+        cells may reinforce apical synapses to. 
+
+        basal_growth_candidates (torch.Tensor) is a list of bits that the active cells 
+        may grow new basal synapses to.
+
+        apical_growth_candidates (torch.Tensor) is a list of bits that the active cells
+        may grow new apical synapses to.
+
+        learn (bool) -- whether to grow, reinforce, and/or punish synapses
         """
+
+        # calculate active cells 
+        
 
     
 
@@ -379,7 +391,7 @@ class TemporalMemoryApicalTiebreak():
             active_basal_segments = torch.cat([
                 fully_active_basal_segments, 
                 potentially_active_basal_segments[
-                    self.isin(potentially_active_cells, reduced_threshold_basal_cells)
+                    isin(potentially_active_cells, reduced_threshold_basal_cells)
                 ]
             ])
         else:
@@ -428,16 +440,16 @@ class TemporalMemoryApicalTiebreak():
         )
 
         # fully depolarized cells should have both active basal and apical segments
-        fully_depolarized_cells = self.intersection(cells_for_basal_segments, 
+        fully_depolarized_cells = intersection(cells_for_basal_segments, 
                                                     cells_for_apical_segments)
 
         # partly depolarized cells have active basal segments *but not* active apical
         # segments 
-        partly_depolarized_cells = self.difference(cells_for_basal_segments, 
+        partly_depolarized_cells = difference(cells_for_basal_segments, 
                                                    fully_depolarized_cells)
 
         # choose which partly depolarized cells to inhibit
-        inhibited_mask = self.isin(
+        inhibited_mask = isin(
             partly_depolarized_cells // self.num_cells_per_minicolumn,
             fully_depolarized_cells // self.num_cells_per_minicolumn
         )
@@ -476,65 +488,43 @@ class TemporalMemoryApicalTiebreak():
             )
         ]).to(int_type)
 
-    @staticmethod
-    def isin(a, b):
-        """
-        return True for each element of `a` (torch.Tensor) if it is 
-        in `b` (torch.Tensor).
 
-        both `a` and `b` are 1D tensors.
-        """
-        
-        return (a[:, None] == b).any(axis=-1)
+def isin(a, b):
+    """
+    return True for each element of `a` (torch.Tensor) if it is 
+    in `b` (torch.Tensor).
+
+    both `a` and `b` are 1D tensors.
+    """
     
-    @staticmethod
-    def intersection(a, b):
-        """
-        returns intersection of elements in `a` (torch.Tensor) and `b` (torch.Tensor). 
-        
-        both `a` and `b` are 1D tensors.
-        both `a` and `b` cannot have any duplicate elements.
-        """
-        
-        uniques, counts = torch.cat([a, b]).unique(return_counts=True)
+    return (a[:, None] == b).any(axis=-1)
 
-        return uniques[counts > 1]
+def intersection(a, b):
+    """
+    returns intersection of elements in `a` (torch.Tensor) and `b` (torch.Tensor). 
+    
+    both `a` and `b` are 1D tensors.
+    both `a` and `b` cannot have any duplicate elements.
+    """
+    
+    uniques, counts = torch.cat([a, b]).unique(return_counts=True)
 
-    @staticmethod
-    def difference(a, b):
-        """
-        returns unique values in `a` (torch.Tensor) that are not in `b` (torch.Tensor).
+    return uniques[counts > 1]
 
-        both `a` and `b` are 1D tensors.
-        both `a` and `b` cannot have any duplicate elements.
-        """
+def difference(a, b):
+    """
+    returns unique values in `a` (torch.Tensor) that are not in `b` (torch.Tensor).
 
-        expanded_b = b.expand(a.shape[0], b.shape[0]).T
+    both `a` and `b` are 1D tensors.
+    both `a` and `b` cannot have any duplicate elements.
+    """
 
-        return a[(a != expanded_b).T.prod(axis=1) == 1]
+    expanded_b = b.expand(a.shape[0], b.shape[0]).T
 
-        
+    return a[(a != expanded_b).T.prod(axis=1) == 1]
 
-
-
-
-
-
-
-
-
-
-
-
-        
-
-
-
-        
-
-
-
-        
-
-
-      
+def set_compare(a, b, a_key=None, b_key=None, 
+                left_minus_right=False, right_minus_left=False):
+    """
+    
+    """
