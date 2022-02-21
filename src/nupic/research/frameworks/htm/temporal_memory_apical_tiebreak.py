@@ -82,7 +82,7 @@ class TemporalMemoryApicalTiebreak():
 
         activation_threshold:                       if # of active connected synapses
                                                     on a segment is at least this
-                                                    threshold, the segment is active.
+                                                    threshold, the segment is "active".
                                                     default `13`.
 
         reduced_basal_threshold:                    activation threshold of basal
@@ -187,8 +187,12 @@ class TemporalMemoryApicalTiebreak():
         self.use_apical_modulation_basal_threshold = True
 
         # one-to-one mapping of segment to cell
-        self.segment_to_cell = defaultdict(lambda : -1)
-        self.cell_to_segments = defaultdict(lambda : torch.Tensor([]).to(int_type))
+        self.apical_segment_to_cell = defaultdict(lambda : -1)
+        self.basal_segment_to_cell = defaultdict(lambda : -1)
+
+        # one-to-many mapping of cell to segments
+        self.apical_cell_to_segments = defaultdict(lambda : torch.Tensor().to(int_type))
+        self.basal_cell_to_segments = defaultdict(lambda : torch.Tensor().to(int_type))
 
     def reset(self):
         """
@@ -198,7 +202,7 @@ class TemporalMemoryApicalTiebreak():
         self.active_cells = torch.empty(0, dtype=int_type)
         self.winner_cells = torch.empty(0, dtype=int_type)
         self.predicted_cells = torch.empty(0, dtype=int_type)
-        self.predicted_acive_cells = torch.empty(0, dtype=int_type)
+        self.predicted_active_cells = torch.empty(0, dtype=int_type)
         self.active_basal_segments = torch.empty(0, dtype=int_type)
         self.active_apical_segments = torch.empty(0, dtype=int_type)
         self.matching_basal_segments = torch.empty(0, dtype=int_type)
@@ -223,16 +227,12 @@ class TemporalMemoryApicalTiebreak():
          apical_potential_overlaps) = self.compute_apical_segment_activity(apical_input)
 
         if learn or not self.use_apical_modulation_basal_threshold:
-            reduced_threshold_basal_cells = torch.Tensor([])
+            reduced_threshold_basal_cells = torch.Tensor()
         else:
-            # apical_connections.map_segments_to_cells(active_apical_segments)
-
-            reduced_threshold_basal_cells = torch.Tensor([
-                map(
-                    lambda cell : self.segment_to_cell[cell.item()], 
-                    self.active_apical_segments
-                )
-            ])
+            # map each segment to a cell
+            reduced_threshold_basal_cells = self.map_apical_segments_to_cells(
+                self.active_apical_segments
+            )
 
         # compute basal segment activity
         (active_basal_segments,
@@ -242,9 +242,39 @@ class TemporalMemoryApicalTiebreak():
              reduced_threshold_basal_cells
         )
 
-            
+        predicted_cells = self.calculate_predicted_cells(active_basal_segments, 
+                                                         active_apical_segments)
 
+        self.predicted_cells = predicted_cells
+        self.active_basal_segments = active_basal_segments
+        self.active_apical_segments = active_apical_segments
+        self.matching_basal_segments = matching_basal_segments
+        self.matching_apical_segments = matching_apical_segments
+        self.basal_potential_overlaps = basal_potential_overlaps
+        self.apical_potential_overlaps = apical_potential_overlaps
+    
+    def activate_cells(
+        self, 
+        active_minicolumns, 
+        basal_reinforce_candidates, 
+        apical_reinforce_candidates,
+        basal_growth_candidates,
+        apical_growth_candidates,
+        learn=True
+    ):
+        """
+        activate cells in specified minicolumns using result `depolarize_cells()` as
+        predictions. then learn.
 
+        active_minicolumns (torch.Tensor) is a list of active minicolumns.
+
+        basal_reinforce_candidates (torch.Tensor) is a list of bits that the active 
+        cells may reinforce basal synapses to.
+
+        apical_reinforce_candidates (torch.Tensor) is a list of bits that 
+        """
+
+    
 
     def compute_apical_segment_activity(self, apical_input):
         """
@@ -268,23 +298,25 @@ class TemporalMemoryApicalTiebreak():
 
         # compute active segments
         overlaps = (
-            (self.apical_connections > self.connected_permanence).float() @ apical_input
-        ).ravel().to(int_type)
+            (self.apical_connections >= self.connected_permanence).to(real_type) \
+                @ apical_input
+        ).squeeze().to(int_type)
         
         active_apical_segments = torch.nonzero(
-            overlaps > self.activation_threshold
+            overlaps >= self.activation_threshold
         ).squeeze().to(int_type)
 
         # compute matching segments
         apical_potential_overlaps = (
-            (self.apical_connections > 0).float() @ apical_input
-        ).ravel().to(int_type)
-
-        matching_apical_segments = torch.nonzero(
-            apical_potential_overlaps > self.matching_threshold
+            (self.apical_connections > 0).to(real_type) @ apical_input
         ).squeeze().to(int_type)
 
-        return (active_apical_segments, matching_apical_segments, apical_potential_overlaps)
+        matching_apical_segments = torch.nonzero(
+            apical_potential_overlaps >= self.matching_threshold
+        ).squeeze().to(int_type)
+
+        return (active_apical_segments, matching_apical_segments, 
+                apical_potential_overlaps)
             
     def compute_basal_segment_activity(self, 
                                        basal_input, 
@@ -311,8 +343,188 @@ class TemporalMemoryApicalTiebreak():
         for each segment. includes counts for active, matching, and non-matching
         segments.
         """
+        
+        # compute active segments
+        overlaps = (
+            (self.basal_connections >= self.connected_permanence).to(real_type) \
+                @ basal_input
+        ).squeeze().to(int_type)
+
+        # fully active basal segments (i.e. above the activation threshold)
+        fully_active_basal_segments = torch.nonzero(
+            overlaps >= self.activation_threshold
+        ).squeeze().to(int_type)
+
+        if (self.reduced_basal_threshold != self.activation_threshold and 
+            len(reduced_threshold_basal_cells) > 0):
+            # active apical segments lower the activation threshold for 
+            # basal (lateral) segments. find segments that are above the reduced 
+            # threshold.
+            potentially_active_basal_segments = torch.nonzero(
+                (overlaps < self.activation_threshold) & 
+                (overlaps >= self.reduced_basal_threshold) 
+            )
+
+            # find cells that correspond to each potentially active basal segment
+            potentially_active_cells = self.map_basal_segments_to_cells(
+                potentially_active_basal_segments
+            )
+
+            # pick cells that are potentially active and have reduced threshold basal
+            # segments. then find the segments for these cells. add those segments
+            # to the list of fully active basal segments. 
+            #
+            # `isin()` method equivalent to `torch.isin(a, b)`, where 
+            # `a = potentially_active_cells` and `b = reduced_threshold_basal_cells`
+            active_basal_segments = torch.cat([
+                fully_active_basal_segments, 
+                potentially_active_basal_segments[
+                    self.isin(potentially_active_cells, reduced_threshold_basal_cells)
+                ]
+            ])
+        else:
+            active_basal_segments = fully_active_basal_segments
+
+        # compute matching segments
+        basal_potential_overlaps = (
+            (self.basal_connections > 0).to(real_type) @ basal_input
+        ).squeeze().to(int_type)
+
+        matching_basal_segments = torch.nonzero(
+            basal_potential_overlaps >= self.matching_threshold
+        ).squeeze().to(int_type)
+
+        return (active_basal_segments, matching_basal_segments, 
+                basal_potential_overlaps)
+
+    def calculate_predicted_cells(self, active_basal_segments, active_apical_segments):
+        """
+        calculate the predicted cells, given the set of active segments:
+
+        an active basal segment is enough to predict a cell. 
+        an active apical segment is *not* enough to predict a cell. 
+
+        when a cell has both types of segments active, other cells in its minicolumn 
+        must also have both types of segments to be considered predictive. 
+
+        active_basal_segments (torch.Tensor) contains list of active basal segments. 
+        active_apical_segments (torch.Tensor) contains list of active apical segments.
+
+        returns: 
+
+        predicted cells (torch.Tensor) contains list of predicted cells.
+        """
+
+        cells_for_basal_segments = self.map_basal_segments_to_cells(
+            active_basal_segments
+        )
+
+        # if not using apical tiebreak, predicted cells = cells_for_basal_segments
+        if not self.use_apical_tiebreak:
+            return cells_for_basal_segments
+
+        cells_for_apical_segments = self.map_apical_segments_to_cells(
+            active_apical_segments
+        )
+
+        # fully depolarized cells should have both active basal and apical segments
+        fully_depolarized_cells = self.intersection(cells_for_basal_segments, 
+                                                    cells_for_apical_segments)
+
+        # partly depolarized cells have active basal segments *but not* active apical
+        # segments 
+        partly_depolarized_cells = self.difference(cells_for_basal_segments, 
+                                                   fully_depolarized_cells)
+
+        # choose which partly depolarized cells to inhibit
+        inhibited_mask = self.isin(
+            partly_depolarized_cells // self.num_cells_per_minicolumn,
+            fully_depolarized_cells // self.num_cells_per_minicolumn
+        )
+
+        # predicted cells = fully_depolarized_cells + some of partly_depolarized_cells
+        return torch.cat([
+            fully_depolarized_cells, 
+            partly_depolarized_cells[~inhibited_mask]
+        ])
+
+    def map_apical_segments_to_cells(self, segments):
+        """
+        map each apical segment in `segments` (torch.Tensor) to a cell. 
+        
+        mapping is one-to-one.
+        """
+
+        return torch.Tensor([
+            map(
+                lambda cell : self.apical_segment_to_cell[cell.item()],
+                segments
+            )
+        ]).to(int_type)
+    
+    def map_basal_segments_to_cells(self, segments):
+        """
+        map each basal segment in `segments` (torch.Tensor) to a cell.
+
+        mapping is one-to-one.
+        """
+
+        return torch.Tensor([
+            map(
+                lambda cell : self.basal_segment_to_cell[cell.item()],
+                segments
+            )
+        ]).to(int_type)
+
+    @staticmethod
+    def isin(a, b):
+        """
+        return True for each element of `a` (torch.Tensor) if it is 
+        in `b` (torch.Tensor).
+
+        both `a` and `b` are 1D tensors.
+        """
+        
+        return (a[:, None] == b).any(axis=-1)
+    
+    @staticmethod
+    def intersection(a, b):
+        """
+        returns intersection of elements in `a` (torch.Tensor) and `b` (torch.Tensor). 
+        
+        both `a` and `b` are 1D tensors.
+        both `a` and `b` cannot have any duplicate elements.
+        """
+        
+        uniques, counts = torch.cat([a, b]).unique(return_counts=True)
+
+        return uniques[counts > 1]
+
+    @staticmethod
+    def difference(a, b):
+        """
+        returns unique values in `a` (torch.Tensor) that are not in `b` (torch.Tensor).
+
+        both `a` and `b` are 1D tensors.
+        both `a` and `b` cannot have any duplicate elements.
+        """
+
+        expanded_b = b.expand(a.shape[0], b.shape[0]).T
+
+        return a[(a != expanded_b).T.prod(axis=1) == 1]
 
         
+
+
+
+
+
+
+
+
+
+
+
 
         
 
