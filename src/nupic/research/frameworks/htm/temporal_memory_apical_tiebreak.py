@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 from collections import defaultdict
+from enum import unique
 
 import torch
 
@@ -172,10 +173,18 @@ class TemporalMemoryApicalTiebreak():
             dtype=int_type
         )
 
+
+        # 
+        #
+        #
+        #
+        #
+        #
+        #
         self.active_cells = torch.empty(0, dtype=int_type)
         self.winner_cells = torch.empty(0, dtype=int_type)
         self.predicted_cells = torch.empty(0, dtype=int_type)
-        self.predicted_acive_cells = torch.empty(0, dtype=int_type)
+        self.predicted_active_cells = torch.empty(0, dtype=int_type)
         self.active_basal_segments = torch.empty(0, dtype=int_type)
         self.active_apical_segments = torch.empty(0, dtype=int_type)
         self.matching_basal_segments = torch.empty(0, dtype=int_type)
@@ -238,14 +247,12 @@ class TemporalMemoryApicalTiebreak():
         (active_basal_segments,
          matching_basal_segments,
          basal_potential_overlaps) = self.compute_basal_segment_activity(
-             basal_input, 
-             reduced_threshold_basal_cells
+            basal_input, 
+            reduced_threshold_basal_cells
         )
 
-        predicted_cells = self.calculate_predicted_cells(active_basal_segments, 
-                                                         active_apical_segments)
-
-        self.predicted_cells = predicted_cells
+        self.predicted_cells = self.compute_predicted_cells(active_basal_segments, 
+                                                              active_apical_segments)
         self.active_basal_segments = active_basal_segments
         self.active_apical_segments = active_apical_segments
         self.matching_basal_segments = matching_basal_segments
@@ -283,8 +290,45 @@ class TemporalMemoryApicalTiebreak():
         learn (bool) -- whether to grow, reinforce, and/or punish synapses
         """
 
-        # calculate active cells 
+        # correctly predicted cells are predicted and correspond to active_minicolumns
+        correctly_predicted_cells = self.predicted_cellss[
+            isin(
+                self.predicted_cells // self.num_cells_per_minicolumn, 
+                active_minicolumns
+            )
+        ]
+
+        # bursting minicolumns are all the active minicolumns that didn't have 
+        # any predicted cells
+        bursting_minicolumns = active_minicolumns[
+            ~isin(
+                active_minicolumns,
+                self.predicted_cells // self.num_cells_per_minicolumn
+            )
+        ]
+
+        # mark all correctly predicted cells for activation
+        # mark all cells in bursting minicolumns for activation
+        new_active_cells = torch.cat([
+            correctly_predicted_cells,
+            get_cells_in_minicolumn(bursting_minicolumns, self.num_cells_per_minicolumn)
+        ])
         
+        # compute basal learning
+        (learning_active_basal_segments,
+         learning_matching_basal_segments,
+         basal_segments_to_punish,
+         new_basal_segment_cells, 
+         learning_cells) = self.compute_basal_learning(
+             active_minicolumns, bursting_minicolumns, correctly_predicted_cells
+        )
+
+        
+
+
+        
+
+
 
     
 
@@ -409,9 +453,9 @@ class TemporalMemoryApicalTiebreak():
         return (active_basal_segments, matching_basal_segments, 
                 basal_potential_overlaps)
 
-    def calculate_predicted_cells(self, active_basal_segments, active_apical_segments):
+    def compute_predicted_cells(self, active_basal_segments, active_apical_segments):
         """
-        calculate the predicted cells, given the set of active segments:
+        compute the predicted cells, given the set of active segments:
 
         an active basal segment is enough to predict a cell. 
         an active apical segment is *not* enough to predict a cell. 
@@ -441,12 +485,12 @@ class TemporalMemoryApicalTiebreak():
 
         # fully depolarized cells should have both active basal and apical segments
         fully_depolarized_cells = intersection(cells_for_basal_segments, 
-                                                    cells_for_apical_segments)
+                                               cells_for_apical_segments)
 
         # partly depolarized cells have active basal segments *but not* active apical
         # segments 
-        partly_depolarized_cells = difference(cells_for_basal_segments, 
-                                                   fully_depolarized_cells)
+        partly_depolarized_cells = difference(cells_for_basal_segments,
+                                              fully_depolarized_cells)
 
         # choose which partly depolarized cells to inhibit
         inhibited_mask = isin(
@@ -460,6 +504,91 @@ class TemporalMemoryApicalTiebreak():
             partly_depolarized_cells[~inhibited_mask]
         ])
 
+    def compute_basal_learning(
+        self, 
+        active_minicolumns, 
+        bursting_minicolumns,
+        correctly_predicted_cells
+    ):
+        """
+        correctly predicted cells always have active basal segments on which learning 
+        occurs. 
+
+        in bursting minicolumns, must learn on an existing basal segment or 
+        grow a new one.
+
+        apical dendrites influence which cells are considered "predicted". therefore,
+        an active apical dendrite can prevent some basal segments in active minicolumns
+        from learning. 
+
+        returns:
+
+        learning_active_basal_segments (torch.Tensor) contains active basal segments
+        on correctly predicted cells. 
+
+        learning_matching_basal_segments (torch.Tensor) contains matching basal segments
+        selected for learning in bursting minicolumns. 
+
+        basal_segments_to_punish (torch.Tensor) contains basal segments that should be
+        punished for predicting an inactive mincolumn. 
+
+        learning_cells (torch.Tensor) contains cells that have learning basal segments
+        or are selected to grow a basal segment.
+        """
+
+        # return subset of basal segments that are on the correctly predicted cells
+        learning_active_basal_segments = self.active_basal_segments[
+            isin(
+                self.map_basal_segments_to_cells[self.active_basal_segments], 
+                correctly_predicted_cells
+            )
+        ]
+
+        # find cells for matching basal segments
+        cells_for_matching_basal_segments = self.map_basal_segments_to_cells(
+            self.matching_basal_segments
+        )
+
+        # find unique cells which contain matching basal segments
+        unique_cells_for_matching_basal_segments = torch.unique(
+            cells_for_matching_basal_segments
+        )
+
+        # overlap between bursting minicolumns and minicolumns with cells 
+        # that have matching basal segments
+        matching_cells_in_bursting_minicolumns \
+        = unique_cells_for_matching_basal_segments[isin(
+            unique_cells_for_matching_basal_segments // self.num_cells_per_minicolumn,
+        )]
+
+        # which bursting minicolumns contain no cells with matching basal segments
+        bursting_minicolumns_with_no_matching_cells = bursting_minicolumns[~isin(
+            bursting_minicolumns,
+            unique_cells_for_matching_basal_segments // self.num_cells_per_minicolumn
+        )]
+
+        learning_matching_basal_segments = self.chooseBestSegmentPerColumn(
+            self.basal_connections, matching_cells_in_bursting_minicolumns, 
+            self.matching_basal_segments, self.basal_potential_overlaps, 
+            self.num_cells_per_minicolumn
+        )
+
+
+
+
+
+        
+
+    
+
+    
+
+    
+
+        
+
+
+
     def map_apical_segments_to_cells(self, segments):
         """
         map each apical segment in `segments` (torch.Tensor) to a cell. 
@@ -467,12 +596,9 @@ class TemporalMemoryApicalTiebreak():
         mapping is one-to-one.
         """
 
-        return torch.Tensor([
-            map(
-                lambda cell : self.apical_segment_to_cell[cell.item()],
-                segments
-            )
-        ]).to(int_type)
+        return segments.clone().detach().apply_(
+            lambda segment : self.apical_cell_to_segments[segment]
+        ).to(int_type)
     
     def map_basal_segments_to_cells(self, segments):
         """
@@ -481,12 +607,9 @@ class TemporalMemoryApicalTiebreak():
         mapping is one-to-one.
         """
 
-        return torch.Tensor([
-            map(
-                lambda cell : self.basal_segment_to_cell[cell.item()],
-                segments
-            )
-        ]).to(int_type)
+        return segments.clone().detach().apply_(
+            lambda segment : self.basal_segment_to_cell[segment]
+        ).to(int_type)
 
 
 def isin(a, b):
@@ -523,8 +646,14 @@ def difference(a, b):
 
     return a[(a != expanded_b).T.prod(axis=1) == 1]
 
-def set_compare(a, b, a_key=None, b_key=None, 
-                left_minus_right=False, right_minus_left=False):
+def get_cells_in_minicolumn(minicolumns, num_cells_per_minicolumn):
     """
-    
+    calculate all cell indices in the specified minicolumns. 
+
+    minicolumns (torch.Tensor) contains all minicolumns. 
+    cells_per_minicolumn (int) is number of cells per minicolumn.
     """
+
+    return (minicolumns * num_cells_per_minicolumn).view(-1, 1) + \
+        torch.arange(num_cells_per_minicolumn).to(int_type).flatten()
+
