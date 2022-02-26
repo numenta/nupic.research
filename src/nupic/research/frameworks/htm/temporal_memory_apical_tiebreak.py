@@ -536,6 +536,8 @@ class TemporalMemoryApicalTiebreak():
         or are selected to grow a basal segment.
         """
 
+        # ***** LEARNING_ACTIVE_BASAL_SEGMENTS *****
+
         # return subset of basal segments that are on the correctly predicted cells
         learning_active_basal_segments = self.active_basal_segments[
             isin(
@@ -543,6 +545,8 @@ class TemporalMemoryApicalTiebreak():
                 correctly_predicted_cells
             )
         ]
+
+        # ***** LEARNING_MATCHING_BASAL_SEGMENTS *****
 
         # find cells for matching basal segments
         cells_for_matching_basal_segments = self.map_basal_segments_to_cells(
@@ -567,15 +571,7 @@ class TemporalMemoryApicalTiebreak():
             unique_cells_for_matching_basal_segments // self.num_cells_per_minicolumn
         )]
 
-        learning_matching_basal_segments = self.chooseBestSegmentPerColumn(
-            self.basal_connections, matching_cells_in_bursting_minicolumns,
-            self.matching_basal_segments, self.basal_potential_overlaps,
-            self.num_cells_per_minicolumn
-        )
-
-        # for all the minicolumns covered by matching cells, choose each minicolumn's
-        # matching segment with largest number of active potential synapses. pick
-        # the first segment when there's a tie.
+        # find matching basal segments whose cells are in bursting minicolumns
         candidate_matching_basal_segments = self.matching_basal_segments[
             isin(
                 self.map_basal_segments_to_cells[self.matching_basal_segments],
@@ -583,25 +579,24 @@ class TemporalMemoryApicalTiebreak():
             )
         ]
 
+        # for each minicolumn covered by matching cells, choose ONE matching segment 
+        # with the largest number of active potential synapses. 
         # 
-        cell_scores = self.basal_potential_overlaps[candidate_matching_basal_segments]
+        # pick the first segment when there's a tie.
+        best_candidate_matching_basal_segments = argmax_multi(
+            # number of active potential synapses for candidate matching basal segments
+            self.basal_potential_overlaps[candidate_matching_basal_segments],
 
-
-        candidate_minicolumns_with_matching_basal_segments \
-        = self.map_basal_segments_to_cells[
-            candidate_matching_basal_segments
-        ] // self.num_cells_per_minicolumn
-
-        # 
-         =  argmax_multi(
-                # 
-                self.basal_potential_overlaps[candidate_matching_basal_segments],
-
-                # candidate minicolumns with matching basal segments
-                self.map_basal_segments_to_cells[
-                    candidate_matching_basal_segments
-                ] // self.num_cells_per_minicolumn
+            # candidate minicolumns with matching basal segments
+            self.map_basal_segments_to_cells[
+                candidate_matching_basal_segments
+            ] // self.num_cells_per_minicolumn
         )
+
+        learning_matching_basal_segments \
+        = candidate_matching_basal_segments[best_candidate_matching_basal_segments]
+
+        
 
         
 
