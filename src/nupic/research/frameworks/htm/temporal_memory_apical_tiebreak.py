@@ -291,9 +291,9 @@ class TemporalMemoryApicalTiebreak():
         """
 
         # correctly predicted cells are predicted and correspond to active_minicolumns
-        correctly_predicted_cells = self.predicted_cellss[
+        correctly_predicted_cells = self.predicted_cells[
             isin(
-                self.predicted_cells // self.num_cells_per_minicolumn,
+                cells_to_minicolumns(self.predicted_cells),
                 active_minicolumns
             )
         ]
@@ -303,7 +303,7 @@ class TemporalMemoryApicalTiebreak():
         bursting_minicolumns = active_minicolumns[
             ~isin(
                 active_minicolumns,
-                self.predicted_cells // self.num_cells_per_minicolumn
+                cells_to_minicolumns(self.predicted_cells)
             )
         ]
 
@@ -471,31 +471,31 @@ class TemporalMemoryApicalTiebreak():
         predicted cells (torch.Tensor) contains list of predicted cells.
         """
 
-        cells_for_basal_segments = self.map_basal_segments_to_cells(
+        cells_with_basal_segments = self.map_basal_segments_to_cells(
             active_basal_segments
         )
 
-        # if not using apical tiebreak, predicted cells = cells_for_basal_segments
+        # if not using apical tiebreak, predicted cells = cells_with_basal_segments
         if not self.use_apical_tiebreak:
-            return cells_for_basal_segments
+            return cells_with_basal_segments
 
-        cells_for_apical_segments = self.map_apical_segments_to_cells(
+        cells_with_apical_segments = self.map_apical_segments_to_cells(
             active_apical_segments
         )
 
         # fully depolarized cells should have both active basal and apical segments
-        fully_depolarized_cells = intersection(cells_for_basal_segments,
-                                               cells_for_apical_segments)
+        fully_depolarized_cells = intersection(cells_with_basal_segments,
+                                               cells_with_apical_segments)
 
         # partly depolarized cells have active basal segments *but not* active apical
         # segments
-        partly_depolarized_cells = difference(cells_for_basal_segments,
+        partly_depolarized_cells = difference(cells_with_basal_segments,
                                               fully_depolarized_cells)
 
         # choose which partly depolarized cells to inhibit
         inhibited_mask = isin(
-            partly_depolarized_cells // self.num_cells_per_minicolumn,
-            fully_depolarized_cells // self.num_cells_per_minicolumn
+            cells_to_minicolumns(partly_depolarized_cells),
+            cells_to_minicolumns(fully_depolarized_cells)
         )
 
         # predicted cells = fully_depolarized_cells + some of partly_depolarized_cells
@@ -536,7 +536,7 @@ class TemporalMemoryApicalTiebreak():
         or are selected to grow a basal segment.
         """
 
-        # ***** LEARNING_ACTIVE_BASAL_SEGMENTS *****
+        # ***** LEARNING_ACTIVE_BASAL_SEGMENTS ***** #
 
         # return subset of basal segments that are on the correctly predicted cells
         learning_active_basal_segments = self.active_basal_segments[
@@ -546,57 +546,81 @@ class TemporalMemoryApicalTiebreak():
             )
         ]
 
-        # ***** LEARNING_MATCHING_BASAL_SEGMENTS *****
+        # ***** LEARNING_MATCHING_BASAL_SEGMENTS ***** #
 
-        # find cells for matching basal segments
-        cells_for_matching_basal_segments = self.map_basal_segments_to_cells(
+        # find cells with matching basal segments
+        cells_with_matching_basal_segments = self.map_basal_segments_to_cells(
             self.matching_basal_segments
         )
 
         # find unique cells which contain matching basal segments
-        unique_cells_for_matching_basal_segments = torch.unique(
-            cells_for_matching_basal_segments
+        unique_cells_with_matching_basal_segments = torch.unique(
+            cells_with_matching_basal_segments
         )
 
-        # overlap between bursting minicolumns and minicolumns with cells
-        # that have matching basal segments
-        matching_cells_in_bursting_minicolumns \
-        = unique_cells_for_matching_basal_segments[isin(
-            unique_cells_for_matching_basal_segments // self.num_cells_per_minicolumn,
-        )]
-
-        # which bursting minicolumns contain no cells with matching basal segments
-        bursting_minicolumns_with_no_matching_cells = bursting_minicolumns[~isin(
-            bursting_minicolumns,
-            unique_cells_for_matching_basal_segments // self.num_cells_per_minicolumn
-        )]
+        # overlap between (1) minicolumns with cells with matching basal segments 
+        # and (2) bursting minicolumns 
+        # ====> overlap = bursting minicolumns with cells with matching basal segments
+        #
+        # then get all the cells in the overlap
+        cells_with_matching_basal_segments_in_bursting_minicolumns \
+            = unique_cells_with_matching_basal_segments[
+                isin(
+                    cells_to_minicolumns(unique_cells_with_matching_basal_segments),
+                    bursting_minicolumns
+                )
+            ]
 
         # find matching basal segments whose cells are in bursting minicolumns
-        candidate_matching_basal_segments = self.matching_basal_segments[
-            isin(
-                self.map_basal_segments_to_cells[self.matching_basal_segments],
-                matching_cells_in_bursting_minicolumns
+        matching_basal_segments_of_cells_in_bursting_minicolumns = \
+            self.matching_basal_segments[
+                isin(
+                    cells_with_matching_basal_segments,
+                    cells_with_matching_basal_segments_in_bursting_minicolumns
+                )
+            ]
+
+        # best matching basal segment (highest # of active synapses) 
+        # among all cells in each bursting minicolumn
+        learning_matching_basal_segments = \
+            matching_basal_segments_of_cells_in_bursting_minicolumns[
+                # for each minicolumn with cells with matching basal segments, 
+                # choose ONE matching segment with the largest number of 
+                # active potential synapses.
+                # 
+                # pick the first segment when there's a tie.
+                argmax_multi(
+                    # number of active potential synapses for matching basal segments 
+                    # of cells in bursting minicolumns
+                    values=self.basal_potential_overlaps[
+                        matching_basal_segments_of_cells_in_bursting_minicolumns
+                    ],
+
+                    # which bursting minicolumn each cell with matching basal segments
+                    # belongs to
+                    groups=cells_to_minicolumns(
+                        self.map_basal_segments_to_cells[
+                            matching_basal_segments_of_cells_in_bursting_minicolumns
+                        ]
+                    )
+                )
+            ]
+
+
+
+
+    
+        # which bursting minicolumns contain no cells with matching basal segments
+        bursting_minicolumns_with_no_matching_cells = bursting_minicolumns[
+            ~isin(
+                bursting_minicolumns,
+                cells_to_minicolumns(unique_cells_with_matching_basal_segments)
             )
         ]
 
-        # for each minicolumn covered by matching cells, choose ONE matching segment 
-        # with the largest number of active potential synapses. 
-        # 
-        # pick the first segment when there's a tie.
-        best_candidate_matching_basal_segments = argmax_multi(
-            # number of active potential synapses for candidate matching basal segments
-            self.basal_potential_overlaps[candidate_matching_basal_segments],
 
-            # candidate minicolumns with matching basal segments
-            self.map_basal_segments_to_cells[
-                candidate_matching_basal_segments
-            ] // self.num_cells_per_minicolumn
-        )
 
-        learning_matching_basal_segments \
-        = candidate_matching_basal_segments[best_candidate_matching_basal_segments]
 
-        
 
         
 
@@ -684,26 +708,33 @@ def get_cells_in_minicolumn(minicolumns, num_cells_per_minicolumn):
     return (minicolumns * num_cells_per_minicolumn).view(-1, 1) + \
         torch.arange(num_cells_per_minicolumn).to(int_type).flatten()
 
-def argmax_multi(tensor, groups):
+def cells_to_minicolumns(cell, num_cells_per_minicolumn):
     """
-    gets indices of the max values of each group in `tensor` (torch.Tensor), 
+    return minicolumn index (`torch.Tensor`) for a particular cell (`torch.Tensor`). 
+    """
+    
+    return cell.div(num_cells_per_minicolumn, rounding_mode="floor")
+
+def argmax_multi(values, groups):
+    """
+    gets indices of the max values of each group in `values` (torch.Tensor), 
     grouping the elements by their correspondiing value in `groups` (torch.Tensor). 
 
-    returns index (within `tensor`) of maximal element in each group.
+    returns index (within `values`) of maximal element in each group.
 
     example: 
-        argmax_multi(tensor = [5, 4, 7, 2, 9, 8],    -->    [2, 4]   
+        argmax_multi(values = [5, 4, 7, 2, 9, 8],    -->    [2, 4]   
                      groups = [0, 0, 0, 1, 1, 1])
     """
 
     # find the set of all groups 
-    values = torch.unique(groups)
+    unique_groups = torch.unique(groups)
     
     # non-zero elements in column `i` of `max_values` contain values of 
-    # `tensor` that belong in group `groups[i]`.
+    # `values` that belong in group `groups[i]`.
     #
     # (add a `1` in order to represent zeros.)
-    max_values = (tensor + 1).view(-1, 1) * (groups.view(-1, 1) == values)
+    max_values = (values + 1).view(-1, 1) * (groups.view(-1, 1) == unique_groups)
 
     # return indices of maximal element in each group. 
     # break ties by picking the first occurrence of each maximal value.
