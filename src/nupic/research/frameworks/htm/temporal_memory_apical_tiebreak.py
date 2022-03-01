@@ -174,7 +174,7 @@ class TemporalMemoryApicalTiebreak():
         )
 
 
-        #
+        # 
         #
         #
         #
@@ -200,8 +200,8 @@ class TemporalMemoryApicalTiebreak():
         self.basal_segment_to_cell = defaultdict(lambda : -1)
 
         # one-to-many mapping of cell to segments
-        self.apical_cell_to_segments = defaultdict(lambda : torch.Tensor().to(int_type))
-        self.basal_cell_to_segments = defaultdict(lambda : torch.Tensor().to(int_type))
+        self.cell_to_apical_segments = defaultdict(lambda : torch.Tensor().to(int_type))
+        self.cell_to_basal_segments = defaultdict(lambda : torch.Tensor().to(int_type))
 
     def reset(self):
         """
@@ -311,23 +311,27 @@ class TemporalMemoryApicalTiebreak():
         # mark all cells in bursting minicolumns for activation
         new_active_cells = torch.cat([
             correctly_predicted_cells,
-            get_cells_in_minicolumn(bursting_minicolumns, self.num_cells_per_minicolumn)
+            get_cells_in_minicolumns(
+                bursting_minicolumns, self.num_cells_per_minicolumn
+            )
         ])
 
         # compute basal learning
         (learning_active_basal_segments,
          learning_matching_basal_segments,
          basal_segments_to_punish,
-         new_basal_segment_cells,
-         learning_cells) = self.compute_basal_learning(
+         cells_with_new_basal_segments,
+         all_learning_cells) = self.compute_basal_learning(
              active_minicolumns, bursting_minicolumns, correctly_predicted_cells
         )
 
-
-
-
-
-
+        # compute apical learning
+        (learning_active_apical_segments,
+         learning_matching_apical_segments,
+         apical_segments_to_punish, 
+         cells_with_new_apical_segments) = self.calculate_apical_learning(
+             all_learning_cells, active_minicolumns
+        )
 
 
 
@@ -532,8 +536,11 @@ class TemporalMemoryApicalTiebreak():
         basal_segments_to_punish (torch.Tensor) contains basal segments that should be
         punished for predicting an inactive mincolumn.
 
-        learning_cells (torch.Tensor) contains cells that have learning basal segments
-        or are selected to grow a basal segment.
+        cells_with_new_basal_segments (torch.Tensor) contains cells in bursting 
+        minicolumns that are selected to grow new basal segments.
+
+        all_learning_cells (torch.Tensor) contains cells that have learning basal 
+        segments or are selected to grow a basal segment.
         """
 
         # ***** LEARNING_ACTIVE_BASAL_SEGMENTS ***** #
@@ -546,12 +553,23 @@ class TemporalMemoryApicalTiebreak():
             )
         ]
 
-        # ***** LEARNING_MATCHING_BASAL_SEGMENTS ***** #
+        # ***** BASAL_SEGMENTS_TO_PUNISH ***** #
 
         # find cells with matching basal segments
         cells_with_matching_basal_segments = self.map_basal_segments_to_cells(
             self.matching_basal_segments
         )
+
+        # basal segments to punish are not associated with cells in any 
+        # active minicolumns
+        basal_segments_to_punish = self.matching_basal_segments[
+            ~isin(
+                cells_to_minicolumns(cells_with_matching_basal_segments),
+                active_minicolumns
+            )
+        ]
+
+        # ***** LEARNING_MATCHING_BASAL_SEGMENTS ***** #
 
         # find unique cells which contain matching basal segments
         unique_cells_with_matching_basal_segments = torch.unique(
@@ -606,37 +624,148 @@ class TemporalMemoryApicalTiebreak():
                 )
             ]
 
+        # ***** CELLS_WITH_NEW_BASAL_SEGMENTS ***** # 
 
-
-
-    
         # which bursting minicolumns contain no cells with matching basal segments
-        bursting_minicolumns_with_no_matching_cells = bursting_minicolumns[
-            ~isin(
-                bursting_minicolumns,
-                cells_to_minicolumns(unique_cells_with_matching_basal_segments)
+        bursting_minicolumns_with_cells_with_no_matching_basal_segments = \
+            bursting_minicolumns[
+                ~isin(
+                    bursting_minicolumns,
+                    cells_to_minicolumns(unique_cells_with_matching_basal_segments)
+                )
+            ]
+
+        # cells in bursting minicolumns with no matching basal segments
+        #
+        # arranged as minicolumns x cells.
+        cells_in_bursting_minicolumns_with_no_matching_basal_segments = \
+            get_cells_in_minicolumns(
+                bursting_minicolumns_with_cells_with_no_matching_basal_segments, 
+                self.num_cells_per_minicolumn
             )
-        ]
+
+        # segment counts for each cell in bursting minicolumns with no matching basal
+        # segments. 
+        #
+        # arranged as minicolumns x cells. 
+        basal_segment_counts = self.get_basal_segment_counts(
+            cells_in_bursting_minicolumns_with_no_matching_basal_segments
+        ).reshape(
+            bursting_minicolumns_with_cells_with_no_matching_basal_segments.numel(),
+            self.num_cells_per_minicolumn
+        )
+
+        min_basal_segment_counts = basal_segment_counts.amin(dim=1, keepdim=True)
+
+        # reduce cells to those with fewest basal segments in each minicolumn
+        cells_in_bursting_minicolumns_with_no_matching_basal_segments = \
+            cells_in_bursting_minicolumns_with_no_matching_basal_segments[
+                torch.nonzero(
+                    (basal_segment_counts == min_basal_segment_counts).ravel()
+                ).squeeze()
+            ]
+
+        # get unique bursting minicolumns with cells with no matching basal segments
+        unique_minicolumns, num_candidates_in_minicolumns = torch.unique(
+            cells_to_minicolumns(
+                cells_in_bursting_minicolumns_with_no_matching_basal_segments,
+                self.num_cells_per_minicolumn
+            ), 
+            return_counts=True
+        )
+
+        # only pick one cell per bursting minicolumn that has no matching basal segments
+        one_cell_per_minicolumn_filter = (
+                unique_minicolumns.view(-1, 1) \
+                == cells_to_minicolumns(
+                    cells_in_bursting_minicolumns_with_no_matching_basal_segments,
+                    self.num_cells_per_minicolumn
+                )
+        ).to(int_type).argmax(dim=1)
+
+        # randomly keep only some of the cells
+        one_cell_per_minicolumn_filter = (
+            one_cell_per_minicolumn_filter + torch.rand(
+                size=(
+                    one_cell_per_minicolumn_filter.numel(),
+                ), 
+                generator=self.generator
+            ).to(real_type) * num_candidates_in_minicolumns
+        ).floor()
+
+        # cells with new basal segments 
+        cells_with_new_basal_segments = \
+            cells_in_bursting_minicolumns_with_no_matching_basal_segments[
+                one_cell_per_minicolumn_filter
+            ]
+
+        # ***** ALL_LEARNING_CELLS ***** # 
+        all_learning_cells = torch.cat([
+            correctly_predicted_cells,
+            self.map_basal_segments_to_cells(learning_matching_basal_segments),
+            cells_with_new_basal_segments
+        ])
+
+        return (learning_active_basal_segments, 
+                learning_matching_basal_segments,
+                basal_segments_to_punish,
+                cells_with_new_basal_segments,
+                all_learning_cells)
+
+    def calculate_apical_learning(self, all_learning_cells, active_minicolumns):
+        """
+        correctly predicted cells always have active basal segments on which learning
+        occurs.
+
+        in bursting minicolumns, must learn on an existing basal segment or
+        grow a new one.
+
+        apical dendrites influence which cells are considered "predicted". therefore,
+        an active apical dendrite can prevent some basal segments in active minicolumns
+        from learning.
+
+        returns:
+
+        learning_active_basal_segments (torch.Tensor) contains active basal segments
+        on correctly predicted cells.
+
+        learning_matching_basal_segments (torch.Tensor) contains matching basal segments
+        selected for learning in bursting minicolumns.
+
+        basal_segments_to_punish (torch.Tensor) contains basal segments that should be
+        punished for predicting an inactive mincolumn.
+
+        learning_cells (torch.Tensor) contains cells that have learning basal segments
+        or are selected to grow a basal segment.
 
 
+        set of `all_learning_cells` (torch.Tensor) is determined from 
+        basal segments -- must do all apical learning on the same cells. 
 
+        learn on any active segments on learning cells. 
+        for cells without active segments, learn on the best matching segment.
+        for cells without a matching segment, grow a new segment.
 
+        returns:
+
+        learning_active_apical_segments (torch.Tensor) contains active apical segments
+        on correctly predicted cells.
+
+        learning_matching_apical_segments (torch.Tensor) contains matching apical
+        segments selected for learning in bursting minicolumns.
+
+        apical_segments_to_punish (torch.Tensor) contains apical segments that should
+        be punished for predicting an inactive minicolumn.
+
+        cells_with_new_apical_segments (torch.Tensor) contains cells in bursting 
+        minicolumns that are selected to grow new apical segments.
+        """
 
         
-
         
 
-
-
-
-
-
-
-
-
-
-
-
+        pass
+    
 
 
 
@@ -648,7 +777,7 @@ class TemporalMemoryApicalTiebreak():
         """
 
         return segments.clone().detach().apply_(
-            lambda segment : self.apical_cell_to_segments[segment]
+            lambda segment : self.apical_segment_to_cell[segment]
         ).to(int_type)
 
     def map_basal_segments_to_cells(self, segments):
@@ -662,6 +791,14 @@ class TemporalMemoryApicalTiebreak():
             lambda segment : self.basal_segment_to_cell[segment]
         ).to(int_type)
 
+    def get_basal_segment_counts(self, cells):
+        """
+        return number of basal segments for each cell in `cells` (torch.Tensor)
+        """
+
+        return cells.clone().detach().apply_(
+            lambda cell : self.cell_to_basal_segments[cell].numel()
+        ).to(int_type)
 
 def isin(a, b):
     """
@@ -697,7 +834,7 @@ def difference(a, b):
 
     return a[(a != expanded_b).T.prod(axis=1) == 1]
 
-def get_cells_in_minicolumn(minicolumns, num_cells_per_minicolumn):
+def get_cells_in_minicolumns(minicolumns, num_cells_per_minicolumn):
     """
     calculate all cell indices in the specified minicolumns.
 
@@ -705,15 +842,15 @@ def get_cells_in_minicolumn(minicolumns, num_cells_per_minicolumn):
     cells_per_minicolumn (int) is number of cells per minicolumn.
     """
 
-    return (minicolumns * num_cells_per_minicolumn).view(-1, 1) + \
-        torch.arange(num_cells_per_minicolumn).to(int_type).flatten()
+    return ((minicolumns * num_cells_per_minicolumn).view(-1, 1) + \
+        torch.arange(num_cells_per_minicolumn).to(int_type)).flatten()
 
-def cells_to_minicolumns(cell, num_cells_per_minicolumn):
+def cells_to_minicolumns(cells, num_cells_per_minicolumn):
     """
-    return minicolumn index (`torch.Tensor`) for a particular cell (`torch.Tensor`). 
+    return minicolumn indices (torch.Tensor) for `cells` (torch.Tensor). 
     """
     
-    return cell.div(num_cells_per_minicolumn, rounding_mode="floor")
+    return cells.div(num_cells_per_minicolumn, rounding_mode="floor")
 
 def argmax_multi(values, groups):
     """
@@ -730,7 +867,7 @@ def argmax_multi(values, groups):
     # find the set of all groups 
     unique_groups = torch.unique(groups)
     
-    # non-zero elements in column `i` of `max_values` contain values of 
+    # non-zero elements in column `i` of `max_values` contain elements of 
     # `values` that belong in group `groups[i]`.
     #
     # (add a `1` in order to represent zeros.)
