@@ -907,12 +907,9 @@ class TemporalMemoryApicalTiebreak():
                                            max_new_synapses, max_synapses_to_reach)
 
 
-        self.basal_connections.growSynapsesToSample(
-            learning_segments, basal_growth_candidates,
-            max_new_synapses, self.initial_permanence, self.generator
+        self.grow_synapses_on_basal_segments(
+            learning_segments, basal_growth_candidates, max_new_synapses
         )
-
-
     
     def learn_apical(
         self, 
@@ -924,7 +921,52 @@ class TemporalMemoryApicalTiebreak():
         adjust synapse permanences, grow new synapses, and grow new apical segments.
         """
 
-        pass
+        # ***** ADJUST SYNAPSES ***** #
+
+        # increment synapses 
+        self.adjust_synapses_on_apical_segments(
+            learning_segments, 
+            apical_reinforce_candidates,
+            self.permanence_increment
+        )
+
+        # decrement synapses
+        self.adjust_synapses_on_apical_segments(
+            learning_segments,
+            difference(
+                torch.arange(self.apical_connections.shape[1]),
+                apical_reinforce_candidates
+            ),
+            -self.permanence_decrement
+        )
+
+        # ***** GROW NEW SYNAPSES ***** #
+
+        if self.sample_size == -1:
+            max_new_synapses = len(apical_growth_candidates)
+        else:
+            # sample size (how much of active SDR to sample with synapses) - 
+            # how much of each apical learning segment is currently sampled with 
+            # synapses
+            max_new_synapses = self.sample_size - \
+                               self.apical_potential_overlaps[learning_segments]
+        
+        # if defining the maximum number of synapses per segment
+        if self.max_synapses_per_segment != -1:
+            # how many active synapses per cell
+            synapse_counts = self.apical_connections.count_nonzero(dim=1)
+
+            # max synapses left to grow is max synapses allowed per segment - 
+            # current active synapse counts (per cell) 
+            max_synapses_to_reach = self.max_synapses_per_segment - synapse_counts
+            
+            # pick the smaller number of maximum new synapses to grow
+            max_new_synapses = torch.where(max_new_synapses <= max_synapses_to_reach,
+                                           max_new_synapses, max_synapses_to_reach)
+
+        self.grow_synapses_on_apical_segments(
+            learning_segments, apical_growth_candidates, max_new_synapses
+        )
 
     def grow_synapses_on_basal_segments(
         self, 
@@ -975,6 +1017,7 @@ class TemporalMemoryApicalTiebreak():
             )
         ))
 
+        # initialize synapses
         self.basal_connections[
             ind_x[change_inds], ind_y[change_inds]
         ] = self.initial_permanence
@@ -1033,6 +1076,7 @@ class TemporalMemoryApicalTiebreak():
             )
         ))
 
+        # initialize synapses
         self.apical_connections[
             ind_x[change_inds], ind_y[change_inds]
         ] = self.initial_permanence
