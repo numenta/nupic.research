@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 from collections import defaultdict
+from email import generator
 from enum import unique
 
 import torch
@@ -164,13 +165,13 @@ class TemporalMemoryApicalTiebreak():
         self.basal_connections = torch.zeros(
             self.num_minicolumns * self.num_cells_per_minicolumn,
             self.basal_input_size,
-            dtype=int_type
+            dtype=real_type
         )
 
         self.apical_connections = torch.zeros(
             self.num_minicolumns * self.num_cells_per_minicolumn,
             self.apical_input_size,
-            dtype=int_type
+            dtype=real_type
         )
 
 
@@ -293,7 +294,9 @@ class TemporalMemoryApicalTiebreak():
         # correctly predicted cells are predicted and correspond to active_minicolumns
         correctly_predicted_cells = self.predicted_cells[
             isin(
-                cells_to_minicolumns(self.predicted_cells),
+                cells_to_minicolumns(
+                    self.predicted_cells, self.num_cells_per_minicolumn
+                ),
                 active_minicolumns
             )
         ]
@@ -303,7 +306,9 @@ class TemporalMemoryApicalTiebreak():
         bursting_minicolumns = active_minicolumns[
             ~isin(
                 active_minicolumns,
-                cells_to_minicolumns(self.predicted_cells)
+                cells_to_minicolumns(
+                    self.predicted_cells, self.num_cells_per_minicolumn
+                )
             )
         ]
 
@@ -333,6 +338,24 @@ class TemporalMemoryApicalTiebreak():
              all_learning_cells, active_minicolumns
         )
 
+        if learn:
+            for learning_segments in (learning_active_basal_segments,
+                                      learning_matching_basal_segments):
+                self.learn_basal(
+                    learning_segments, 
+                    basal_reinforce_candidates, 
+                    basal_growth_candidates
+                )
+
+            for learning_segments in (learning_active_apical_segments, 
+                                      learning_matching_apical_segments):
+                self.learn_apical(
+                    learning_segments, 
+                    apical_reinforce_candidates,
+                    apical_growth_candidates
+                )
+
+        
 
 
 
@@ -378,9 +401,11 @@ class TemporalMemoryApicalTiebreak():
         return (active_apical_segments, matching_apical_segments,
                 apical_potential_overlaps)
 
-    def compute_basal_segment_activity(self,
-                                       basal_input,
-                                       reduced_threshold_basal_cells):
+    def compute_basal_segment_activity(
+        self,
+        basal_input,
+        reduced_threshold_basal_cells
+    ):
         """
         compute the active and matching basal segments for this timestep.
 
@@ -498,8 +523,12 @@ class TemporalMemoryApicalTiebreak():
 
         # choose which partly depolarized cells to inhibit
         inhibited_mask = isin(
-            cells_to_minicolumns(partly_depolarized_cells),
-            cells_to_minicolumns(fully_depolarized_cells)
+            cells_to_minicolumns(
+                partly_depolarized_cells, self.num_cells_per_minicolumn
+            ),
+            cells_to_minicolumns(
+                fully_depolarized_cells, self.num_cells_per_minicolumn
+            )
         )
 
         # predicted cells = fully_depolarized_cells + some of partly_depolarized_cells
@@ -562,9 +591,12 @@ class TemporalMemoryApicalTiebreak():
 
         # basal segments to punish are not associated with cells in any 
         # active minicolumns
+        # (i.e. these apical segments incorrectly predicted minicolumns)
         basal_segments_to_punish = self.matching_basal_segments[
             ~isin(
-                cells_to_minicolumns(cells_with_matching_basal_segments),
+                cells_to_minicolumns(
+                    cells_with_matching_basal_segments, self.num_cells_per_minicolumn
+                ),
                 active_minicolumns
             )
         ]
@@ -584,7 +616,10 @@ class TemporalMemoryApicalTiebreak():
         cells_with_matching_basal_segments_in_bursting_minicolumns \
             = unique_cells_with_matching_basal_segments[
                 isin(
-                    cells_to_minicolumns(unique_cells_with_matching_basal_segments),
+                    cells_to_minicolumns(
+                        unique_cells_with_matching_basal_segments, 
+                        self.num_cells_per_minicolumn
+                    ),
                     bursting_minicolumns
                 )
             ]
@@ -619,7 +654,8 @@ class TemporalMemoryApicalTiebreak():
                     groups=cells_to_minicolumns(
                         self.map_basal_segments_to_cells[
                             matching_basal_segments_of_cells_in_bursting_minicolumns
-                        ]
+                        ],
+                        self.num_cells_per_minicolumn
                     )
                 )
             ]
@@ -631,7 +667,10 @@ class TemporalMemoryApicalTiebreak():
             bursting_minicolumns[
                 ~isin(
                     bursting_minicolumns,
-                    cells_to_minicolumns(unique_cells_with_matching_basal_segments)
+                    cells_to_minicolumns(
+                        unique_cells_with_matching_basal_segments,
+                        self.num_cells_per_minicolumn
+                    )
                 )
             ]
 
@@ -700,6 +739,11 @@ class TemporalMemoryApicalTiebreak():
             ]
 
         # ***** ALL_LEARNING_CELLS ***** # 
+
+        # all learning cells include:
+        #   - correctly predicted cells
+        #   - cells with learning with matching basal segments
+        #   - cells with new basal segments
         all_learning_cells = torch.cat([
             correctly_predicted_cells,
             self.map_basal_segments_to_cells(learning_matching_basal_segments),
@@ -714,33 +758,8 @@ class TemporalMemoryApicalTiebreak():
 
     def calculate_apical_learning(self, all_learning_cells, active_minicolumns):
         """
-        correctly predicted cells always have active basal segments on which learning
-        occurs.
-
-        in bursting minicolumns, must learn on an existing basal segment or
-        grow a new one.
-
-        apical dendrites influence which cells are considered "predicted". therefore,
-        an active apical dendrite can prevent some basal segments in active minicolumns
-        from learning.
-
-        returns:
-
-        learning_active_basal_segments (torch.Tensor) contains active basal segments
-        on correctly predicted cells.
-
-        learning_matching_basal_segments (torch.Tensor) contains matching basal segments
-        selected for learning in bursting minicolumns.
-
-        basal_segments_to_punish (torch.Tensor) contains basal segments that should be
-        punished for predicting an inactive mincolumn.
-
-        learning_cells (torch.Tensor) contains cells that have learning basal segments
-        or are selected to grow a basal segment.
-
-
         set of `all_learning_cells` (torch.Tensor) is determined from 
-        basal segments -- must do all apical learning on the same cells. 
+        basal segments. compute apical learning on the same cells. 
 
         learn on any active segments on learning cells. 
         for cells without active segments, learn on the best matching segment.
@@ -761,13 +780,312 @@ class TemporalMemoryApicalTiebreak():
         minicolumns that are selected to grow new apical segments.
         """
 
+        # ***** LEARNING_ACTIVE_APICAL_SEGMENTS ***** #
+
+        # return subset of apical segments that are on the learning cells
+        learning_active_apical_segments = self.active_apical_segments[isin(
+            self.map_apical_segments_to_cells(self.active_apical_segments),
+            all_learning_cells
+        )]
+
+        # ***** LEARNING_MATCHING_APICAL_SEGMENTS ***** #
         
+        # learning cells without active apical segments
+        learning_cells_without_active_apical_segments = difference(
+            all_learning_cells, 
+            self.map_apical_segments_to_cells(learning_active_apical_segments)
+        )
+
+        cells_with_matching_apical_segments = self.map_apical_segments_to_cells(
+            self.matching_apical_segments
+        )
+
+        # learning cells with matching apical segments are cells that have both 
+        # active apical segments and matching apical segments
+        learning_cells_with_matching_apical_segments = intersection(
+            learning_cells_without_active_apical_segments,
+            cells_with_matching_apical_segments
+        )
+
+        # find matching apical segments whose cells are learning
+        matching_apical_segments_of_learning_cells = self.matching_apical_segments[
+            isin(
+                self.map_apical_segments_to_cells(self.matching_apical_segments),
+                learning_cells_with_matching_apical_segments
+            )
+        ]
+
+        # choose matching segment with largest number of active potential synapses
+        learning_matching_apical_segments = matching_apical_segments_of_learning_cells[
+            argmax_multi(
+                values=self.apical_potential_overlaps[
+                    matching_apical_segments_of_learning_cells
+                ],
+                groups=self.map_apical_segments_to_cells(
+                    matching_apical_segments_of_learning_cells
+                )
+            )
+        ]
+
+        # ***** CELLS_WITH_NEW_APICAL_SEGMENTS ***** #
+
+        # cells that need to grow a new apical segment
+        cells_with_new_apical_segments = difference(
+            learning_cells_without_active_apical_segments,
+            learning_cells_with_matching_apical_segments
+        )
+
+        # ***** CELLS_WITH_NEW_APICAL_SEGMENTS ***** #
+
+        # apical segments to punish are not associated with cells in any 
+        # active minicolumns 
+        # (i.e. these apical segments incorrectly predicted minicolumns)
+        apical_segments_to_punish = self.matching_apical_segments[
+            ~isin(
+                cells_to_minicolumns(
+                    cells_with_matching_apical_segments, self.num_cells_per_minicolumn
+                ),
+                active_minicolumns
+            )
+        ]
+
+        return (learning_active_apical_segments,
+                learning_matching_apical_segments,
+                apical_segments_to_punish,
+                cells_with_new_apical_segments)
+
+    def learn_basal(
+        self, 
+        learning_segments, 
+        basal_reinforce_candidates,
+        basal_growth_candidates
+    ):
+        """
+        adjust synapse permanences, grow new synapses, and grow new basal segments.
+        """
+
+        # ***** ADJUST SYNAPSES ***** #
+
+        # increment synapses 
+        self.adjust_synapses_on_basal_segments(
+            learning_segments, 
+            basal_reinforce_candidates,
+            self.permanence_increment
+        )
+
+        # decrement synapses
+        self.adjust_synapses_on_basal_segments(
+            learning_segments,
+            difference(
+                torch.arange(self.basal_connections.shape[1]),
+                basal_reinforce_candidates
+            ),
+            -self.permanence_decrement
+        )
+
+        # ***** GROW NEW SYNAPSES ***** #
+
+        if self.sample_size == -1:
+            max_new_synapses = len(basal_growth_candidates)
+        else:
+            # sample size (how much of active SDR to sample with synapses) - 
+            # how much of each basal learning segment is currently sampled with synapses
+            max_new_synapses = self.sample_size - \
+                               self.basal_potential_overlaps[learning_segments]
         
+        # if defining the maximum number of synapses per segment
+        if self.max_synapses_per_segment != -1:
+            # how many active synapses per cell
+            synapse_counts = self.basal_connections.count_nonzero(dim=1)
+
+            # max synapses left to grow is max synapses allowed per segment - 
+            # current active synapse counts (per cell) 
+            max_synapses_to_reach = self.max_synapses_per_segment - synapse_counts
+            
+            # pick the smaller number of maximum new synapses to grow
+            max_new_synapses = torch.where(max_new_synapses <= max_synapses_to_reach,
+                                           max_new_synapses, max_synapses_to_reach)
+
+
+        self.basal_connections.growSynapsesToSample(
+            learning_segments, basal_growth_candidates,
+            max_new_synapses, self.initial_permanence, self.generator
+        )
+
+
+    
+    def learn_apical(
+        self, 
+        learning_segments, 
+        apical_reinforce_candidates,
+        apical_growth_candidates
+    ):
+        """
+        adjust synapse permanences, grow new synapses, and grow new apical segments.
+        """
 
         pass
-    
 
+    def grow_synapses_on_basal_segments(
+        self, 
+        segments, 
+        active_inputs, 
+        max_new_synapses
+    ):
+        """
+        grow synapses on `segments` (torch.Tensor), which lists the 
+        relevant basal segments. 
 
+        `active_inputs` (torch.Tensor) specifies list of bits that the active
+        cells may reinforce basal synapses to.
+
+        `max_new_synapses` (torch.Tensor) specifies maximum number of new synapses to
+        be created per row.
+        """
+        
+        inds = torch.cartesian_prod(segments, active_inputs).long()
+        ind_x = inds[:, 0]
+        ind_y = inds[:, 1]
+
+        zero_ind = (self.basal_connections[ind_x, ind_y] == 0).nonzero()
+
+        # number of zeros per row
+        split_ind = (
+            ~torch.stack(
+                self.basal_connections[ind_x, ind_y].chunk(segments.numel())
+            ).to(torch.bool)
+        ).sum(dim=1).cumsum(dim=0) - 1
+
+        # only consider zero elements
+        ind_x = ind_x[zero_ind].squeeze()
+        ind_y = ind_y[zero_ind].squeeze()
+
+        mask = torch.cat(
+            ((ind_x == ind_x.view(-1, 1))[split_ind], max_new_synapses.view(-1, 1)),
+            dim=1
+        )
+
+        # indices (randomly chosen) at which to initialize new synapses
+        change_inds = torch.cat(list(
+            map(lambda x : torch.multinomial(
+                    x.squeeze()[:-1], 
+                    num_samples=int(x.squeeze()[-1].item()),
+                    generator=self.generator),
+                mask.chunk(mask.shape[0])
+            )
+        ))
+
+        self.basal_connections[
+            ind_x[change_inds], ind_y[change_inds]
+        ] = self.initial_permanence
+
+        self.basal_connections[
+            ind_x[change_inds]
+        ] = self.basal_connections[ind_x[change_inds]].clamp(0, 1)
+        
+
+    def grow_synapses_on_apical_segments(
+        self,
+        segments,
+        active_inputs,
+        max_new_synapses
+    ):
+        """
+        grow synapses on `segments` (torch.Tensor), which lists the 
+        relevant apical segments. 
+
+        `active_inputs` (torch.Tensor) specifies list of bits that the active
+        cells may reinforce apical synapses to.
+
+        `max_new_synapses` (torch.Tensor) specifies maximum number of new synapses to
+        be created per row.
+        """
+        
+        inds = torch.cartesian_prod(segments, active_inputs).long()
+        ind_x = inds[:, 0]
+        ind_y = inds[:, 1]
+
+        zero_ind = (self.apical_connections[ind_x, ind_y] == 0).nonzero()
+
+        # number of zeros per row
+        split_ind = (
+            ~torch.stack(
+                self.apical_connections[ind_x, ind_y].chunk(segments.numel())
+            ).to(torch.bool)
+        ).sum(dim=1).cumsum(dim=0) - 1
+
+        # only consider zero elements
+        ind_x = ind_x[zero_ind].squeeze()
+        ind_y = ind_y[zero_ind].squeeze()
+
+        mask = torch.cat(
+            ((ind_x == ind_x.view(-1, 1))[split_ind], max_new_synapses.view(-1, 1)),
+            dim=1
+        )
+
+        # indices (randomly chosen) at which to initialize new synapses
+        change_inds = torch.cat(list(
+            map(lambda x : torch.multinomial(
+                    x.squeeze()[:-1], 
+                    num_samples=int(x.squeeze()[-1].item()),
+                    generator=self.generator),
+                mask.chunk(mask.shape[0])
+            )
+        ))
+
+        self.apical_connections[
+            ind_x[change_inds], ind_y[change_inds]
+        ] = self.initial_permanence
+
+        self.apical_connections[
+            ind_x[change_inds]
+        ] = self.apical_connections[ind_x[change_inds]].clamp(0, 1)
+
+    def adjust_synapses_on_basal_segments(self, segments, active_inputs, delta):
+        """
+        adjust synapses on basal segments. 
+
+        `segments` (torch.Tensor) specifies which segments to consider. 
+
+        `active_inputs` (torch.Tensor) specifies list of bits that the active
+        cells may reinforce basal synapses to.
+
+        `delta` (int) specifies how much each synapse is strengthened/weakened.
+        """
+
+        ind = torch.cartesian_prod(segments, active_inputs).to(int_type)
+        ind_x = ind[:, 0]
+        ind_y = ind[:, 1]
+        nz_ind = self.basal_connections[ind_x, ind_y].nonzero()
+
+        self.basal_connections[ind_x[nz_ind], ind_y[nz_ind]] += delta
+
+        self.basal_connections[
+            ind_x[nz_ind]
+        ] = self.basal_connections[ind_x[nz_ind]].clamp(0, 1)
+
+    def adjust_synapses_on_apical_segments(self, segments, active_inputs, delta):
+        """
+        adjust synapses on apical segments. 
+
+        `segments` (torch.Tensor) specifies which segments to consider. 
+
+        `active_inputs` (torch.Tensor) specifies list of bits that the active
+        cells may reinforce apical synapses to.
+
+        `delta` (int) specifies how much each synapse is strengthened/weakened.
+        """
+
+        ind = torch.cartesian_prod(segments, active_inputs).to(int_type)
+        ind_x = ind[:, 0]
+        ind_y = ind[:, 1]
+        nz_ind = self.apical_connections[ind_x, ind_y].nonzero()
+
+        self.apical_connections[ind_x[nz_ind], ind_y[nz_ind]] += delta
+
+        self.apical_connections[
+            ind_x[nz_ind]
+        ] = self.apical_connections[ind_x[nz_ind]].clamp(0, 1)
 
     def map_apical_segments_to_cells(self, segments):
         """
