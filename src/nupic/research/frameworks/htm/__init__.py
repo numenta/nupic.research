@@ -20,3 +20,8 @@
 # ----------------------------------------------------------------------
 
 from .spatial_pooler import SpatialPooler
+from .temporal_memory_apical_tiebreak import (
+    TemporalMemoryApicalTiebreak, 
+    SequenceMemoryApicalTiebreak
+)
+
