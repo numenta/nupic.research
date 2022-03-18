@@ -3,7 +3,7 @@
 
 # Install nupic.research frameworks
 -e packages/ray
--e packages/dendrites
+-e packages/dendrites[cl]
 -e packages/sigopt
 -e packages/wandb
 -e packages/dynamic_sparse
