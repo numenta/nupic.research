@@ -121,7 +121,7 @@ class SequenceMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
 
         self.activate_cells(
             active_minicolumns=active_minicolumns,
-            basal_reinforce_candidates=self.newly_active_cells,
+            basal_reinforce_candidates=self.active_cells,
             apical_reinforce_candidates=self.previous_apical_input,
             basal_growth_candidates=self.learning_cells,
             apical_growth_candidates=self.previous_apical_growth_candidates,
@@ -129,7 +129,7 @@ class SequenceMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
         )
 
         self.depolarize_cells(
-            basal_input=self.newly_active_cells, 
+            basal_input=self.active_cells, 
             apical_input=apical_input, 
             learn=learn
         )
@@ -137,12 +137,12 @@ class SequenceMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
         self.previous_apical_input = apical_input.clone()
         self.previous_apical_growth_candidates = apical_growth_candidates.clone()
 
-    def get_newly_active_cells(self):
+    def get_active_cells(self):
         """
-        return set of newly active cells.
+        return set of new active cells.
         """
 
-        return self.newly_active_cells
+        return self.active_cells
 
     def get_predicted_cells(self):
         """
