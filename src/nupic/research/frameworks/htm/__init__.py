@@ -22,7 +22,7 @@
 from .spatial_pooler import SpatialPooler
 
 from .temporal_memory import (
-    TemporalMemoryApicalTiebreak, 
+    TemporalMemoryApicalTiebreak,
     SequenceMemoryApicalTiebreak,
     # PairMemoryApicalTiebreak
 )
