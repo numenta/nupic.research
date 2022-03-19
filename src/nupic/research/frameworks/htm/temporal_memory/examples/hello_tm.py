@@ -21,7 +21,7 @@
 
 from itertools import count
 
-import torch 
+import torch
 
 from nupic.research.frameworks.htm import SequenceMemoryApicalTiebreak
 
@@ -92,7 +92,7 @@ for j in range(5):
     # What you should notice is that the columns where active state is 1
     # represent the SDR for the current input pattern and the columns where
     # predicted state is 1 represent the SDR for the next expected pattern
-    print("\nAll the active and predicted cells:")    
+    print("\nAll the active and predicted cells:")
     print("active cells ", tm.get_active_cells().tolist())
     print("predictive cells ", tm.get_predicted_cells().tolist())
     print("winner cells ", tm.get_learning_cells().tolist())
