@@ -74,7 +74,7 @@ class SequenceMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
         self.previous_apical_input = torch.empty(0, dtype=int_type)
         self.previous_apical_growth_candidates = torch.empty(0, dtype=int_type)
         self.previous_predicted_cells = torch.empty(0, dtype=int_type)
-    
+
     def reset(self):
         """
         clear all cell and segment activity.
@@ -95,7 +95,7 @@ class SequenceMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
     ):
         """
         perform one timestep: activate the specified minicolumn using the predictions
-        from the previous timestep and then learn. form a new set of predictions 
+        from the previous timestep and then learn. form a new set of predictions
         using the newly active cells and the apical input.
 
         `active_minicolumns` (torch.Tensor) contains the active minicolumns.
@@ -103,8 +103,8 @@ class SequenceMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
         `apical_input` (torch.Tensor) contains the list of active input bits
         for the apical dendrite segments.
 
-        `apical_growth_candidates` (torch.Tensor or None) contains the list of bits 
-        that the active cells may grow new apical synapses to. 
+        `apical_growth_candidates` (torch.Tensor or None) contains the list of bits
+        that the active cells may grow new apical synapses to.
         if None, the `apical_input` is assumed to be growth candidates.
 
         `learn` (bool) -- whether to grow / reinforce / punish synapses
@@ -129,8 +129,8 @@ class SequenceMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
         )
 
         self.depolarize_cells(
-            basal_input=self.active_cells, 
-            apical_input=apical_input, 
+            basal_input=self.active_cells,
+            apical_input=apical_input,
             learn=learn
         )
 
@@ -155,16 +155,16 @@ class SequenceMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
         """
         return set of learning cells.
         """
-        
+
         return self.learning_cells
-    
+
     def get_next_predicted_cells(self):
         """
         return prediction for next timestep.
         """
 
         return self.predicted_cells
-    
+
     def get_next_basal_predicted_cells(self):
         """
         return cells with active basal segments.
@@ -173,7 +173,7 @@ class SequenceMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
         return torch.unique(
             self.map_basal_segments_to_cells(self.active_basal_segments)
         )
-    
+
     def get_next_apical_predicted_cells(self):
         """
         return cells with active apical segments.
@@ -182,7 +182,7 @@ class SequenceMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
         return torch.unique(
             self.map_apical_segments_to_cells(self.active_apical_segments)
         )
-    
+
     def get_num_basal_segments(self):
         """
         return total number of basal segments.
