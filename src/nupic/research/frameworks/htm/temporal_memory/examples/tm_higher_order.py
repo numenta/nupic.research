@@ -63,7 +63,7 @@ def corruptVector(v1, noiseLevel, numActiveCols):
     """
 
     size = len(v1)
-    v2 = np.zeros(size, dtype="uint32")
+    v2 = torch.zeros(size, dtype=int_type)
     bitsToSwap = int(noiseLevel * numActiveCols)
 
     # Copy the contents of v1 into v2
@@ -88,22 +88,26 @@ def showPredictions():
         tm.reset()
         print("--- " + "ABCDXY"[k] + " ---")
 
-        tm.compute(seq_t[k][:].nonzero()[0].tolist(), learn=False)
+        tm.compute(seq_t[k][:].nonzero().squeeze(), learn=False)
 
-        activeColumnIndices = [int(i / tm.cellsPerColumn) for i in tm.getActiveCells()]
-        predictedColumnIndices = [
-            int(i / tm.cellsPerColumn) for i in tm.getPredictedCells()
+        active_minicolumn_indices = [
+            (i//tm.num_cells_per_minicolumn) for i in tm.get_active_cells().tolist()
+        ]
+        predicted_minicolumn_indices = [
+            (i//tm.num_cells_per_minicolumn) for i in tm.get_predicted_cells().tolist()
         ]
 
-        currentColumns = [
-            1 if i in activeColumnIndices else 0 for i in range(tm.numberOfColumns())
-        ]
-        predictedColumns = [
-            1 if i in predictedColumnIndices else 0 for i in range(tm.numberOfColumns())
-        ]
+        current_minicolumns = torch.Tensor([
+            1 if i in active_minicolumn_indices else 0 \
+                for i in range(tm.num_minicolumns)
+        ])
+        predicted_minicolumns = torch.Tensor([
+            1 if i in predicted_minicolumn_indices else 0 \
+                for i in range(tm.num_minicolumns)
+        ])
 
-        print("Active cols: " + str(np.nonzero(currentColumns)[0]))
-        print("Predicted cols: " + str(np.nonzero(predictedColumns)[0]))
+        print("Active cols: " + str(torch.nonzero(current_minicolumns).squeeze()))
+        print("Predicted cols: " + str(torch.nonzero(predicted_minicolumns).squeeze()))
         print()
 
 
@@ -119,8 +123,8 @@ def trainTM(sequence, timeSteps, noiseLevel):
     sequence
     """
 
-    currentColumns = np.zeros(tm.numberOfColumns(), dtype="uint32")
-    predictedColumns = np.zeros(tm.numberOfColumns(), dtype="uint32")
+    current_minicolumns = torch.zeros(tm.num_minicolumns, dtype=int_type)
+    predicted_minicolumns = torch.zeros(tm.num_minicolumns, dtype=int_type)
     ts = 0
 
     for _ in range(timeSteps):
@@ -129,25 +133,27 @@ def trainTM(sequence, timeSteps, noiseLevel):
         for k in range(4):
             v = corruptVector(sequence[k][:], noiseLevel, sparse_cols)
 
-            tm.compute(v[:].nonzero()[0].tolist(), learn=True)
+            tm.compute(v[:].nonzero().squeeze(), learn=True)
 
-            activeColumnIndices = [
-                int(i / tm.cellsPerColumn) for i in tm.getActiveCells()
+            active_minicolumn_indices = [
+                (i//tm.num_cells_per_minicolumn) \
+                    for i in tm.get_active_cells().tolist()
             ]
-            predictedColumnIndices = [
-                int(i / tm.cellsPerColumn) for i in tm.getPredictedCells()
-            ]
-
-            currentColumns = [
-                1 if i in activeColumnIndices else 0
-                for i in range(tm.numberOfColumns())
-            ]
-            predictedColumns = [
-                1 if i in predictedColumnIndices else 0
-                for i in range(tm.numberOfColumns())
+            predicted_minicolumn_indices = [
+                (i//tm.num_cells_per_minicolumn) \
+                    for i in tm.get_predicted_cells().tolist()
             ]
 
-            acc = accuracy(currentColumns, predictedColumns)
+            current_minicolumns = torch.Tensor([
+                1 if i in active_minicolumn_indices else 0 \
+                    for i in range(tm.num_minicolumns)
+            ])
+            predicted_minicolumns = torch.Tensor([
+                1 if i in predicted_minicolumn_indices else 0 \
+                    for i in range(tm.num_minicolumns)
+            ])
+
+            acc = accuracy(current_minicolumns, predicted_minicolumns)
 
             x.append(ts)
             y.append(acc)
@@ -161,40 +167,39 @@ basic properties of the Temporal Memory, in particular when it comes
 to how it handles high-order sequences.
 """
 
-tm = ApicalTiebreakSequenceMemory(
-    columnCount=2048,
-    cellsPerColumn=8,
-    initialPermanence=0.21,
-    connectedPermanence=0.3,
-    minThreshold=15,
-    permanenceIncrement=0.1,
-    permanenceDecrement=0.1,
-    activationThreshold=15,
-    basalPredictedSegmentDecrement=0.01,
+tm = SequenceMemoryApicalTiebreak(
+    num_minicolumns=2048,
+    num_cells_per_minicolumn=8,
+    initial_permanence=0.21, 
+    connected_permanence=0.3,
+    matching_threshold=15,
+    permanence_increment=0.1,
+    permanence_decrement=0.1,
+    activation_threshold=15,
+    basal_segment_incorrect_decrement=0.01
 )
 
-uint_type = "uint32"
 random.seed(1)
 
 sparsity = 0.02
-sparse_cols = int(tm.numberOfColumns() * sparsity)
+sparse_cols = int(tm.num_minicolumns * sparsity)
 
 # We will create a sparse representation of characters A, B, C, D, X, and Y.
 # In this particular example we manually construct them, but usually you would
 # use the spatial pooler to build these.
-seq1 = np.zeros((4, tm.numberOfColumns()), dtype="uint32")
+seq1 = torch.zeros((4, tm.num_minicolumns), dtype=int_type)
 seq1[0, 0:sparse_cols] = 1  # Input SDR representing "A"
 seq1[1, sparse_cols : 2 * sparse_cols] = 1  # Input SDR representing "B"
 seq1[2, 2 * sparse_cols : 3 * sparse_cols] = 1  # Input SDR representing "C"
 seq1[3, 3 * sparse_cols : 4 * sparse_cols] = 1  # Input SDR representing "D"
 
-seq2 = np.zeros((4, tm.numberOfColumns()), dtype="uint32")
+seq2 = torch.zeros((4, tm.num_minicolumns), dtype=int_type)
 seq2[0, 4 * sparse_cols : 5 * sparse_cols] = 1  # Input SDR representing "X"
 seq2[1, sparse_cols : 2 * sparse_cols] = 1  # Input SDR representing "B"
 seq2[2, 2 * sparse_cols : 3 * sparse_cols] = 1  # Input SDR representing "C"
 seq2[3, 5 * sparse_cols : 6 * sparse_cols] = 1  # Input SDR representing "Y"
 
-seq_t = np.zeros((6, tm.numberOfColumns()), dtype="uint32")
+seq_t = torch.zeros((6, tm.num_minicolumns), dtype=int_type)
 seq_t[0, 0:sparse_cols] = 1  # Input SDR representing "A"
 seq_t[1, sparse_cols : 2 * sparse_cols] = 1  # Input SDR representing "B"
 seq_t[2, 2 * sparse_cols : 3 * sparse_cols] = 1  # Input SDR representing "C"
@@ -486,7 +491,7 @@ print()
 print("-" * 50)
 print(
     "Part 4: Present both ABCD and XBCY randomly to the TM. We might observe\n \
-    simultaneous predictins occurring when TM is presented with D, Y, and C.\n \
+    simultaneous predictions occurring when TM is presented with D, Y, and C.\n \
     Use a blank TM for this reason. Note that we don't reset the TM after\n \
     presenting each sequence since we want TM to learn different predictions\n \
     for D and Y."
@@ -494,30 +499,30 @@ print(
 print("-" * 50)
 print()
 
-tm = ApicalTiebreakSequenceMemory(
-    columnCount=2048,
-    cellsPerColumn=8,
-    initialPermanence=0.21,
-    connectedPermanence=0.3,
-    minThreshold=15,
-    permanenceIncrement=0.1,
-    permanenceDecrement=0.1,
-    activationThreshold=15,
-    basalPredictedSegmentDecrement=0.01,
+tm = SequenceMemoryApicalTiebreak(
+    num_minicolumns=2048,
+    num_cells_per_minicolumn=8,
+    initial_permanence=0.21, 
+    connected_permanence=0.3,
+    matching_threshold=15,
+    permanence_increment=0.1,
+    permanence_decrement=0.1,
+    activation_threshold=15,
+    basal_segment_incorrect_decrement=0.01
 )
 
 for _ in range(75):
     rnd = random.randrange(2)
     for k in range(4):
         if rnd == 0:
-            tm.compute(seq1[k][:].nonzero()[0].tolist(), learn=True)
+            tm.compute(seq1[k][:].nonzero().squeeze(), learn=True)
         else:
-            tm.compute(seq2[k][:].nonzero()[0].tolist(), learn=True)
+            tm.compute(seq2[k][:].nonzero().squeeze(), learn=True)
 
 print()
 print("-" * 50)
 print(
-    "Look at output when presente with A, B, C, D, X, and Y. We might observe\n \
+    "Look at output when presented with A, B, C, D, X, and Y. We might observe\n \
     simultaneous predictions when presented with D (predicting A and X), with\n \
     character Y (predicting A and X), and with C (predicting D and Y). Note, due to\n \
     stochasticity of this script, we might not observe simultaneous predictions\n \
