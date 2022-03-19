@@ -170,7 +170,7 @@ to how it handles high-order sequences.
 tm = SequenceMemoryApicalTiebreak(
     num_minicolumns=2048,
     num_cells_per_minicolumn=8,
-    initial_permanence=0.21, 
+    initial_permanence=0.21,
     connected_permanence=0.3,
     matching_threshold=15,
     permanence_increment=0.1,
@@ -502,7 +502,7 @@ print()
 tm = SequenceMemoryApicalTiebreak(
     num_minicolumns=2048,
     num_cells_per_minicolumn=8,
-    initial_permanence=0.21, 
+    initial_permanence=0.21,
     connected_permanence=0.3,
     matching_threshold=15,
     permanence_increment=0.1,
