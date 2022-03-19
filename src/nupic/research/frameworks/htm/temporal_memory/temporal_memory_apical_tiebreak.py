@@ -1018,6 +1018,10 @@ class TemporalMemoryApicalTiebreak():
         if isinstance(max_new_synapses, int):
             max_new_synapses = torch.Tensor([max_new_synapses]).repeat(segments.numel())
 
+        # no need to grow new synapses if none are specified 
+        if max_new_synapses.sum() <= 0:
+            return
+
         inds = torch.cartesian_prod(segments, active_inputs).to(int_type)
         ind_x = inds[:, 0]
         ind_y = inds[:, 1]
@@ -1038,13 +1042,20 @@ class TemporalMemoryApicalTiebreak():
         # only consider zero elements
         ind_x = ind_x[zero_ind].squeeze()
         ind_y = ind_y[zero_ind].squeeze()
-
+        
+        # split connections matrix into rows, where each row contains synapses with zero
+        # permanences and has a corresponding non-zero max_new_synapses value
         zero_mask = torch.cat(
             ((ind_x == ind_x.view(-1, 1))[split_ind], max_new_synapses.view(-1, 1)),
             dim=1
         )
-        zero_mask = zero_mask.chunk(zero_mask.shape[0])
+        zero_mask = zero_mask[max_new_synapses > 0]
+        
+        if zero_mask.numel() == 0:
+           return
 
+        zero_mask = zero_mask.chunk(zero_mask.shape[0])
+        
         # indices (randomly chosen) at which to initialize new synapses
         change_inds = torch.cat(list(
             map(lambda x : torch.multinomial(
