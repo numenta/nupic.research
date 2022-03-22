@@ -78,7 +78,7 @@ class PairMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
         apical_growth_candidates = apical_growth_candidates.to(int_type).to(device)
 
         self.depolarize_cells(
-            basal_input=self.active_cells,
+            basal_input=basal_input,
             apical_input=apical_input,
             learn=learn
         )
@@ -92,9 +92,16 @@ class PairMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
             learn=learn
         )
 
-    def get_next_predicted_cells(self):
+    def get_active_cells(self):
         """
-        return prediction for next timestep.
+        return set of new active cells.
+        """
+
+        return self.active_cells
+
+    def get_predicted_cells(self):
+        """
+        return prediction for this timestep.
         """
 
         return self.predicted_cells
