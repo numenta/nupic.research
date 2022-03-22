@@ -172,14 +172,6 @@ class TemporalMemoryApicalTiebreak():
 
         self.num_total_cells = self.num_minicolumns * self.num_cells_per_minicolumn
 
-
-        #
-        #
-        #
-        #
-        #
-        #
-        #
         self.active_cells = torch.empty(0, dtype=int_type)
         self.learning_cells = torch.empty(0, dtype=int_type)
         self.predicted_cells = torch.empty(0, dtype=int_type)
@@ -400,7 +392,6 @@ class TemporalMemoryApicalTiebreak():
         self.learning_cells = torch.sort(learning_cells).values
         self.predicted_active_cells = correctly_predicted_cells
 
-
     def compute_apical_segment_activity(self, apical_input):
         """
         compute the active and matching apical segments for this timestep.
@@ -442,6 +433,10 @@ class TemporalMemoryApicalTiebreak():
         matching_apical_segments = torch.nonzero(
             apical_potential_overlaps >= self.matching_threshold
         ).squeeze().to(int_type)
+
+        convert_1d(active_apical_segments)
+        convert_1d(matching_apical_segments)
+        convert_1d(apical_potential_overlaps)
 
         return (active_apical_segments, matching_apical_segments,
                 apical_potential_overlaps)
@@ -510,7 +505,7 @@ class TemporalMemoryApicalTiebreak():
                 fully_active_basal_segments,
                 potentially_active_basal_segments[
                     isin(potentially_active_cells, reduced_threshold_basal_cells)
-                ]
+                ].squeeze()
             ])
         else:
             active_basal_segments = fully_active_basal_segments
@@ -523,6 +518,10 @@ class TemporalMemoryApicalTiebreak():
         matching_basal_segments = torch.nonzero(
             basal_potential_overlaps >= self.matching_threshold
         ).squeeze().to(int_type)
+
+        convert_1d(active_basal_segments)
+        convert_1d(matching_basal_segments)
+        convert_1d(basal_potential_overlaps)
 
         return (active_basal_segments, matching_basal_segments,
                 basal_potential_overlaps)
@@ -549,6 +548,8 @@ class TemporalMemoryApicalTiebreak():
             "basal",
             active_basal_segments
         )
+
+        #print(active_basal_segments)
 
         # if not using apical tiebreak, predicted cells = cells_with_basal_segments
         if not self.use_apical_tiebreak:
@@ -958,7 +959,6 @@ class TemporalMemoryApicalTiebreak():
         )
 
         # ***** GROW NEW SYNAPSES ***** #
-
         if self.sample_size == -1:
             max_new_synapses = growth_candidates.numel()
         else:
@@ -1005,7 +1005,7 @@ class TemporalMemoryApicalTiebreak():
         synapses to be created per row.
         """
 
-        if segments.numel() == 0:
+        if segments.numel() == 0 or active_inputs.numel() == 0:
             return
 
         check_segment_type(segment_type)
@@ -1022,56 +1022,39 @@ class TemporalMemoryApicalTiebreak():
         if max_new_synapses.sum() <= 0:
             return
 
-        inds = torch.cartesian_prod(segments, active_inputs).to(int_type)
-        ind_x = inds[:, 0]
-        ind_y = inds[:, 1]
+        # only consider segments where you can grow new synapses
+        synapse_mask = (max_new_synapses > 0)
+        segments = segments[synapse_mask]
+        max_new_synapses = max_new_synapses[synapse_mask].to(int_type)
 
-        zero_ind = (connections[ind_x, ind_y] == 0).nonzero()
+        # generate all segment and active_input coordinates
+        x, y = torch.meshgrid(segments, active_inputs, indexing="ij")
+        x = x.to(int_type)
+        y = y.to(int_type)
+
+        # which synapses are zero in the connections matrix
+        zero_elem_mask = ~connections[x, y].to(torch.bool)
+
+        # number of synapses with zero permanence per segment
+        num_zeros_per_segment = zero_elem_mask.sum(dim=1)
 
         # cannot grow new synapses if all are already connected
-        if zero_ind.numel() == 0:
+        if num_zeros_per_segment.sum() == 0:
             return
 
-        # number of zeros per row
-        split_ind = (
-            ~torch.stack(
-                connections[ind_x, ind_y].chunk(segments.numel())
-            ).to(torch.bool)
-        ).sum(dim=1).cumsum(dim=0) - 1
+        # only consider synapses that have zero permanence
+        x = x[zero_elem_mask]
+        y = y[zero_elem_mask]
 
-        # only consider zero elements
-        ind_x = ind_x[zero_ind].squeeze()
-        ind_y = ind_y[zero_ind].squeeze()
+        # initialize synapses
+        for num_synapses, x, y in zip(
+            max_new_synapses[num_zeros_per_segment.to(torch.bool)],
+            x.tensor_split(num_zeros_per_segment.cumsum(dim=0))[:-1],
+            y.tensor_split(num_zeros_per_segment.cumsum(dim=0))[:-1]
+        ):
+            rand_inds = torch.randperm(x.shape[0])[:num_synapses]
 
-        # split connections matrix into rows, where each row contains synapses with zero
-        # permanences and has a corresponding non-zero max_new_synapses value
-        zero_mask = torch.cat(
-            ((ind_x == ind_x.view(-1, 1))[split_ind], max_new_synapses.view(-1, 1)),
-            dim=1
-        )
-        zero_mask = zero_mask[max_new_synapses > 0]
-
-        if zero_mask.numel() == 0:
-           return
-
-        zero_mask = zero_mask.chunk(zero_mask.shape[0])
-
-        # indices (randomly chosen) at which to initialize new synapses
-        change_inds = torch.cat(list(
-            map(lambda x : torch.multinomial(
-                    x.to(real_type).squeeze()[:-1],
-                    num_samples=int(x.squeeze()[-1].item()),
-                    generator=self.generator
-                ),
-                zero_mask
-            )
-        ))
-
-        # initialize synapses at those chosen indices
-        connections[ind_x[change_inds], ind_y[change_inds]] = self.initial_permanence
-
-        # clip permanence values between 0 and 1 at those chosen indices
-        connections[ind_x[change_inds]] = connections[ind_x[change_inds]].clamp(0, 1)
+            connections[x[rand_inds], y[rand_inds]] = self.initial_permanence
 
     def learn_segments(
         self,
@@ -1156,8 +1139,11 @@ class TemporalMemoryApicalTiebreak():
         `active_inputs` (torch.Tensor) specifies list of bits that the active
         cells may reinforce basal/apical synapses to.
 
-        `delta` (int) specifies how much each synapse is strengthened/weakened.
+        `delta` (float) specifies how much each synapse is strengthened/weakened.
         """
+
+        if segments.numel() == 0 or active_inputs.numel() == 0:
+            return
 
         check_segment_type(segment_type)
 
@@ -1166,18 +1152,16 @@ class TemporalMemoryApicalTiebreak():
         elif segment_type == "apical":
             connections = self.apical_connections
 
-        ind = torch.cartesian_prod(segments, active_inputs).to(int_type)
-        ind_x = ind[:, 0]
-        ind_y = ind[:, 1]
+        x, y = torch.meshgrid(segments, active_inputs, indexing="ij")
+        x = x.to(int_type)
+        y = y.to(int_type)
 
         # find nonzero indices
-        nz_ind = connections[ind_x, ind_y].nonzero()
+        nz_ind_mask = connections[x, y].bool()
+        x = x[nz_ind_mask]
+        y = y[nz_ind_mask]
 
-        # increment synaptic permanence at those nonzero indices
-        connections[ind_x[nz_ind], ind_y[nz_ind]] += delta
-
-        # clip permanence values between 0 and 1 at those nonzero indices
-        connections[ind_x[nz_ind]] = connections[ind_x[nz_ind]].clamp(0, 1)
+        connections[x, y] = (connections[x, y] + delta).clamp_(0, 1)
 
     def map_segments_to_cells(self, segment_type, segments):
         """
@@ -1188,12 +1172,14 @@ class TemporalMemoryApicalTiebreak():
 
         check_segment_type(segment_type)
 
+        convert_1d(segments)
+
         if segment_type == "basal":
-            return segments.clone().detach().apply_(
+            return segments.clone().apply_(
                 lambda segment : self.basal_segment_to_cell[segment]
             ).to(int_type)
         elif segment_type == "apical":
-            return segments.clone().detach().apply_(
+            return segments.clone().apply_(
                 lambda segment : self.apical_segment_to_cell[segment]
             ).to(int_type)
 
@@ -1202,7 +1188,7 @@ class TemporalMemoryApicalTiebreak():
         return number of basal segments for each cell in `cells` (torch.Tensor)
         """
 
-        return cells.clone().detach().apply_(
+        return cells.clone().apply_(
             lambda cell : len(self.cell_to_basal_segments[cell])
         ).to(int_type)
 
@@ -1214,6 +1200,13 @@ def check_segment_type(segment_type):
 
     assert segment_type in {"basal", "apical"}
 
+def convert_1d(a):
+    """
+    convert `a` (torch.Tensor) into a 1D tensor if it is 0D
+    """
+    if len(a.size()) == 0:
+        a.unsqueeze_(0)
+
 def isin(a, b):
     """
     return True for each element of `a` (torch.Tensor) if it is
@@ -1221,6 +1214,9 @@ def isin(a, b):
 
     both `a` and `b` are 1D tensors.
     """
+
+    convert_1d(a)
+    convert_1d(b)
 
     return (a.view(-1, 1) == b).any(axis=-1)
 
@@ -1231,6 +1227,9 @@ def intersection(a, b):
     both `a` and `b` are 1D tensors.
     both `a` and `b` cannot have any duplicate elements.
     """
+
+    convert_1d(a)
+    convert_1d(b)
 
     uniques, counts = torch.cat([a, b]).unique(return_counts=True)
 
@@ -1244,9 +1243,7 @@ def difference(a, b):
     both `a` and `b` cannot have any duplicate elements.
     """
 
-    expanded_b = b.expand(a.shape[0], b.shape[0]).T
-
-    return a[(a != expanded_b).T.prod(axis=1) == 1]
+    return a[~isin(a, b)]
 
 def get_cells_in_minicolumns(minicolumns, num_cells_per_minicolumn):
     """
