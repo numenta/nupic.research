@@ -26,6 +26,8 @@ import torch
 real_type = torch.float32
 int_type = torch.int64
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
 class SequenceMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
     """
     sequence memory with apical tiebreak, built on temporal memory with apical tiebreak.
@@ -71,9 +73,11 @@ class SequenceMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
 
         super().__init__(**params)
 
-        self.previous_apical_input = torch.empty(0, dtype=int_type)
-        self.previous_apical_growth_candidates = torch.empty(0, dtype=int_type)
-        self.previous_predicted_cells = torch.empty(0, dtype=int_type)
+        self.previous_apical_input = torch.empty(0, dtype=int_type).to(device)
+        self.previous_apical_growth_candidates = torch.empty(
+            0, dtype=int_type
+        ).to(device)
+        self.previous_predicted_cells = torch.empty(0, dtype=int_type).to(device)
 
     def reset(self):
         """
@@ -82,14 +86,15 @@ class SequenceMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
 
         super().reset()
 
-        self.previous_apical_input = torch.empty(0, dtype=int_type)
-        self.previous_apical_growth_candidates = torch.empty(0, dtype=int_type)
-        self.previous_predicted_cells = torch.empty(0, dtype=int_type)
+        self.previous_apical_input = self.previous_apical_input.new_empty((0,))
+        self.previous_apical_growth_candidates = \
+            self.previous_apical_growth_candidates.new_empty((0,))
+        self.previous_predicted_cells = self.previous_predicted_cells.new_empty((0,))
 
     def compute(
         self,
         active_minicolumns,
-        apical_input=torch.Tensor(),
+        apical_input=torch.Tensor().to(device),
         apical_growth_candidates=None,
         learn=True
     ):
@@ -110,12 +115,12 @@ class SequenceMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
         `learn` (bool) -- whether to grow / reinforce / punish synapses
         """
 
-        active_minicolumns = active_minicolumns.to(int_type)
-        apical_input = apical_input.to(int_type)
+        active_minicolumns = active_minicolumns.to(int_type).to(device)
+        apical_input = apical_input.to(int_type).to(device)
 
         if apical_growth_candidates is None:
             apical_growth_candidates = apical_input
-        apical_growth_candidates = apical_growth_candidates.to(int_type)
+        apical_growth_candidates = apical_growth_candidates.to(int_type).to(device)
 
         self.previous_predicted_cells = self.predicted_cells
 
