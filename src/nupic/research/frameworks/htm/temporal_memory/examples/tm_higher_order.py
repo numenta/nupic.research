@@ -32,6 +32,7 @@ matplotlib.use("Agg")
 real_type = torch.float32
 int_type = torch.int64
 
+
 def accuracy(current, predicted):
     """
     Computes the accuracy of the TM at time-step t based on the prediction
@@ -91,20 +92,25 @@ def showPredictions():
         tm.compute(seq_t[k][:].nonzero().squeeze(), learn=False)
 
         active_minicolumn_indices = [
-            (i//tm.num_cells_per_minicolumn) for i in tm.get_active_cells().tolist()
+            (i // tm.num_cells_per_minicolumn) for i in tm.get_active_cells().tolist()
         ]
         predicted_minicolumn_indices = [
-            (i//tm.num_cells_per_minicolumn) for i in tm.get_predicted_cells().tolist()
+            (i // tm.num_cells_per_minicolumn)
+            for i in tm.get_predicted_cells().tolist()
         ]
 
-        current_minicolumns = torch.Tensor([
-            1 if i in active_minicolumn_indices else 0 \
+        current_minicolumns = torch.Tensor(
+            [
+                1 if i in active_minicolumn_indices else 0
                 for i in range(tm.num_minicolumns)
-        ])
-        predicted_minicolumns = torch.Tensor([
-            1 if i in predicted_minicolumn_indices else 0 \
+            ]
+        )
+        predicted_minicolumns = torch.Tensor(
+            [
+                1 if i in predicted_minicolumn_indices else 0
                 for i in range(tm.num_minicolumns)
-        ])
+            ]
+        )
 
         print("Active cols: " + str(torch.nonzero(current_minicolumns).squeeze()))
         print("Predicted cols: " + str(torch.nonzero(predicted_minicolumns).squeeze()))
@@ -136,22 +142,26 @@ def trainTM(sequence, timeSteps, noiseLevel):
             tm.compute(v[:].nonzero().squeeze(), learn=True)
 
             active_minicolumn_indices = [
-                (i//tm.num_cells_per_minicolumn) \
-                    for i in tm.get_active_cells().tolist()
+                (i // tm.num_cells_per_minicolumn)
+                for i in tm.get_active_cells().tolist()
             ]
             predicted_minicolumn_indices = [
-                (i//tm.num_cells_per_minicolumn) \
-                    for i in tm.get_predicted_cells().tolist()
+                (i // tm.num_cells_per_minicolumn)
+                for i in tm.get_predicted_cells().tolist()
             ]
 
-            current_minicolumns = torch.Tensor([
-                1 if i in active_minicolumn_indices else 0 \
+            current_minicolumns = torch.Tensor(
+                [
+                    1 if i in active_minicolumn_indices else 0
                     for i in range(tm.num_minicolumns)
-            ])
-            predicted_minicolumns = torch.Tensor([
-                1 if i in predicted_minicolumn_indices else 0 \
+                ]
+            )
+            predicted_minicolumns = torch.Tensor(
+                [
+                    1 if i in predicted_minicolumn_indices else 0
                     for i in range(tm.num_minicolumns)
-            ])
+                ]
+            )
 
             acc = accuracy(current_minicolumns, predicted_minicolumns)
 
@@ -176,7 +186,7 @@ tm = SequenceMemoryApicalTiebreak(
     permanence_increment=0.1,
     permanence_decrement=0.1,
     activation_threshold=15,
-    basal_segment_incorrect_decrement=0.01
+    basal_segment_incorrect_decrement=0.01,
 )
 
 random.seed(1)
@@ -508,7 +518,7 @@ tm = SequenceMemoryApicalTiebreak(
     permanence_increment=0.1,
     permanence_decrement=0.1,
     activation_threshold=15,
-    basal_segment_incorrect_decrement=0.01
+    basal_segment_incorrect_decrement=0.01,
 )
 
 for _ in range(75):
