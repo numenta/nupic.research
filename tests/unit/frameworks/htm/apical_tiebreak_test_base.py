@@ -24,15 +24,17 @@ Test the Temporal Memory with explicit basal and apical input. Test that it
 correctly uses the "apical tiebreak" approach to basal/apical input.
 """
 
-import unittest
 import random
+import unittest
 from abc import ABCMeta, abstractmethod
+
 import torch
 
 from nupic.research.frameworks.htm import PairMemoryApicalTiebreak
 
 real_type = torch.float32
 int_type = torch.int64
+
 
 class ApicalTiebreakTestBase(object, metaclass=ABCMeta):
     """
@@ -47,6 +49,7 @@ class ApicalTiebreakTestBase(object, metaclass=ABCMeta):
     minicolumn with basal support. In other words, they handle the situation where
     the basal input is a union.
     """
+
     apical_input_size = 1000
     basal_input_size = 1000
     num_minicolumns = 2048
@@ -56,12 +59,15 @@ class ApicalTiebreakTestBase(object, metaclass=ABCMeta):
 
         self.num_cells_per_minicolumn = None
 
-        print(("\n"
-               "======================================================\n"
-               "Test: {0} \n"
-               "{1}\n"
-               "======================================================\n"
-               ).format(self.id(), self.shortDescription()))
+        print(
+            (
+                "\n"
+                "======================================================\n"
+                "Test: {0} \n"
+                "{1}\n"
+                "======================================================\n"
+            ).format(self.id(), self.shortDescription())
+        )
 
     def testbasal_inputRequiredForPredictions(self):
         """
@@ -78,8 +84,9 @@ class ApicalTiebreakTestBase(object, metaclass=ABCMeta):
         for _ in range(3):
             self.compute(active_minicolumns, basal_input, apical_input, learn=True)
 
-        self.compute(active_minicolumns, basal_input=(), apical_input=apical_input,
-                     learn=False)
+        self.compute(
+            active_minicolumns, basal_input=(), apical_input=apical_input, learn=False
+        )
 
         self.assertEqual(set(active_minicolumns), self.getBurstingColumns())
 
@@ -108,8 +115,12 @@ class ApicalTiebreakTestBase(object, metaclass=ABCMeta):
             self.compute(active_minicolumns, basal_input2, apical_input2, learn=True)
             activeCells2 = set(self.get_active_cells())
 
-        self.compute(active_minicolumns, basal_input1 | basal_input2, apical_input=(),
-                     learn=False)
+        self.compute(
+            active_minicolumns,
+            basal_input1 | basal_input2,
+            apical_input=(),
+            learn=False,
+        )
 
         self.assertEqual(activeCells1 | activeCells2, set(self.get_active_cells()))
 
@@ -135,8 +146,9 @@ class ApicalTiebreakTestBase(object, metaclass=ABCMeta):
             activeCells1 = set(self.get_active_cells())
             self.compute(active_minicolumns, basal_input2, apical_input2, learn=True)
 
-        self.compute(active_minicolumns, basal_input1 | basal_input2, apical_input1,
-                     learn=False)
+        self.compute(
+            active_minicolumns, basal_input1 | basal_input2, apical_input1, learn=False
+        )
 
         self.assertEqual(activeCells1, set(self.get_active_cells()))
 
@@ -167,8 +179,12 @@ class ApicalTiebreakTestBase(object, metaclass=ABCMeta):
             activeCells2 = set(self.get_active_cells())
             self.compute(active_minicolumns, basal_input3, apical_input3, learn=True)
 
-        self.compute(active_minicolumns, basal_input1 | basal_input2 | basal_input3,
-                     apical_input1 | apical_input2, learn=False)
+        self.compute(
+            active_minicolumns,
+            basal_input1 | basal_input2 | basal_input3,
+            apical_input1 | apical_input2,
+            learn=False,
+        )
 
         self.assertEqual(activeCells1 | activeCells2, set(self.get_active_cells()))
 
@@ -206,10 +222,12 @@ class ApicalTiebreakTestBase(object, metaclass=ABCMeta):
         self.constructTM(**params)
 
     def getBurstingColumns(self):
-        predicted = set(cell // self.num_cells_per_minicolumn
-                        for cell in self.get_predicted_cells())
-        active = set(cell // self.num_cells_per_minicolumn
-                     for cell in self.get_active_cells())
+        predicted = set(
+            cell // self.num_cells_per_minicolumn for cell in self.get_predicted_cells()
+        )
+        active = set(
+            cell // self.num_cells_per_minicolumn for cell in self.get_active_cells()
+        )
 
         return active - predicted
 
@@ -227,11 +245,22 @@ class ApicalTiebreakTestBase(object, metaclass=ABCMeta):
     # ==============================
 
     @abstractmethod
-    def constructTM(self, num_minicolumns, basal_input_size, apical_input_size,
-                    num_cells_per_minicolumn, initial_permanence, connected_permanence,
-                    matching_threshold, sample_size, permanence_increment,
-                    permanence_decrement, predictedSegmentDecrement,
-                    activation_threshold, seed):
+    def constructTM(
+        self,
+        num_minicolumns,
+        basal_input_size,
+        apical_input_size,
+        num_cells_per_minicolumn,
+        initial_permanence,
+        connected_permanence,
+        matching_threshold,
+        sample_size,
+        permanence_increment,
+        permanence_decrement,
+        predictedSegmentDecrement,
+        activation_threshold,
+        seed,
+    ):
         """
         Construct a new TemporalMemory from these parameters.
         """
@@ -260,17 +289,28 @@ class ApicalTiebreakTestBase(object, metaclass=ABCMeta):
         """
         pass
 
-class ApicalTiebreakTM_ApicalTiebreakTests(ApicalTiebreakTestBase,
-                                           unittest.TestCase):
+
+class ApicalTiebreakTM_ApicalTiebreakTests(ApicalTiebreakTestBase, unittest.TestCase):
     """
     Run the "apical tiebreak" tests on the ApicalTiebreakTemporalMemory.
     """
 
-    def constructTM(self, num_minicolumns, basal_input_size, apical_input_size,
-                    num_cells_per_minicolumn, initial_permanence, connected_permanence,
-                    matching_threshold, sample_size, permanence_increment,
-                    permanence_decrement, basal_segment_incorrect_decrement,
-                    activation_threshold, seed):
+    def constructTM(
+        self,
+        num_minicolumns,
+        basal_input_size,
+        apical_input_size,
+        num_cells_per_minicolumn,
+        initial_permanence,
+        connected_permanence,
+        matching_threshold,
+        sample_size,
+        permanence_increment,
+        permanence_decrement,
+        basal_segment_incorrect_decrement,
+        activation_threshold,
+        seed,
+    ):
 
         params = {
             "num_minicolumns": num_minicolumns,
@@ -296,18 +336,21 @@ class ApicalTiebreakTM_ApicalTiebreakTests(ApicalTiebreakTestBase,
         basal_input = torch.Tensor(list(sorted(basal_input))).to(int_type)
         apical_input = torch.Tensor(list(sorted(apical_input))).to(int_type)
 
-        self.tm.compute(active_minicolumns=active_minicolumns,
-                        basal_input=basal_input,
-                        basal_growth_candidates=basal_input,
-                        apical_input=apical_input,
-                        apical_growth_candidates=apical_input,
-                        learn=learn)
+        self.tm.compute(
+            active_minicolumns=active_minicolumns,
+            basal_input=basal_input,
+            basal_growth_candidates=basal_input,
+            apical_input=apical_input,
+            apical_growth_candidates=apical_input,
+            learn=learn,
+        )
 
     def get_active_cells(self):
         return self.tm.get_active_cells().tolist()
 
     def get_predicted_cells(self):
         return self.tm.get_predicted_cells().tolist()
+
 
 if __name__ == "__main__":
     unittest.main()
