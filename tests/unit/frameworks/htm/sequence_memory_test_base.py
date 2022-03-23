@@ -23,16 +23,18 @@
 Sequence memory tests
 """
 
-import unittest
 import random
+import unittest
 from abc import ABCMeta, abstractmethod
-import torch
+
 import pytest
+import torch
 
 from nupic.research.frameworks.htm import SequenceMemoryApicalTiebreak
 
 real_type = torch.float32
 int_type = torch.int64
+
 
 class SequenceMemoryTestBase(object, metaclass=ABCMeta):
     """
@@ -149,6 +151,7 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
     when presented with the second A and B is different from the representation
     in the first presentation. [TODO]
     """
+
     VERBOSITY = 1
     n = 2048
     w = 40
@@ -173,8 +176,9 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
             self.compute(pattern, learn=False)
 
             if i > 0:
-                self.assertEqual(set(self.get_predicted_cells()),
-                                 set(self.get_active_cells()))
+                self.assertEqual(
+                    set(self.get_predicted_cells()), set(self.get_active_cells())
+                )
 
     def testB3(self):
         """N=300, M=1, P=1. (See how high we can go with N)"""
@@ -195,8 +199,9 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
             self.compute(pattern, learn=False)
 
             if i > 0:
-                self.assertEqual(set(self.get_predicted_cells()),
-                                 set(self.get_active_cells()))
+                self.assertEqual(
+                    set(self.get_predicted_cells()), set(self.get_active_cells())
+                )
 
     @pytest.mark.slow
     def testB4(self):
@@ -204,8 +209,7 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
 
         self.init({"num_cells_per_minicolumn": 1})
 
-        sequences = [[self.randomPattern() for _ in range(300)]
-                     for _ in range(3)]
+        sequences = [[self.randomPattern() for _ in range(300)] for _ in range(3)]
 
         # Learn
         for _ in range(2):
@@ -221,8 +225,9 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
                 self.compute(pattern, learn=False)
 
                 if i > 0:
-                    self.assertEqual(set(self.get_predicted_cells()),
-                                     set(self.get_active_cells()))
+                    self.assertEqual(
+                        set(self.get_predicted_cells()), set(self.get_active_cells())
+                    )
 
             self.reset()
 
@@ -246,8 +251,9 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
             self.compute(pattern, learn=False)
 
             if i > 0:
-                self.assertEqual(set(self.get_predicted_cells()),
-                                 set(self.get_active_cells()))
+                self.assertEqual(
+                    set(self.get_predicted_cells()), set(self.get_active_cells())
+                )
 
     def testB7(self):
         """Like B1 but with slower learning.
@@ -261,10 +267,14 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
         segment activation rules are working correctly.
         """
 
-        self.init({"initial_permanence": 0.2,
-                   "connected_permanence": 0.7,
-                   "permanence_increment": 0.2,
-                   "num_cells_per_minicolumn": 1})
+        self.init(
+            {
+                "initial_permanence": 0.2,
+                "connected_permanence": 0.7,
+                "permanence_increment": 0.2,
+                "num_cells_per_minicolumn": 1,
+            }
+        )
 
         sequence = [self.randomPattern() for _ in range(100)]
 
@@ -280,17 +290,22 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
             self.compute(pattern, learn=False)
 
             if i > 0:
-                self.assertEqual(set(self.get_predicted_cells()),
-                                 set(self.get_active_cells()))
+                self.assertEqual(
+                    set(self.get_predicted_cells()), set(self.get_active_cells())
+                )
 
     @pytest.mark.slow
     def testB8(self):
         """Like B7 but with 32 cells per column.
         Should still work."""
 
-        self.init({"initial_permanence": 0.2,
-                   "connected_permanence": 0.7,
-                   "permanence_increment": 0.2})
+        self.init(
+            {
+                "initial_permanence": 0.2,
+                "connected_permanence": 0.7,
+                "permanence_increment": 0.2,
+            }
+        )
 
         sequence = [self.randomPattern() for _ in range(100)]
 
@@ -306,17 +321,22 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
             self.compute(pattern, learn=False)
 
             if i > 0:
-                self.assertEqual(set(self.get_predicted_cells()),
-                                 set(self.get_active_cells()))
+                self.assertEqual(
+                    set(self.get_predicted_cells()), set(self.get_active_cells())
+                )
 
     @pytest.mark.slow
     def testB9(self):
         """Like B7 but present the sequence less than 4 times.
         The inference should be incorrect."""
 
-        self.init({"initial_permanence": 0.2,
-                   "connected_permanence": 0.7,
-                   "permanence_increment": 0.2})
+        self.init(
+            {
+                "initial_permanence": 0.2,
+                "connected_permanence": 0.7,
+                "permanence_increment": 0.2,
+            }
+        )
 
         sequence = [self.randomPattern() for _ in range(100)]
 
@@ -374,10 +394,12 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
         random.seed(37)
         sharedSubsequence = [self.randomPattern() for _ in range(5)]
 
-        sequences = [[self.randomPattern() for _ in range(10)]
-                     + sharedSubsequence
-                     + [self.randomPattern() for _ in range(5)]
-                     for _ in range(2)]
+        sequences = [
+            [self.randomPattern() for _ in range(10)]
+            + sharedSubsequence
+            + [self.randomPattern() for _ in range(5)]
+            for _ in range(2)
+        ]
 
         # Learn
         for _ in range(20):
@@ -396,13 +418,20 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
                     if i == 15:
                         # At the end of both shared sequences, there should be
                         # predicted but inactive columns
-                        self.assertTrue(set(self.get_active_cells()).issubset(
-                            self.get_predicted_cells()))
-                        self.assertGreater(len(self.get_predicted_cells()),
-                                           len(self.get_active_cells()))
+                        self.assertTrue(
+                            set(self.get_active_cells()).issubset(
+                                self.get_predicted_cells()
+                            )
+                        )
+                        self.assertGreater(
+                            len(self.get_predicted_cells()),
+                            len(self.get_active_cells()),
+                        )
                     else:
-                        self.assertEqual(set(self.get_predicted_cells()),
-                                         set(self.get_active_cells()))
+                        self.assertEqual(
+                            set(self.get_predicted_cells()),
+                            set(self.get_active_cells()),
+                        )
 
             self.reset()
 
@@ -417,10 +446,12 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
         random.seed(38)
         sharedSubsequence = [self.randomPattern() for _ in range(5)]
 
-        sequences = [[self.randomPattern() for _ in range(10)]
-                     + sharedSubsequence
-                     + [self.randomPattern() for _ in range(5)]
-                     for _ in range(2)]
+        sequences = [
+            [self.randomPattern() for _ in range(10)]
+            + sharedSubsequence
+            + [self.randomPattern() for _ in range(5)]
+            for _ in range(2)
+        ]
 
         # Learn
         for _ in range(20):
@@ -436,8 +467,9 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
                 self.compute(pattern, learn=False)
 
                 if i > 0:
-                    self.assertEqual(set(self.get_predicted_cells()),
-                                     set(self.get_active_cells()))
+                    self.assertEqual(
+                        set(self.get_predicted_cells()), set(self.get_active_cells())
+                    )
 
             self.reset()
 
@@ -454,9 +486,10 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
         random.seed(39)
         sharedSubsequence = [self.randomPattern() for _ in range(5)]
 
-        sequences = [sharedSubsequence
-                     + [self.randomPattern() for _ in range(15)]
-                     for _ in range(2)]
+        sequences = [
+            sharedSubsequence + [self.randomPattern() for _ in range(15)]
+            for _ in range(2)
+        ]
 
         # Learn
         for _ in range(20):
@@ -475,13 +508,20 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
                     if i == 5:
                         # At the end of each shared sequence, there should be
                         # predicted but inactive columns
-                        self.assertTrue(set(self.get_active_cells()).issubset(
-                            self.get_predicted_cells()))
-                        self.assertGreater(len(self.get_predicted_cells()),
-                                           len(self.get_active_cells()))
+                        self.assertTrue(
+                            set(self.get_active_cells()).issubset(
+                                self.get_predicted_cells()
+                            )
+                        )
+                        self.assertGreater(
+                            len(self.get_predicted_cells()),
+                            len(self.get_active_cells()),
+                        )
                     else:
-                        self.assertEqual(set(self.get_predicted_cells()),
-                                         set(self.get_active_cells()))
+                        self.assertEqual(
+                            set(self.get_predicted_cells()),
+                            set(self.get_active_cells()),
+                        )
 
             self.reset()
 
@@ -523,13 +563,18 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
 
                 if i > 0:
                     if i > 5:
-                        self.assertEqual(set(self.get_predicted_cells()),
-                                         set(self.get_active_cells()))
+                        self.assertEqual(
+                            set(self.get_predicted_cells()),
+                            set(self.get_active_cells()),
+                        )
                     else:
                         # Allow it a few timesteps to disambiguate, in case
                         # there are random shared subsequences.
-                        self.assertTrue(set(self.get_active_cells()).issubset(
-                            self.get_predicted_cells()))
+                        self.assertTrue(
+                            set(self.get_active_cells()).issubset(
+                                self.get_predicted_cells()
+                            )
+                        )
 
             self.reset()
 
@@ -549,9 +594,7 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
         for _ in range(2):
             sublist = list(elements)
             random.shuffle(sublist)
-            sequences.append(sublist[0:10]
-                             + sharedSubsequence
-                             + sublist[10:])
+            sequences.append(sublist[0:10] + sharedSubsequence + sublist[10:])
 
         # Learn
         for _ in range(80):
@@ -568,13 +611,18 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
 
                 if i > 0:
                     if i > 5:
-                        self.assertEqual(set(self.get_predicted_cells()),
-                                         set(self.get_active_cells()))
+                        self.assertEqual(
+                            set(self.get_predicted_cells()),
+                            set(self.get_active_cells()),
+                        )
                     else:
                         # Allow it a few timesteps to disambiguate, in case
                         # there are random shared subsequences.
-                        self.assertTrue(set(self.get_active_cells()).issubset(
-                            self.get_predicted_cells()))
+                        self.assertTrue(
+                            set(self.get_active_cells()).issubset(
+                                self.get_predicted_cells()
+                            )
+                        )
 
             self.reset()
 
@@ -589,10 +637,12 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
         random.seed(42)
         sharedSubsequence = [self.randomPattern() for _ in range(5)]
 
-        sequences = [[self.randomPattern() for _ in range(10)]
-                     + sharedSubsequence
-                     + [self.randomPattern() for _ in range(5)]
-                     for _ in range(2)]
+        sequences = [
+            [self.randomPattern() for _ in range(10)]
+            + sharedSubsequence
+            + [self.randomPattern() for _ in range(5)]
+            for _ in range(2)
+        ]
 
         # Learn
         for _ in range(20):
@@ -629,21 +679,28 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
         random.seed(43)
         sharedSubsequence = [self.randomPattern() for _ in range(3)]
 
-        sequences = [[self.randomPattern() for _ in range(5)]
-                     + sharedSubsequence
-                     + [self.randomPattern() for _ in range(2)]
-                     for _ in range(2)]
+        sequences = [
+            [self.randomPattern() for _ in range(5)]
+            + sharedSubsequence
+            + [self.randomPattern() for _ in range(2)]
+            for _ in range(2)
+        ]
 
         # Add the same noise for both tests.
-        allNoisySequences = [[[noisy(pattern, 2, self.n) for pattern in sequence]
-                              for sequence in sequences]
-                             for _ in range(10)]
+        allNoisySequences = [
+            [
+                [noisy(pattern, 2, self.n) for pattern in sequence]
+                for sequence in sequences
+            ]
+            for _ in range(10)
+        ]
 
         # Learn immediately so that we're sure there will be incorrect predictions.
 
         # train TM on noisy sequences with orphan decay turned off
-        self.init({"initial_permanence": 0.70,
-                   "basal_segment_incorrect_decrement": 0.0})
+        self.init(
+            {"initial_permanence": 0.70, "basal_segment_incorrect_decrement": 0.0}
+        )
 
         for noisySequences in allNoisySequences:
             for sequence in noisySequences:
@@ -659,13 +716,15 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
                 self.compute(pattern, learn=False)
 
                 numPredictedInactiveColumnsBefore += len(
-                    self.getPredictedInactiveColumns())
+                    self.getPredictedInactiveColumns()
+                )
 
             self.reset()
 
         # train TM on the same set of noisy sequences with orphan decay turned on
-        self.init({"initial_permanence": 0.70,
-                   "basal_segment_incorrect_decrement": 0.08})
+        self.init(
+            {"initial_permanence": 0.70, "basal_segment_incorrect_decrement": 0.08}
+        )
 
         for noisySequences in allNoisySequences:
             for sequence in noisySequences:
@@ -681,17 +740,18 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
                 self.compute(pattern, learn=False)
 
                 numPredictedInactiveColumnsAfter += len(
-                    self.getPredictedInactiveColumns())
+                    self.getPredictedInactiveColumns()
+                )
 
                 if i > 0:
-                    self.assertEqual(len(self.getPredictedActiveColumns()),
-                                     self.w)
+                    self.assertEqual(len(self.getPredictedActiveColumns()), self.w)
 
             self.reset()
 
         self.assertGreater(numPredictedInactiveColumnsBefore, 0)
-        self.assertGreater(numPredictedInactiveColumnsBefore,
-                           numPredictedInactiveColumnsAfter)
+        self.assertGreater(
+            numPredictedInactiveColumnsBefore, numPredictedInactiveColumnsAfter
+        )
 
     def init(self, overrides=None):
         """
@@ -721,12 +781,15 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
 
     def setUp(self):
 
-        print(("\n"
-               "======================================================\n"
-               "Test: {0} \n"
-               "{1}\n"
-               "======================================================\n"
-               ).format(self.id(), self.shortDescription()))
+        print(
+            (
+                "\n"
+                "======================================================\n"
+                "Test: {0} \n"
+                "{1}\n"
+                "======================================================\n"
+            ).format(self.id(), self.shortDescription())
+        )
 
     # ==============================
     # Helper functions
@@ -739,26 +802,32 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
         return set(self.get_predicted_cells()) - set(self.get_active_cells())
 
     def getPredictedActiveColumns(self):
-        predicted = set(cell // self.num_cells_per_minicolumn
-                        for cell in self.get_predicted_cells())
-        active = set(cell // self.num_cells_per_minicolumn
-                     for cell in self.get_active_cells())
+        predicted = set(
+            cell // self.num_cells_per_minicolumn for cell in self.get_predicted_cells()
+        )
+        active = set(
+            cell // self.num_cells_per_minicolumn for cell in self.get_active_cells()
+        )
 
         return active & predicted
 
     def getBurstingColumns(self):
-        predicted = set(cell // self.num_cells_per_minicolumn
-                        for cell in self.get_predicted_cells())
-        active = set(cell // self.num_cells_per_minicolumn
-                     for cell in self.get_active_cells())
+        predicted = set(
+            cell // self.num_cells_per_minicolumn for cell in self.get_predicted_cells()
+        )
+        active = set(
+            cell // self.num_cells_per_minicolumn for cell in self.get_active_cells()
+        )
 
         return active - predicted
 
     def getPredictedInactiveColumns(self):
-        predicted = set(cell // self.num_cells_per_minicolumn
-                        for cell in self.get_predicted_cells())
-        active = set(cell // self.num_cells_per_minicolumn
-                     for cell in self.get_active_cells())
+        predicted = set(
+            cell // self.num_cells_per_minicolumn for cell in self.get_predicted_cells()
+        )
+        active = set(
+            cell // self.num_cells_per_minicolumn for cell in self.get_active_cells()
+        )
 
         return predicted - active
 
@@ -770,10 +839,20 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
     # ==============================
 
     @abstractmethod
-    def constructTM(self, num_minicolumns, num_cells_per_minicolumn, initial_permanence,
-                    connected_permanence, matching_threshold, sample_size,
-                    permanence_increment, permanence_decrement,
-                    basal_segment_incorrect_decrement, activation_threshold, seed):
+    def constructTM(
+        self,
+        num_minicolumns,
+        num_cells_per_minicolumn,
+        initial_permanence,
+        connected_permanence,
+        matching_threshold,
+        sample_size,
+        permanence_increment,
+        permanence_decrement,
+        basal_segment_incorrect_decrement,
+        activation_threshold,
+        seed,
+    ):
         """
         Construct a new TemporalMemory from these parameters.
         """
@@ -809,6 +888,7 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
         """
         pass
 
+
 def noisy(pattern, wFlip, n):
     """
     Generate a noisy copy of a pattern.
@@ -839,10 +919,11 @@ def noisy(pattern, wFlip, n):
 
 def containsSublist(list1, sublist):
     for i in range(len(list1)):
-        if list1[i:i + len(sublist)] == sublist:
+        if list1[i : i + len(sublist)] == sublist:
             return True
 
     return False
+
 
 def getLongestSharedSubsequence(sequences):
     """
@@ -860,8 +941,9 @@ def getLongestSharedSubsequence(sequences):
             while True:
                 foundIt = False
 
-                otherSequences = ([currentSequence[i + 1:]]
-                                  + sequences[sequenceNumber + 1:])
+                otherSequences = [currentSequence[i + 1 :]] + sequences[
+                    sequenceNumber + 1 :
+                ]
                 for otherSequence in otherSequences:
                     foundIt = containsSublist(otherSequence, currentSubsequence)
                     if foundIt:
@@ -881,16 +963,26 @@ def getLongestSharedSubsequence(sequences):
 
     return best
 
-class ApicalTiebreakTM_SequenceMemoryTests(SequenceMemoryTestBase,
-                                           unittest.TestCase):
+
+class ApicalTiebreakTM_SequenceMemoryTests(SequenceMemoryTestBase, unittest.TestCase):
     """
     Run the sequence memory tests on the ApicalTiebreakTemporalMemory
     """
 
-    def constructTM(self, num_minicolumns, num_cells_per_minicolumn, initial_permanence,
-                    connected_permanence, matching_threshold, sample_size,
-                    permanence_increment, permanence_decrement,
-                    basal_segment_incorrect_decrement, activation_threshold, seed):
+    def constructTM(
+        self,
+        num_minicolumns,
+        num_cells_per_minicolumn,
+        initial_permanence,
+        connected_permanence,
+        matching_threshold,
+        sample_size,
+        permanence_increment,
+        permanence_decrement,
+        basal_segment_incorrect_decrement,
+        activation_threshold,
+        seed,
+    ):
 
         params = {
             "num_minicolumns": num_minicolumns,
@@ -922,6 +1014,7 @@ class ApicalTiebreakTM_SequenceMemoryTests(SequenceMemoryTestBase,
 
     def get_predicted_cells(self):
         return self.tm.get_predicted_cells().tolist()
+
 
 if __name__ == "__main__":
     unittest.main()
