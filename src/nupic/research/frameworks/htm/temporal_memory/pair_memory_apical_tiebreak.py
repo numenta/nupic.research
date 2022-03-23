@@ -19,9 +19,9 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from nupic.research.frameworks.htm.temporal_memory import TemporalMemoryApicalTiebreak
-
 import torch
+
+from nupic.research.frameworks.htm.temporal_memory import TemporalMemoryApicalTiebreak
 
 real_type = torch.float32
 int_type = torch.int64
