@@ -28,6 +28,7 @@ from nupic.research.frameworks.htm import SequenceMemoryApicalTiebreak
 real_type = torch.float32
 int_type = torch.int64
 
+
 def formatRow(x):
     s = ""
     for c in range(len(x)):
@@ -45,7 +46,7 @@ tm = SequenceMemoryApicalTiebreak(
     matching_threshold=8,
     permanence_increment=0.1,
     permanence_decrement=0.0,
-    activation_threshold=8
+    activation_threshold=8,
 )
 
 x = torch.zeros((5, tm.num_minicolumns), dtype=int_type)
@@ -108,16 +109,14 @@ for j in range(5):
     # Reconstructing the active and inactive columns with 1 as active and 0 as
     # inactive representation.
     active_minicolumn_state = [
-        "1" if i in active_minicolumn_indices else "0" for i in range(
-            tm.num_minicolumns
-        )
+        "1" if i in active_minicolumn_indices else "0"
+        for i in range(tm.num_minicolumns)
     ]
     active_minicolumn_str = "".join(active_minicolumn_state)
 
     predictive_minicolumn_state = [
-        "1" if i in predicted_minicolumn_indices else "0" for i in range(
-            tm.num_minicolumns
-        )
+        "1" if i in predicted_minicolumn_indices else "0"
+        for i in range(tm.num_minicolumns)
     ]
     predictive_minicolumn_str = "".join(predictive_minicolumn_state)
 
