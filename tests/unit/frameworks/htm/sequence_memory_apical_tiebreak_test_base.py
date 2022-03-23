@@ -23,15 +23,17 @@
 Sequence memory tests that focus on the effects of feedback.
 """
 
-import unittest
 import random
+import unittest
 from abc import ABCMeta, abstractmethod
+
 import torch
 
 from nupic.research.frameworks.htm import SequenceMemoryApicalTiebreak
 
 real_type = torch.float32
 int_type = torch.int64
+
 
 class ApicalTiebreakSequencesTestBase(object, metaclass=ABCMeta):
     """
@@ -55,12 +57,15 @@ class ApicalTiebreakSequencesTestBase(object, metaclass=ABCMeta):
     def setUp(self):
         self.num_cells_per_minicolumn = None
 
-        print(("\n"
-               "======================================================\n"
-               "Test: {0} \n"
-               "{1}\n"
-               "======================================================\n"
-               ).format(self.id(), self.shortDescription()))
+        print(
+            (
+                "\n"
+                "======================================================\n"
+                "Test: {0} \n"
+                "{1}\n"
+                "======================================================\n"
+            ).format(self.id(), self.shortDescription())
+        )
 
     def testSequenceMemory_BasalInputRequiredForPredictions(self):
         """
@@ -229,8 +234,9 @@ class ApicalTiebreakSequencesTestBase(object, metaclass=ABCMeta):
         self.assertEqual(yCells, set(self.get_predicted_cells()))
 
         # E should burst, except for columns that happen to be shared with Y.
-        self.assertEqual(set(abcde[4]) - set(xbcdy[4]),
-                         set(self.get_bursting_minicolumns()))
+        self.assertEqual(
+            set(abcde[4]) - set(xbcdy[4]), set(self.get_bursting_minicolumns())
+        )
 
     def testSequenceMemory_UnionOfFeedback(self):
         """
@@ -326,10 +332,12 @@ class ApicalTiebreakSequencesTestBase(object, metaclass=ABCMeta):
         self.constructTM(**params)
 
     def get_bursting_minicolumns(self):
-        predicted = set(cell // self.num_cells_per_minicolumn
-                        for cell in self.get_predicted_cells())
-        active = set(cell // self.num_cells_per_minicolumn
-                     for cell in self.get_active_cells())
+        predicted = set(
+            cell // self.num_cells_per_minicolumn for cell in self.get_predicted_cells()
+        )
+        active = set(
+            cell // self.num_cells_per_minicolumn for cell in self.get_active_cells()
+        )
 
         return active - predicted
 
@@ -340,19 +348,30 @@ class ApicalTiebreakSequencesTestBase(object, metaclass=ABCMeta):
         return set(random.sample(range(self.apical_input_size), self.w))
 
     def filterCellsByColumn(self, cells, columns):
-        return [cell
-                for cell in cells
-                if (cell // self.num_cells_per_minicolumn) in columns]
+        return [
+            cell for cell in cells if (cell // self.num_cells_per_minicolumn) in columns
+        ]
 
     # ==============================
     # Extension points
     # ==============================
 
     @abstractmethod
-    def constructTM(self, num_minicolumns, apical_input_size, num_cells_per_minicolumn,
-                    initial_permanence, connected_permanence, matching_threshold,
-                    sample_size, permanence_increment, permanence_decrement,
-                    basal_segment_incorrect_decrement, activation_threshold, seed):
+    def constructTM(
+        self,
+        num_minicolumns,
+        apical_input_size,
+        num_cells_per_minicolumn,
+        initial_permanence,
+        connected_permanence,
+        matching_threshold,
+        sample_size,
+        permanence_increment,
+        permanence_decrement,
+        basal_segment_incorrect_decrement,
+        activation_threshold,
+        seed,
+    ):
         """
         Construct a new TemporalMemory from these parameters.
         """
@@ -388,16 +407,29 @@ class ApicalTiebreakSequencesTestBase(object, metaclass=ABCMeta):
         """
         pass
 
-class ApicalTiebreakTM_ApicalTiebreakSequencesTests(ApicalTiebreakSequencesTestBase,
-                                                    unittest.TestCase):
+
+class ApicalTiebreakTM_ApicalTiebreakSequencesTests(
+    ApicalTiebreakSequencesTestBase, unittest.TestCase
+):
     """
     Runs the "apical tiebreak sequences" tests on the ApicalTiebreakTemporalMemory
     """
 
-    def constructTM(self, num_minicolumns, apical_input_size, num_cells_per_minicolumn,
-                    initial_permanence, connected_permanence, matching_threshold,
-                    sample_size, permanence_increment, permanence_decrement,
-                    basal_segment_incorrect_decrement, activation_threshold, seed):
+    def constructTM(
+        self,
+        num_minicolumns,
+        apical_input_size,
+        num_cells_per_minicolumn,
+        initial_permanence,
+        connected_permanence,
+        matching_threshold,
+        sample_size,
+        permanence_increment,
+        permanence_decrement,
+        basal_segment_incorrect_decrement,
+        activation_threshold,
+        seed,
+    ):
 
         params = {
             "num_minicolumns": num_minicolumns,
@@ -418,17 +450,15 @@ class ApicalTiebreakTM_ApicalTiebreakSequencesTests(ApicalTiebreakSequencesTestB
         self.tm = SequenceMemoryApicalTiebreak(**params)
 
     def compute(self, active_minicolumns, apical_input, learn):
-        import time
-        # start = time.time()
-
         active_minicolumns = torch.Tensor(list(sorted(active_minicolumns))).to(int_type)
         apical_input = torch.Tensor(list(sorted(apical_input))).to(int_type)
 
-        self.tm.compute(active_minicolumns,
-                        apical_input=apical_input,
-                        apical_growth_candidates=apical_input,
-                        learn=learn)
-        # print(time.time() - start)
+        self.tm.compute(
+            active_minicolumns,
+            apical_input=apical_input,
+            apical_growth_candidates=apical_input,
+            learn=learn,
+        )
 
     def reset(self):
         self.tm.reset()
@@ -438,6 +468,7 @@ class ApicalTiebreakTM_ApicalTiebreakSequencesTests(ApicalTiebreakSequencesTestB
 
     def get_predicted_cells(self):
         return self.tm.get_predicted_cells().tolist()
+
 
 if __name__ == "__main__":
     unittest.main()
