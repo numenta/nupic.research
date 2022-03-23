@@ -21,7 +21,7 @@
 
 import torch
 
-from nupic.research.frameworks.htm.temporal_memory import TemporalMemoryApicalTiebreak
+from .temporal_memory_apical_tiebreak import TemporalMemoryApicalTiebreak
 
 real_type = torch.float32
 int_type = torch.int64
