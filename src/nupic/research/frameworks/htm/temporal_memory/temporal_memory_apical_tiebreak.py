@@ -28,6 +28,7 @@ int_type = torch.int64
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
+
 class TemporalMemoryApicalTiebreak():
     """
     generalized Temporal Memory (TM) with apical dendrites that add a "tiebreak".
@@ -160,7 +161,6 @@ class TemporalMemoryApicalTiebreak():
         else:
             self.seed = seed
 
-        #self.generator = torch.Generator(torch.device(device)).manual_seed(self.seed)
         self.generator = torch.manual_seed(self.seed)
 
         self.basal_connections = torch.zeros(
@@ -420,8 +420,8 @@ class TemporalMemoryApicalTiebreak():
 
         # compute active segments
         overlaps = (
-            (self.apical_connections >= self.connected_permanence).to(real_type) \
-                @ apical_input_sdr
+            (self.apical_connections >= self.connected_permanence).to(real_type)
+            @ apical_input_sdr
         ).squeeze().to(int_type)
 
         active_apical_segments = torch.nonzero(
@@ -475,12 +475,10 @@ class TemporalMemoryApicalTiebreak():
         basal_input_sdr = torch.zeros(self.basal_input_size).to(device)
         basal_input_sdr[basal_input.to(int_type)] = 1
 
-        self.basal_connections >= self.connected_permanence
-
         # compute active segments
         overlaps = (
-            (self.basal_connections >= self.connected_permanence).to(real_type) \
-                @ basal_input_sdr
+            (self.basal_connections >= self.connected_permanence).to(real_type)
+            @ basal_input_sdr
         ).squeeze().to(int_type)
 
         # fully active basal segments (i.e. above the activation threshold)
@@ -488,14 +486,14 @@ class TemporalMemoryApicalTiebreak():
             overlaps >= self.activation_threshold
         ).squeeze().to(int_type)
 
-        if (self.reduced_basal_threshold != self.activation_threshold and
-            reduced_threshold_basal_cells.numel() > 0):
+        if (self.reduced_basal_threshold != self.activation_threshold
+                and reduced_threshold_basal_cells.numel() > 0):
             # active apical segments lower the activation threshold for
             # basal (lateral) segments. find segments that are above the reduced
             # threshold.
             potentially_active_basal_segments = torch.nonzero(
-                (overlaps < self.activation_threshold) &
-                (overlaps >= self.reduced_basal_threshold)
+                (overlaps < self.activation_threshold)
+                & (overlaps >= self.reduced_basal_threshold)
             )
 
             # find cells that correspond to each potentially active basal segment
@@ -1225,12 +1223,14 @@ def check_segment_type(segment_type):
 
     assert segment_type in {"basal", "apical"}
 
+
 def convert_1d(a):
     """
     convert `a` (torch.Tensor) into a 1D tensor if it is 0D
     """
     if len(a.size()) == 0:
         a.unsqueeze_(0)
+
 
 def isin(a, b):
     """
@@ -1244,6 +1244,7 @@ def isin(a, b):
     convert_1d(b)
 
     return (a.view(-1, 1) == b).any(axis=-1)
+
 
 def intersection(a, b):
     """
@@ -1260,6 +1261,7 @@ def intersection(a, b):
 
     return uniques[counts > 1]
 
+
 def difference(a, b):
     """
     returns unique values in `a` (torch.Tensor) that are not in `b` (torch.Tensor).
@@ -1270,6 +1272,7 @@ def difference(a, b):
 
     return a[~isin(a, b)]
 
+
 def get_cells_in_minicolumns(minicolumns, num_cells_per_minicolumn):
     """
     calculate all cell indices in the specified minicolumns.
@@ -1278,8 +1281,11 @@ def get_cells_in_minicolumns(minicolumns, num_cells_per_minicolumn):
     cells_per_minicolumn (int) is number of cells per minicolumn.
     """
 
-    return ((minicolumns * num_cells_per_minicolumn).view(-1, 1) + \
-        torch.arange(num_cells_per_minicolumn).to(int_type).to(device)).flatten()
+    return (
+        (minicolumns * num_cells_per_minicolumn).view(-1, 1)
+        + torch.arange(num_cells_per_minicolumn).to(int_type).to(device)
+    ).flatten()
+
 
 def cells_to_minicolumns(cells, num_cells_per_minicolumn):
     """
@@ -1287,6 +1293,7 @@ def cells_to_minicolumns(cells, num_cells_per_minicolumn):
     """
 
     return cells.div(num_cells_per_minicolumn, rounding_mode="floor")
+
 
 def argmax_multi(values, groups):
     """
