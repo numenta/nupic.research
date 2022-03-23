@@ -77,10 +77,10 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
     additional synapses are learned. [TODO]
     B3) N=300, M=1, P=1. (See how high we can go with N)
     B4) N=100, M=3, P=1. (See how high we can go with N*M)
-    B5) Like B1 but with num_cells_per_minicolumn = 32. First order sequences should still
-    work just fine.
-    B6) Like B4 but with num_cells_per_minicolumn = 32. First order sequences should still
-    work just fine.
+    B5) Like B1 but with num_cells_per_minicolumn = 32. First order sequences should
+    still work just fine.
+    B6) Like B4 but with num_cells_per_minicolumn = 32. First order sequences should
+    still work just fine.
     B7) Like B1 but with slower learning. Set the following parameters
     differently:
             initial_permanence = 0.2
