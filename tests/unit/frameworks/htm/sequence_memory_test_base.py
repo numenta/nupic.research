@@ -23,13 +23,11 @@
 Sequence memory tests
 """
 
-import random
-from abc import ABCMeta, abstractmethod
-
 import unittest
 import random
 from abc import ABCMeta, abstractmethod
 import torch
+import pytest
 
 from nupic.research.frameworks.htm import SequenceMemoryApicalTiebreak
 
@@ -158,6 +156,7 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
 
     def testB1(self):
         """Basic sequence learner.    M=1, N=100, P=1."""
+
         self.init({"num_cells_per_minicolumn": 1})
 
         sequence = [self.randomPattern() for _ in range(100)]
@@ -179,6 +178,7 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
 
     def testB3(self):
         """N=300, M=1, P=1. (See how high we can go with N)"""
+
         self.init({"num_cells_per_minicolumn": 1})
 
         sequence = [self.randomPattern() for _ in range(300)]
@@ -198,8 +198,10 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
                 self.assertEqual(set(self.get_predicted_cells()),
                                  set(self.get_active_cells()))
 
+    @pytest.mark.slow
     def testB4(self):
         """N=100, M=3, P=1. (See how high we can go with N*M)"""
+
         self.init({"num_cells_per_minicolumn": 1})
 
         sequences = [[self.randomPattern() for _ in range(300)]
@@ -281,6 +283,7 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
                 self.assertEqual(set(self.get_predicted_cells()),
                                  set(self.get_active_cells()))
 
+    @pytest.mark.slow
     def testB8(self):
         """Like B7 but with 32 cells per column.
         Should still work."""
@@ -306,6 +309,7 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
                 self.assertEqual(set(self.get_predicted_cells()),
                                  set(self.get_active_cells()))
 
+    @pytest.mark.slow
     def testB9(self):
         """Like B7 but present the sequence less than 4 times.
         The inference should be incorrect."""
@@ -361,8 +365,10 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
     def testH1(self):
         """Learn two sequences with a short shared pattern.
         Parameters should be the same as B1.
-        Since num_cells_per_minicolumn == 1, it should make more predictions than necessary.
+        Since num_cells_per_minicolumn == 1, it should make more predictions than
+        necessary.
         """
+
         self.init({"num_cells_per_minicolumn": 1})
 
         random.seed(37)
@@ -400,6 +406,7 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
 
             self.reset()
 
+    @pytest.mark.slow
     def testH2(self):
         """Same as H1, but with num_cells_per_minicolumn == 32, and train more times.
         It should make just the right number of predictions.
@@ -434,6 +441,7 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
 
             self.reset()
 
+    @pytest.mark.slow
     def testH3(self):
         """Like H2, except the shared subsequence is in the beginning.
         (e.g. "ABCDEF" and "ABCGHIJ") At the point where the shared subsequence
@@ -483,6 +491,7 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
         sequences. All sequences are different shufflings of the same set of N
         patterns (there is no intentional shared subsequence).
         """
+
         self.init()
 
         random.seed(40)
@@ -524,6 +533,7 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
 
             self.reset()
 
+    @pytest.mark.slow
     def testH5(self):
         """Combination of H4) and H2).
         Shared patterns in different sequences, with a shared subsequence.
@@ -799,7 +809,6 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
         """
         pass
 
-
 def noisy(pattern, wFlip, n):
     """
     Generate a noisy copy of a pattern.
@@ -834,7 +843,6 @@ def containsSublist(list1, sublist):
             return True
 
     return False
-
 
 def getLongestSharedSubsequence(sequences):
     """
