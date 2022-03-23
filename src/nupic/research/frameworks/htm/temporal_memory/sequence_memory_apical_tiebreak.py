@@ -28,6 +28,7 @@ int_type = torch.int64
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
+
 class SequenceMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
     """
     sequence memory with apical tiebreak, built on temporal memory with apical tiebreak.
@@ -94,7 +95,7 @@ class SequenceMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
     def compute(
         self,
         active_minicolumns,
-        apical_input=torch.Tensor().to(device),
+        apical_input=None,
         apical_growth_candidates=None,
         learn=True
     ):
@@ -116,6 +117,9 @@ class SequenceMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
         """
 
         active_minicolumns = active_minicolumns.to(int_type).to(device)
+
+        if apical_input is None:
+            apical_input = torch.Tensor([])
         apical_input = apical_input.to(int_type).to(device)
 
         if apical_growth_candidates is None:
