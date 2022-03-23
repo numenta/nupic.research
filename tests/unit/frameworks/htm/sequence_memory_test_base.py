@@ -231,6 +231,7 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
 
             self.reset()
 
+    @pytest.mark.slow
     def testB5(self):
         """Like B1 but with num_cells_per_minicolumn = 32.
         First order sequences should still work just fine."""
@@ -355,6 +356,7 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
                 self.assertEqual(set(), set(self.get_predicted_cells()))
                 self.assertEqual(self.w * 32, len(self.get_active_cells()))
 
+    @pytest.mark.slow
     def testB11(self):
         """Like B5, but with each pattern corrupted by a small amount of spatial
         noise (X = 0.02)."""
@@ -525,6 +527,7 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
 
             self.reset()
 
+    @pytest.mark.slow
     def testH4(self):
         """Shared patterns.
         Similar to H2 except that patterns are shared between
@@ -626,6 +629,7 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
 
             self.reset()
 
+    @pytest.mark.slow
     def testH9(self):
         """Sensitivity to small amounts of spatial noise during inference
         (X = 0.05).
@@ -667,6 +671,7 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
 
             self.reset()
 
+    @pytest.mark.slow
     def testH10(self):
         """Orphan Decay mechanism reduce predicted inactive cells (extra
         predictions).
