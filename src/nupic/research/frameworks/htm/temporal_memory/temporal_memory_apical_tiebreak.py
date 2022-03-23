@@ -475,6 +475,8 @@ class TemporalMemoryApicalTiebreak():
         basal_input_sdr = torch.zeros(self.basal_input_size).to(device)
         basal_input_sdr[basal_input.to(int_type)] = 1
 
+        self.basal_connections >= self.connected_permanence
+
         # compute active segments
         overlaps = (
             (self.basal_connections >= self.connected_permanence).to(real_type) \
@@ -510,21 +512,20 @@ class TemporalMemoryApicalTiebreak():
                     isin(potentially_active_cells, reduced_threshold_basal_cells)
                 ].squeeze()
             ])
+            convert_1d(active_basal_segments)
         else:
             active_basal_segments = fully_active_basal_segments
 
         basal_potential_overlaps = (
             (self.basal_connections > 0).to(real_type) @ basal_input_sdr
         ).squeeze().to(int_type)
+        convert_1d(basal_potential_overlaps)
 
         # compute matching segments
         matching_basal_segments = torch.nonzero(
             basal_potential_overlaps >= self.matching_threshold
         ).squeeze().to(int_type)
-
-        convert_1d(active_basal_segments)
         convert_1d(matching_basal_segments)
-        convert_1d(basal_potential_overlaps)
 
         return (active_basal_segments, matching_basal_segments,
                 basal_potential_overlaps)
@@ -551,8 +552,6 @@ class TemporalMemoryApicalTiebreak():
             "basal",
             active_basal_segments
         )
-
-        #print(active_basal_segments)
 
         # if not using apical tiebreak, predicted cells = cells_with_basal_segments
         if not self.use_apical_tiebreak:
@@ -632,6 +631,7 @@ class TemporalMemoryApicalTiebreak():
                 correctly_predicted_cells
             )
         ]
+        convert_1d(learning_active_basal_segments)
 
         # ***** BASAL_SEGMENTS_TO_PUNISH ***** #
 
@@ -653,6 +653,7 @@ class TemporalMemoryApicalTiebreak():
                 active_minicolumns
             )
         ]
+        convert_1d(basal_segments_to_punish)
 
         # ***** LEARNING_MATCHING_BASAL_SEGMENTS ***** #
 
@@ -676,6 +677,7 @@ class TemporalMemoryApicalTiebreak():
                     bursting_minicolumns
                 )
             ]
+        convert_1d(cells_with_matching_basal_segments_in_bursting_minicolumns)
 
         # find matching basal segments whose cells are in bursting minicolumns
         matching_basal_segments_of_cells_in_bursting_minicolumns = \
@@ -685,6 +687,7 @@ class TemporalMemoryApicalTiebreak():
                     cells_with_matching_basal_segments_in_bursting_minicolumns
                 )
             ]
+        convert_1d(matching_basal_segments_of_cells_in_bursting_minicolumns)
 
         # best matching basal segment (highest # of active synapses)
         # among all cells in each bursting minicolumn
@@ -715,6 +718,7 @@ class TemporalMemoryApicalTiebreak():
                     )
                 ).to(int_type)
             ]
+        convert_1d(learning_matching_basal_segments)
 
         # ***** CELLS_WITH_NEW_BASAL_SEGMENTS ***** #
 
@@ -729,6 +733,7 @@ class TemporalMemoryApicalTiebreak():
                     )
                 )
             ]
+        convert_1d(bursting_minicolumns_with_cells_with_no_matching_basal_segments)
 
         # cells in bursting minicolumns with no matching basal segments
         #
@@ -759,6 +764,7 @@ class TemporalMemoryApicalTiebreak():
                     (basal_segment_counts == min_basal_segment_counts).ravel()
                 ).squeeze()
             ]
+        convert_1d(cells_in_bursting_minicolumns_with_no_matching_basal_segments)
 
         # get unique bursting minicolumns with cells with no matching basal segments
         unique_minicolumns, num_candidates_in_minicolumns = torch.unique(
@@ -796,6 +802,7 @@ class TemporalMemoryApicalTiebreak():
             cells_in_bursting_minicolumns_with_no_matching_basal_segments[
                 one_cell_per_minicolumn_filter.to(int_type)
             ].squeeze()
+        convert_1d(cells_with_new_basal_segments)
 
         # ***** LEARNING_CELLS ***** #
 
@@ -850,6 +857,7 @@ class TemporalMemoryApicalTiebreak():
             self.map_segments_to_cells("apical", self.active_apical_segments),
             learning_cells
         )]
+        convert_1d(learning_active_apical_segments)
 
         # ***** LEARNING_MATCHING_APICAL_SEGMENTS ***** #
 
@@ -878,6 +886,7 @@ class TemporalMemoryApicalTiebreak():
                 learning_cells_with_matching_apical_segments
             )
         ]
+        convert_1d(matching_apical_segments_of_learning_cells)
 
         # choose matching segment with largest number of active potential synapses
         learning_matching_apical_segments = matching_apical_segments_of_learning_cells[
@@ -891,6 +900,7 @@ class TemporalMemoryApicalTiebreak():
                 )
             ).to(int_type)
         ]
+        convert_1d(learning_matching_apical_segments)
 
         # ***** CELLS_WITH_NEW_APICAL_SEGMENTS ***** #
 
@@ -913,6 +923,7 @@ class TemporalMemoryApicalTiebreak():
                 active_minicolumns
             )
         ]
+        convert_1d(apical_segments_to_punish)
 
         return (learning_active_apical_segments,
                 learning_matching_apical_segments,
@@ -1171,6 +1182,7 @@ class TemporalMemoryApicalTiebreak():
 
         # find nonzero indices
         nz_ind_mask = connections[x, y].to(torch.bool)
+
         x = x[nz_ind_mask]
         y = y[nz_ind_mask]
 
