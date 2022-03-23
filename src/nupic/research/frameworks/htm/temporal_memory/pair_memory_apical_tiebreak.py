@@ -28,6 +28,7 @@ int_type = torch.int64
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
+
 class PairMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
     """
     pair memory with apical tiebreak.
@@ -37,7 +38,7 @@ class PairMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
         self,
         active_minicolumns,
         basal_input,
-        apical_input=torch.Tensor().to(device),
+        apical_input=None,
         basal_growth_candidates=None,
         apical_growth_candidates=None,
         learn=True
@@ -67,6 +68,9 @@ class PairMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
 
         active_minicolumns = active_minicolumns.to(int_type).to(device)
         basal_input = basal_input.to(int_type).to(device)
+
+        if apical_input is None:
+            apical_input = torch.Tensor([])
         apical_input = apical_input.to(int_type).to(device)
 
         if basal_growth_candidates is None:
