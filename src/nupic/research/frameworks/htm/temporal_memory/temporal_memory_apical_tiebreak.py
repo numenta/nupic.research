@@ -49,6 +49,9 @@ class TemporalMemoryApicalTiebreak():
           internal/external cells -- caller knows what these cells numbers mean
         - TM does not specify when a "timestep" begins and ends. callers or subclasses
           can introduce the notion of a timestep.
+
+    for the original implementation of this class, please refer to:
+    https://github.com/numenta/nupic.research/blob/master/packages/columns/
     """
 
     def __init__(
