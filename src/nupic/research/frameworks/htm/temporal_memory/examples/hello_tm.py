@@ -28,6 +28,15 @@ from nupic.research.frameworks.htm import SequenceMemoryApicalTiebreak
 real_type = torch.float32
 int_type = torch.int64
 
+print("""
+This program shows how to access the Temporal Memory directly by demonstrating
+how to create a TM instance, train it with vectors, get predictions, and
+inspect the state. The code here runs a very simple version of sequence learning,
+with one cell per column. The TM is trained with the simple sequence A->B->C->D->E.
+HOMEWORK: once you have understood exactly what is going on here, try changing
+cellsPerColumn to 4. What is the difference between once cell per column and 4
+cells per column?
+""")
 
 def formatRow(x):
     s = ""
@@ -38,7 +47,7 @@ def formatRow(x):
     s += " "
     return s
 
-
+# create TM with appropriate parameters
 tm = SequenceMemoryApicalTiebreak(
     num_minicolumns=50,
     num_cells_per_minicolumn=2,
@@ -49,6 +58,7 @@ tm = SequenceMemoryApicalTiebreak(
     activation_threshold=8,
 )
 
+# create input vectors that are fed to TM
 x = torch.zeros((5, tm.num_minicolumns), dtype=int_type)
 x[0, 0:10] = 1  # Input SDR representing "A", corresponding to columns 0-9
 x[1, 10:20] = 1  # Input SDR representing "B", corresponding to columns 10-19
@@ -56,15 +66,20 @@ x[2, 20:30] = 1  # Input SDR representing "C", corresponding to columns 20-29
 x[3, 30:40] = 1  # Input SDR representing "D", corresponding to columns 30-39
 x[4, 40:50] = 1  # Input SDR representing "E", corresponding to columns 40-49
 
-# TRAIN TM
+# TRAIN TM: send sequence to TM for learning (repeat the sequence 10 times)
 for i in range(5):
+
+    #send each letter in sequence in order
     for j in range(5):
         active_minicolumns = torch.Tensor(
             list(set([i for i, j in zip(count(), x[j]) if j == 1]))
         )
 
+        # compute method performs one step of learning and/or inference.
         tm.compute(active_minicolumns, learn=True)
 
+        # The following print statements prints out the active cells, predictive
+        # cells, active segments and winner cells.
         print("seeing pattern", ["A", "B", "C", "D", "E"][j])
         print("active cells ", tm.get_active_cells().tolist())
         print("predictive cells ", tm.get_predicted_cells().tolist())
@@ -75,7 +90,7 @@ for i in range(5):
     tm.reset()
     print("Reset!")
 
-# INFERENCE TM (send same sequences and observe outputs)
+# INFERENCE TM: send same sequences and observe outputs
 for j in range(5):
     print("\n\n--------", "ABCDE"[j], "-----------")
     print("Raw input vector : " + formatRow(x[j].tolist()))
