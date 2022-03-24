@@ -31,7 +31,30 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 class PairMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
     """
-    pair memory with apical tiebreak.
+    pair memory with apical tiebreak, built on temporal memory with apical tiebreak.
+
+    pair memory (the process by which information is learned by "grouping" context
+    from basal and apical synapses) is enabled via the following configurations of the
+    basic Temporal Memory algorithm:
+
+    1. basal reinforce candidates (list of bits that active cells may reinforce
+                                   basal synapses to)
+            = basal input
+
+    2. apical reinforce candidates (list of all bits that active cells may reinforce
+                                    apical synapses to)
+            = apical input
+
+    3. basal growth candidates (list of bits that active cells may grow new basal
+                                synapses to)
+            = basal input (by default)
+
+    4. apical growth candidates (list of bits that active cells may grow new apical
+                                 synapses to)
+            = apical input (by default)
+
+    for the original implementation of this class, please refer to:
+    https://github.com/numenta/nupic.research/blob/master/packages/columns/
     """
 
     def compute(
