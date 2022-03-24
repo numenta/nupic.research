@@ -32,6 +32,32 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 class SequenceMemoryApicalTiebreak(TemporalMemoryApicalTiebreak):
     """
     sequence memory with apical tiebreak, built on temporal memory with apical tiebreak.
+
+    sequence memory (the process by which sequences are learned) is enabled
+    via the following configurations of the basic Temporal Memory algorithm:
+
+    1. basal reinforce candidates (list of bits that active cells may reinforce
+                                   basal synapses to)
+            = active cells (all correctly predicted cells + all cells in bursting
+                            minicolumns)
+
+    2. apical reinforce candidates (list of all bits that active cells may reinforce
+                                    apical synapses to)
+            = previous apical input
+
+    3. basal growth candidates (list of bits that active cells may grow new basal
+                                synapses to)
+            = learning cells (correctly predicted cells + cells with best matching
+                              basal segments, which are the cells with the highest
+                              active synapses among cells in each bursting minicolumn +
+                              cells with new basal segments)
+
+    4. apical growth candidates (list of bits that active cells may grow new apical
+                                 synapses to)
+            = previous apical growht candidates
+
+    for the original implementation of this class, please refer to:
+    https://github.com/numenta/nupic.research/blob/master/packages/columns/
     """
 
     def __init__(
