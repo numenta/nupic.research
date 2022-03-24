@@ -19,9 +19,6 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from .spatial_pooler import SpatialPooler
-from .temporal_memory import (
-    PairMemoryApicalTiebreak,
-    SequenceMemoryApicalTiebreak,
-    TemporalMemoryApicalTiebreak,
-)
+from .pair_memory_apical_tiebreak import PairMemoryApicalTiebreak
+from .sequence_memory_apical_tiebreak import SequenceMemoryApicalTiebreak
+from .temporal_memory_apical_tiebreak import TemporalMemoryApicalTiebreak

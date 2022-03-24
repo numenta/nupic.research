@@ -137,7 +137,7 @@ jobs:
       - run:
           name: Run python tests
           environment:
-            PYTEST_ADDOPTS: --junitxml=test_results/pytest/results.xml --verbose
+            PYTEST_ADDOPTS: --junitxml=test_results/pytest/results.xml --verbose -m "not slow"
           command: |
             set -e
             cp -f .circleci/pytest.ini pytest.ini
