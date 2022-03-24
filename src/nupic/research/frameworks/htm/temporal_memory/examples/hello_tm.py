@@ -38,6 +38,7 @@ cellsPerColumn to 4. What is the difference between once cell per column and 4
 cells per column?
 """)
 
+
 def formatRow(x):
     s = ""
     for c in range(len(x)):
@@ -46,6 +47,7 @@ def formatRow(x):
         s += str(x[c])
     s += " "
     return s
+
 
 # create TM with appropriate parameters
 tm = SequenceMemoryApicalTiebreak(
@@ -69,7 +71,7 @@ x[4, 40:50] = 1  # Input SDR representing "E", corresponding to columns 40-49
 # TRAIN TM: send sequence to TM for learning (repeat the sequence 10 times)
 for i in range(5):
 
-    #send each letter in sequence in order
+    # send each letter in sequence in order
     for j in range(5):
         active_minicolumns = torch.Tensor(
             list(set([i for i, j in zip(count(), x[j]) if j == 1]))
