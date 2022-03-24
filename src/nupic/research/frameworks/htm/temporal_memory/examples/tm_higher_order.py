@@ -39,6 +39,7 @@ basic properties of the Temporal Memory, in particular when it comes
 to how it handles high-order sequences.
 """)
 
+
 def accuracy(current, predicted):
     """
     Computes the accuracy of the TM at time-step t based on the prediction
@@ -174,6 +175,7 @@ def trainTM(sequence, timeSteps, noiseLevel):
             x.append(ts)
             y.append(acc)
             ts += 1
+
 
 tm = SequenceMemoryApicalTiebreak(
     num_minicolumns=2048,
