@@ -32,6 +32,12 @@ matplotlib.use("Agg")
 real_type = torch.float32
 int_type = torch.int64
 
+print("""
+A simple tutorial that shows some features of the Temporal Memory.
+The following program has the purpose of presenting some
+basic properties of the Temporal Memory, in particular when it comes
+to how it handles high-order sequences.
+""")
 
 def accuracy(current, predicted):
     """
@@ -168,14 +174,6 @@ def trainTM(sequence, timeSteps, noiseLevel):
             x.append(ts)
             y.append(acc)
             ts += 1
-
-
-"""
-A simple tutorial that shows some features of the Temporal Memory.
-The following program has the purpose of presenting some
-basic properties of the Temporal Memory, in particular when it comes
-to how it handles high-order sequences.
-"""
 
 tm = SequenceMemoryApicalTiebreak(
     num_minicolumns=2048,
