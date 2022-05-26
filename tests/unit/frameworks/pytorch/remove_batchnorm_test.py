@@ -19,9 +19,11 @@
 #
 import unittest
 
+import pytest
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from packaging.version import Version
 
 from nupic.research.frameworks.pytorch.model_compare import compare_models
 from nupic.research.frameworks.pytorch.models import LeSparseNet
@@ -76,7 +78,10 @@ def train_randomly(model, in_channels=1, num_samples=20):
 
 
 class RemoveBatchnormTest(unittest.TestCase):
-
+    @pytest.mark.skipif(
+        Version(torch.__version__) > Version("1.10.2"),
+        reason=f"Expecting pytorch <= 1.10.2 but got {torch.__version__}",
+    )
     def test_simple_cnn(self):
         """Compare a network with itself after batchnorm is removed."""
         model = create_simple_cnn()
@@ -90,6 +95,10 @@ class RemoveBatchnormTest(unittest.TestCase):
         self.assertEqual(actual_modules, expected_modules)
         self.assertTrue(compare_models(model, model2, (1, 32, 32)))
 
+    @pytest.mark.skipif(
+        Version(torch.__version__) > Version("1.10.2"),
+        reason=f"Expecting pytorch <= 1.10.2 but got {torch.__version__}",
+    )
     def test_cnn_more_out_channels(self):
         """Compare another network with itself after batchnorm is removed."""
         model = create_simple_cnn(
@@ -105,6 +114,10 @@ class RemoveBatchnormTest(unittest.TestCase):
         self.assertEqual(actual_modules, expected_modules)
         self.assertTrue(compare_models(model, model2, (1, 32, 32)))
 
+    @pytest.mark.skipif(
+        Version(torch.__version__) > Version("1.10.2"),
+        reason=f"Expecting pytorch <= 1.10.2 but got {torch.__version__}",
+    )
     def test_cnn_more_in_channels(self):
         """
         Compare a network with 3 in_channels with itself after batchnorm is removed.
@@ -124,6 +137,10 @@ class RemoveBatchnormTest(unittest.TestCase):
         self.assertEqual(actual_modules, expected_modules)
         self.assertTrue(compare_models(model, model2, (3, 32, 32)))
 
+    @pytest.mark.skipif(
+        Version(torch.__version__) > Version("1.10.2"),
+        reason=f"Expecting pytorch <= 1.10.2 but got {torch.__version__}",
+    )
     def test_cnn_sparse_weights(self):
         """
         Compare a network with 3 in_channels with itself after batchnorm is removed.
@@ -144,6 +161,10 @@ class RemoveBatchnormTest(unittest.TestCase):
         self.assertEqual(actual_modules, expected_modules)
         self.assertTrue(compare_models(model, model2, (3, 32, 32)))
 
+    @pytest.mark.skipif(
+        Version(torch.__version__) > Version("1.10.2"),
+        reason=f"Expecting pytorch <= 1.10.2 but got {torch.__version__}",
+    )
     def test_gsc(self):
         """
         Compare the GSC network after batchnorm is removed.
