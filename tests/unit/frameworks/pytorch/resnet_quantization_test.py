@@ -24,6 +24,7 @@ import pytest
 import torch
 import torch.nn as nn
 import torch.nn.intrinsic as nni
+from packaging.version import Version
 
 from nupic.research.frameworks.pytorch.model_compare import compare_models
 from nupic.research.frameworks.pytorch.models.sparse_resnets import resnet34, resnet50
@@ -40,6 +41,10 @@ def _create_test_model(model_class):
 
 
 @pytest.mark.parametrize("model_class", TEST_MODEL_CLASS)
+@pytest.mark.skipif(
+    Version(torch.__version__) > Version("1.10.2"),
+    reason=f"Expecting pytorch <= 1.10.2 but got {torch.__version__}",
+)
 def test_fuse_model_conv_bn(model_class):
     original = _create_test_model(model_class=model_class)
 
@@ -78,6 +83,10 @@ def test_fuse_model_conv_bn(model_class):
 
 
 @pytest.mark.parametrize("model_class", TEST_MODEL_CLASS)
+@pytest.mark.skipif(
+    Version(torch.__version__) > Version("1.10.2"),
+    reason=f"Expecting pytorch <= 1.10.2 but got {torch.__version__}",
+)
 def test_fuse_model_conv_bn_relu(model_class):
     original = _create_test_model(model_class=model_class)
 
