@@ -45,8 +45,8 @@ class ApicalTiebreakPairMemoryWrapper(ApicalTiebreakPairMemory):
         seed
     ):
         """
-        wrapper class around ApicalTiebreakPairMemory that uses Pythonic 
-        variables instead of camelCase. 
+        wrapper class around ApicalTiebreakPairMemory that uses Pythonic
+        variables instead of camelCase.
         FIXME: need to change variable structure in ApicalTiebreakTemporalMemory
         """
         super().__init__(
