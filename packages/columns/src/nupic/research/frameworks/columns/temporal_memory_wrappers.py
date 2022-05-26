@@ -44,6 +44,11 @@ class ApicalTiebreakPairMemoryWrapper(ApicalTiebreakPairMemory):
         permanence_decrement,
         seed
     ):
+        """
+        wrapper class around ApicalTiebreakPairMemory that uses Pythonic 
+        variables instead of camelCase. 
+        FIXME: need to change variable structure in ApicalTiebreakTemporalMemory
+        """
         super().__init__(
             columnCount=proximal_n,
             basalInputSize=basal_n,
