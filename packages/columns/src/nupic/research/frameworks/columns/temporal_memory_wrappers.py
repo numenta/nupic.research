@@ -71,3 +71,27 @@ class ApicalTiebreakPairMemoryWrapper(ApicalTiebreakPairMemory):
         self.basal_w = basal_w
         self.apical_n = apical_n
         self.apical_w = apical_w
+
+    def compute(
+        self,
+        active_columns,
+        basal_input,
+        apical_input=(),
+        basal_growth_candidates=None,
+        apical_growth_candidates=None,
+        learn=True
+    ):
+        super().compute(
+            activeColumns=active_columns,
+            basalInput=basal_input,
+            apicalInput=apical_input,
+            basalGrowthCandidates=basal_growth_candidates,
+            apicalGrowthCandidates=apical_growth_candidates,
+            learn=learn
+        )
+
+    def get_winner_cells(self):
+        return super().getWinnerCells()
+
+    def get_predicted_active_cells(self):
+        return super().getPredictedActiveCells()
