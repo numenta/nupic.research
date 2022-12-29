@@ -1,25 +1,23 @@
 Introduction
 ==============
 
-This repository contains the code for experimental algorithm work done internally at Numenta. A description of our core neuroscience research is [available here](https://www.numenta.com/neuroscience-research/). A description of how we are applying neuroscience research to machine learning (our current focus) is [available here](https://numenta.com/machine-intelligence-research).
+This repository contains the code for experimental and neuroscience algorithm work done internally at Numenta. A description of our core neuroscience research is [available here](https://www.numenta.com/neuroscience-research/). A description of how we are applying neuroscience research to machine learning (our current focus) is [available here](https://www.numenta.com/technology/).
 
 Open Research
 ==============
 
-We are dramatically open with our research. We even release our day to day research code into this repository. It contains experimental algorithm code done internally at Numenta. It includes prototypes and experiments with different algorithm implementations. Many of our internal research meetings are recorded and [released on YouTube](https://www.youtube.com/c/NumentaTheory/videos).
-
-Please see this [blog entry](https://numenta.com/blog/2018/10/22/framework_for_intelligence_commitment_to_open_science/) for a discussion on our commitment to Open Science and Open Research.
+This repository contains much of our basic code for experimental algorithm and neuroscience theories done internally at Numenta. It includes prototypes and experiments of several ideas behind the Thousand Brains Theory, sometimes with several different implementations of the same algorithm. Many of our related internal research meetings are recorded and [released on YouTube](https://www.youtube.com/c/NumentaTheory/videos).
 
 The NuPIC open source community continues to maintain and improve our more stable older algorithms. See https://discourse.numenta.org for discussions on that codebase - you can also post your research related questions there.
 
-The ideas in this repository are constantly in flux as we tweak and experiment. Hence the following DISCLAIMERS:
+The ideas in this repository are constantly in flux as we tweak and experiment. Anyone looking through this should understand the following DISCLAIMERS:
  
 What you should understand about this repository
 ================================================
 
 - the code can change quickly and without warning as experiments are discarded and recreated
 - code will not be production-quality, bug free, or well documented
-- if we do work with external partners, that work will probably NOT be here
+- if we do work with, or for, external partners and customers, that work will probably NOT be here
 - we might decide at some point to not do our research in the open anymore and instead delete the whole repository
 
 Papers
