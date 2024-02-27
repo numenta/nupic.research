@@ -41,7 +41,7 @@ def _randomSDR(numOfBits, size):
   :param size: Number of active bits desired in the SDR
   :return: list with active bits indexes in SDR
   """
-  return random.sample(xrange(numOfBits), size)
+  return random.sample(range(numOfBits), size)
 
 
 class L4L2ExperimentTest(unittest.TestCase):
@@ -68,15 +68,15 @@ class L4L2ExperimentTest(unittest.TestCase):
 
     # Set up feature and location SDRs for two locations, A and B, for each
     # cortical column, 0 and 1.
-    locA0 = list(xrange(0, 20))
-    featA0 = list(xrange(0, 20))
-    locA1 = list(xrange(20, 40))
-    featA1 = list(xrange(20, 40))
+    locA0 = list(range(0, 20))
+    featA0 = list(range(0, 20))
+    locA1 = list(range(20, 40))
+    featA1 = list(range(20, 40))
 
-    locB0 = list(xrange(40, 60))
-    featB0 = list(xrange(40, 60))
-    locB1 = list(xrange(60, 80))
-    featB1 = list(xrange(60, 80))
+    locB0 = list(range(40, 60))
+    featB0 = list(range(40, 60))
+    locB1 = list(range(60, 80))
+    featB1 = list(range(60, 80))
 
     # Learn each location for each column with several repetitions
     objectsToLearn = {"obj1": [
@@ -249,15 +249,15 @@ class L4L2ExperimentTest(unittest.TestCase):
 
     # Set up feature and location SDRs for two locations, A and B, for each
     # cortical column, 0 and 1.
-    locA0 = list(xrange(0, 5))
-    featA0 = list(xrange(0, 5))
-    locA1 = list(xrange(5, 10))
-    featA1 = list(xrange(5, 10))
+    locA0 = list(range(0, 5))
+    featA0 = list(range(0, 5))
+    locA1 = list(range(5, 10))
+    featA1 = list(range(5, 10))
 
-    locB0 = list(xrange(10, 15))
-    featB0 = list(xrange(10, 15))
-    locB1 = list(xrange(15, 20))
-    featB1 = list(xrange(15, 20))
+    locB0 = list(range(10, 15))
+    featB0 = list(range(10, 15))
+    locB1 = list(range(15, 20))
+    featB1 = list(range(15, 20))
 
     # Learn each location for each column with several repetitions
     objectsToLearn = {"obj1": [
@@ -297,8 +297,8 @@ class L4L2ExperimentTest(unittest.TestCase):
     """
     random.seed(23)
     # Location and feature pool
-    features = [_randomSDR(1024, 20) for _ in xrange(4)]
-    locations = [_randomSDR(1024, 20) for _ in xrange(15)]
+    features = [_randomSDR(1024, 20) for _ in range(4)]
+    locations = [_randomSDR(1024, 20) for _ in range(15)]
 
     # Learn 3 different objects (Can, Mug, Box)
     objectsToLearn = dict()
@@ -431,9 +431,9 @@ class L4L2ExperimentTest(unittest.TestCase):
     """
     random.seed(36)
     objectL2SDR = {
-      "Can": [set(_randomSDR(4096, 40)) for _ in xrange(5)],
-      "Mug": [set(_randomSDR(4096, 40)) for _ in xrange(5)],
-      "Box": [set(_randomSDR(4096, 40)) for _ in xrange(5)]
+      "Can": [set(_randomSDR(4096, 40)) for _ in range(5)],
+      "Mug": [set(_randomSDR(4096, 40)) for _ in range(5)],
+      "Box": [set(_randomSDR(4096, 40)) for _ in range(5)]
     }
 
     with patch.object(l2_l4_inference.L4L2Experiment, "getL2Representations")\
@@ -453,7 +453,7 @@ class L4L2ExperimentTest(unittest.TestCase):
 
       # test no match
       mock_getL2Representations.return_value = [
-        set(_randomSDR(4096, 40)) for _ in xrange(5)]
+        set(_randomSDR(4096, 40)) for _ in range(5)]
       results = exp.getCurrentClassification()
       self.assertDictEqual(results, {"Box": 0, "Mug": 0, "Can": 0})
 
@@ -490,8 +490,8 @@ class L4L2ExperimentTest(unittest.TestCase):
         )
 
     # Location and feature pool
-    features = [_randomSDR(1024, 20) for _ in xrange(4)]
-    locations = [_randomSDR(1024, 20) for _ in xrange(15)]
+    features = [_randomSDR(1024, 20) for _ in range(4)]
+    locations = [_randomSDR(1024, 20) for _ in range(15)]
 
     # Learn 3 different objects (Can, Mug, Box)
     objectsToLearn = dict()
@@ -586,9 +586,9 @@ class L4L2ExperimentTest(unittest.TestCase):
     exp.sendReset()
     exp.infer(sensations, reset=False)
     results = exp.getCurrentClassification()
-    self.assertEquals(results["Mug"], 1)
-    self.assertEquals(results["Box"], 0)
-    self.assertEquals(results["Can"], 0)
+    self.assertEqual(results["Mug"], 1)
+    self.assertEqual(results["Box"], 0)
+    self.assertEqual(results["Can"], 0)
 
     # Try to infer "Cylinder" using first learned grasp
     sensations = [
@@ -598,9 +598,9 @@ class L4L2ExperimentTest(unittest.TestCase):
     exp.sendReset()
     exp.infer(sensations, reset=False)
     results = exp.getCurrentClassification()
-    self.assertEquals(results["Mug"], 0)
-    self.assertEquals(results["Box"], 0)
-    self.assertEquals(results["Can"], 1)
+    self.assertEqual(results["Mug"], 0)
+    self.assertEqual(results["Box"], 0)
+    self.assertEqual(results["Can"], 1)
 
     # Try to infer "Box" using first learned grasp
     sensations = [
@@ -610,9 +610,9 @@ class L4L2ExperimentTest(unittest.TestCase):
     exp.sendReset()
     exp.infer(sensations, reset=False)
     results = exp.getCurrentClassification()
-    self.assertEquals(results["Mug"], 0)
-    self.assertEquals(results["Box"], 1)
-    self.assertEquals(results["Can"], 0)
+    self.assertEqual(results["Mug"], 0)
+    self.assertEqual(results["Box"], 1)
+    self.assertEqual(results["Can"], 0)
 
     # Try to infer half "Box" half "Mug" to confuse
     sensations = [
@@ -634,9 +634,9 @@ class L4L2ExperimentTest(unittest.TestCase):
     exp.sendReset()
     exp.infer(sensations, reset=False)
     results = exp.getCurrentClassification()
-    self.assertEquals(results["Mug"], 0.5)
-    self.assertEquals(results["Box"], 0.5)
-    self.assertEquals(results["Can"], 0)
+    self.assertEqual(results["Mug"], 0.5)
+    self.assertEqual(results["Box"], 0.5)
+    self.assertEqual(results["Can"], 0)
 
 
   def testDefaultParameters(self):
@@ -692,11 +692,11 @@ class L4L2ExperimentTest(unittest.TestCase):
     L2Column = net.regions["L2Column_0"].getSelf()
 
     # check the default parameters are correct in L4
-    for param, value in L4Params.iteritems():
+    for param, value in L4Params.items():
       self.assertEqual(L4Column.getParameter(param), value)
 
     # check the default parameters are correct in L2
-    for param, value in L2Params.iteritems():
+    for param, value in L2Params.items():
       self.assertEqual(L2Column.getParameter(param), value)
 
 

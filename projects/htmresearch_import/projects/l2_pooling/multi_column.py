@@ -175,9 +175,9 @@ def runStretch(noiseLevel=None, profile=False):
     numCorticalColumns=2,
   )
   objects.createRandomObjects(10, 10, numLocations=10, numFeatures=10)
-  print "Objects are:"
-  for object, pairs in objects.objects.iteritems():
-    print str(object) + ": " + str(pairs)
+  print("Objects are:")
+  for object, pairs in objects.objects.items():
+    print(str(object) + ": " + str(pairs))
 
   exp.learnObjects(objects.provideObjectsToLearn())
   if profile:
@@ -196,19 +196,19 @@ def runStretch(noiseLevel=None, profile=False):
   # stay multiple steps on each sensation
   objectSensations1 = []
   for pair in objectCopy1:
-    for _ in xrange(4):
+    for _ in range(4):
       objectSensations1.append(pair)
 
   # stay multiple steps on each sensation
   objectSensations2 = []
   for pair in objectCopy2:
-    for _ in xrange(4):
+    for _ in range(4):
       objectSensations2.append(pair)
 
   # stay multiple steps on each sensation
   objectSensations3 = []
   for pair in objectCopy3:
-    for _ in xrange(4):
+    for _ in range(4):
       objectSensations3.append(pair)
 
   inferConfig = {

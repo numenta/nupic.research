@@ -111,66 +111,66 @@ def debugExperiment(logFile):
   exp.logCalls = False
 
   L2Representations = exp.objectL2Representations
-  print "Learned object representations:"
+  print("Learned object representations:")
   pprint.pprint(L2Representations, width=400)
-  print "=========================="
+  print("==========================")
 
-  print "\nRun inference with a point on the capsule"
+  print("\nRun inference with a point on the capsule")
   sensationList = [
     {0: getObjectPair("Capsule", 0)},
   ]
   exp.infer(sensationList, reset= False)
-  print "Output for capsule:", exp.getL2Representations()
-  print "Intersection with sphere:", len(
-    exp.getL2Representations()[0] & L2Representations["Sphere"][0])
-  print "Intersection with capsule:", len(
-    exp.getL2Representations()[0] & L2Representations["Capsule"][0])
-  print "Intersection with cube:", len(
-    exp.getL2Representations()[0] & L2Representations["Cube"][0])
+  print("Output for capsule:", exp.getL2Representations())
+  print("Intersection with sphere:", len(
+    exp.getL2Representations()[0] & L2Representations["Sphere"][0]))
+  print("Intersection with capsule:", len(
+    exp.getL2Representations()[0] & L2Representations["Capsule"][0]))
+  print("Intersection with cube:", len(
+    exp.getL2Representations()[0] & L2Representations["Cube"][0]))
   exp.sendReset()
 
-  print "\nRun inference with a point on the sphere"
+  print("\nRun inference with a point on the sphere")
   sensationList = [
     {0: getObjectPair("Sphere", 0)},
   ]
   exp.infer(sensationList, reset= False)
-  print "Output for sphere:", exp.getL2Representations()
-  print "Intersection with sphere:", len(
-    exp.getL2Representations()[0] & L2Representations["Sphere"][0])
-  print "Intersection with Capsule:", len(
-    exp.getL2Representations()[0] & L2Representations["Capsule"][0])
-  print "Intersection with cube:", len(
-    exp.getL2Representations()[0] & L2Representations["Cube"][0])
+  print("Output for sphere:", exp.getL2Representations())
+  print("Intersection with sphere:", len(
+    exp.getL2Representations()[0] & L2Representations["Sphere"][0]))
+  print("Intersection with Capsule:", len(
+    exp.getL2Representations()[0] & L2Representations["Capsule"][0]))
+  print("Intersection with cube:", len(
+    exp.getL2Representations()[0] & L2Representations["Cube"][0]))
   exp.sendReset()
 
-  print "\nRun inference with two points on the sphere"
+  print("\nRun inference with two points on the sphere")
   sensationList = [
     {0: getObjectPair("Sphere", 0)},
     {0: getObjectPair("Sphere", 2)},
   ]
   exp.infer(sensationList, reset= False)
-  print "Output for sphere:", exp.getL2Representations()
-  print "Intersection with sphere:", len(
-    exp.getL2Representations()[0] & L2Representations["Sphere"][0])
-  print "Intersection with Capsule:", len(
-    exp.getL2Representations()[0] & L2Representations["Capsule"][0])
-  print "Intersection with cube:", len(
-    exp.getL2Representations()[0] & L2Representations["Cube"][0])
+  print("Output for sphere:", exp.getL2Representations())
+  print("Intersection with sphere:", len(
+    exp.getL2Representations()[0] & L2Representations["Sphere"][0]))
+  print("Intersection with Capsule:", len(
+    exp.getL2Representations()[0] & L2Representations["Capsule"][0]))
+  print("Intersection with cube:", len(
+    exp.getL2Representations()[0] & L2Representations["Cube"][0]))
   exp.sendReset()
 
 
-  print "\nRun inference with a point on the cube"
+  print("\nRun inference with a point on the cube")
   sensationList = [
     {0: getObjectPair("Cube", 2)},
   ]
   exp.infer(sensationList, reset= False)
-  print "Output for cube:", exp.getL2Representations()
-  print "Intersection with sphere:", len(
-    exp.getL2Representations()[0] & L2Representations["Sphere"][0])
-  print "Intersection with Capsule:", len(
-    exp.getL2Representations()[0] & L2Representations["Capsule"][0])
-  print "Intersection with cube:", len(
-    exp.getL2Representations()[0] & L2Representations["Cube"][0])
+  print("Output for cube:", exp.getL2Representations())
+  print("Intersection with sphere:", len(
+    exp.getL2Representations()[0] & L2Representations["Sphere"][0]))
+  print("Intersection with Capsule:", len(
+    exp.getL2Representations()[0] & L2Representations["Capsule"][0]))
+  print("Intersection with cube:", len(
+    exp.getL2Representations()[0] & L2Representations["Cube"][0]))
   exp.sendReset()
 
 
@@ -181,12 +181,12 @@ if __name__ == "__main__":
   createExperiment("callLog.pkl")
 
   # Print out the log
-  print "\n========== CALL LOG ==============="
+  print("\n========== CALL LOG ===============")
 
   for call in LoggingDecorator.load("callLog.pkl"):
-    print call
-    print
-  print "=====================================\n"
+    print(call)
+    print()
+  print("=====================================\n")
 
   # Recreate class from log and debug experiment
   debugExperiment("callLog.pkl")

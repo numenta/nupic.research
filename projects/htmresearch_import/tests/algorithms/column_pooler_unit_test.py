@@ -60,13 +60,13 @@ class ColumnPoolerTest(unittest.TestCase):
                      "Incorrect number of inputs")
 
     self.assertEqual(
-      pooler.numberOfProximalSynapses(range(2048)),
+      pooler.numberOfProximalSynapses(list(range(2048))),
       0,
       "Should be no synapses on initialization"
     )
 
     self.assertEqual(
-      pooler.numberOfConnectedProximalSynapses(range(2048)),
+      pooler.numberOfConnectedProximalSynapses(list(range(2048))),
       0,
       "Should be no connected synapses on initialization"
     )
@@ -111,7 +111,7 @@ class ColumnPoolerTest(unittest.TestCase):
 
 
     # Get initial activity
-    pooler.compute(feedforwardInput=range(0, 40), learn=True)
+    pooler.compute(feedforwardInput=list(range(0, 40)), learn=True)
     self.assertEqual(len(pooler.getActiveCells()), 40,
                      "Incorrect number of active cells")
     objectSDR = set(pooler.getActiveCells())
@@ -132,7 +132,7 @@ class ColumnPoolerTest(unittest.TestCase):
 
     # As multiple different feedforward inputs come in, the same set of cells
     # should be active.
-    pooler.compute(feedforwardInput=range(100, 140), learn=True)
+    pooler.compute(feedforwardInput=list(range(100, 140)), learn=True)
     self.assertEqual(objectSDR, set(pooler.getActiveCells()),
                      "Activity is not consistent for same input")
 
@@ -161,7 +161,7 @@ class ColumnPoolerTest(unittest.TestCase):
     # In "learn new object mode", given a familiar feedforward input after reset
     # we should not get the same set of active cells
     pooler.reset()
-    pooler.compute(feedforwardInput=range(0, 40), learn=True)
+    pooler.compute(feedforwardInput=list(range(0, 40)), learn=True)
     self.assertNotEqual(objectSDR, set(pooler.getActiveCells()),
                "Activity should not be consistent for same input after reset")
     self.assertEqual(len(pooler.getActiveCells()), 40,
@@ -174,15 +174,15 @@ class ColumnPoolerTest(unittest.TestCase):
     pooler = self._initializeDefaultPooler()
 
     # Learn one pattern
-    pooler.compute(feedforwardInput=range(0, 40), learn=True)
+    pooler.compute(feedforwardInput=list(range(0, 40)), learn=True)
     objectSDR = set(pooler.getActiveCells())
 
     # Form internal distal connections
-    pooler.compute(feedforwardInput=range(0, 40), learn=True)
+    pooler.compute(feedforwardInput=list(range(0, 40)), learn=True)
 
     # Inferring on same pattern should lead to same result
     pooler.reset()
-    pooler.compute(feedforwardInput=range(0, 40), learn=False)
+    pooler.compute(feedforwardInput=list(range(0, 40)), learn=False)
     self.assertEqual(objectSDR, set(pooler.getActiveCells()),
                      "Inference on pattern after learning it is incorrect")
 
@@ -198,26 +198,26 @@ class ColumnPoolerTest(unittest.TestCase):
     pooler = self._initializeDefaultPooler()
 
     # Learn object one
-    pooler.compute(feedforwardInput=range(0, 40), learn=True)
+    pooler.compute(feedforwardInput=list(range(0, 40)), learn=True)
     object1SDR = set(pooler.getActiveCells())
 
-    pooler.compute(feedforwardInput=range(100, 140), learn=True)
+    pooler.compute(feedforwardInput=list(range(100, 140)), learn=True)
     self.assertEqual(object1SDR, set(pooler.getActiveCells()),
                      "Activity for second pattern is incorrect")
 
     # Learn object two
     pooler.reset()
-    pooler.compute(feedforwardInput=range(1000, 1040), learn=True)
+    pooler.compute(feedforwardInput=list(range(1000, 1040)), learn=True)
     object2SDR = set(pooler.getActiveCells())
 
-    pooler.compute(feedforwardInput=range(1100, 1140), learn=True)
+    pooler.compute(feedforwardInput=list(range(1100, 1140)), learn=True)
     self.assertEqual(object2SDR, set(pooler.getActiveCells()),
                      "Activity for second pattern is incorrect")
 
     # Inferring on patterns in first object should lead to same result, even
     # after gap
     pooler.reset()
-    pooler.compute(feedforwardInput=range(100, 140), learn=False)
+    pooler.compute(feedforwardInput=list(range(100, 140)), learn=False)
     self.assertEqual(object1SDR, set(pooler.getActiveCells()),
                      "Inference on pattern after learning it is incorrect")
 
@@ -227,14 +227,14 @@ class ColumnPoolerTest(unittest.TestCase):
                      "Inference doesn't maintain activity with no input.")
 
     pooler.reset()
-    pooler.compute(feedforwardInput=range(0, 40), learn=False)
+    pooler.compute(feedforwardInput=list(range(0, 40)), learn=False)
     self.assertEqual(object1SDR, set(pooler.getActiveCells()),
                      "Inference on pattern after learning it is incorrect")
 
     # Inferring on patterns in second object should lead to same result, even
     # after gap
     pooler.reset()
-    pooler.compute(feedforwardInput=range(1100, 1140), learn=False)
+    pooler.compute(feedforwardInput=list(range(1100, 1140)), learn=False)
     self.assertEqual(object2SDR, set(pooler.getActiveCells()),
                      "Inference on pattern after learning it is incorrect")
 
@@ -244,7 +244,7 @@ class ColumnPoolerTest(unittest.TestCase):
                      "Inference doesn't maintain activity with no input.")
 
     pooler.reset()
-    pooler.compute(feedforwardInput=range(1000, 1040), learn=False)
+    pooler.compute(feedforwardInput=list(range(1000, 1040)), learn=False)
     self.assertEqual(object2SDR, set(pooler.getActiveCells()),
                      "Inference on pattern after learning it is incorrect")
 
@@ -263,7 +263,7 @@ class ColumnPoolerTest(unittest.TestCase):
       synPermProximalDec=0,
     )
 
-    feedforwardInput1 = range(10)
+    feedforwardInput1 = list(range(10))
 
     pooler.compute(feedforwardInput1, learn=True)
 
@@ -282,26 +282,26 @@ class ColumnPoolerTest(unittest.TestCase):
         self.assertAlmostEqual(perm, 0.60,
                                msg="Should use 'initialProximalPermanence'.")
 
-    pooler.compute(range(10, 20), learn=True)
+    pooler.compute(list(range(10, 20)), learn=True)
 
     for cell in pooler.getActiveCells():
       self.assertEqual(pooler.numberOfProximalSynapses([cell]), 20,
                        "Should connect to every active input bit.")
 
-    pooler.compute(range(15, 25), learn=True)
+    pooler.compute(list(range(15, 25)), learn=True)
 
     for cell in pooler.getActiveCells():
       self.assertEqual(pooler.numberOfProximalSynapses([cell]), 25,
                        ("Should connect to every active input bit "
                         "that it's not yet connected to."))
 
-    pooler.compute(range(0, 30), learn=True)
+    pooler.compute(list(range(0, 30)), learn=True)
 
     for cell in pooler.getActiveCells():
       self.assertEqual(pooler.numberOfProximalSynapses([cell]), 25,
                        "Should not grow more synapses if it had lots active.")
 
-    pooler.compute(range(23, 30), learn=True)
+    pooler.compute(list(range(23, 30)), learn=True)
 
     for cell in pooler.getActiveCells():
       self.assertEqual(pooler.numberOfProximalSynapses([cell]), 30,
@@ -323,7 +323,7 @@ class ColumnPoolerTest(unittest.TestCase):
       synPermProximalDec=0,
     )
 
-    feedforwardInput1 = range(10)
+    feedforwardInput1 = list(range(10))
 
     pooler.compute(feedforwardInput1, learn=True)
 
@@ -342,19 +342,19 @@ class ColumnPoolerTest(unittest.TestCase):
         self.assertAlmostEqual(perm, 0.60,
                                msg="Should use 'initialProximalPermanence'.")
 
-    pooler.compute(range(30), learn=True)
+    pooler.compute(list(range(30)), learn=True)
 
     for cell in pooler.getActiveCells():
       self.assertEqual(pooler.numberOfProximalSynapses([cell]), 30,
                        "Should grow synapses to every unsynapsed active bit.")
 
-    pooler.compute(range(25, 30), learn=True)
+    pooler.compute(list(range(25, 30)), learn=True)
 
     for cell in pooler.getActiveCells():
       self.assertEqual(pooler.numberOfProximalSynapses([cell]), 30,
                        "Every bit is synapsed so nothing else should grow.")
 
-    pooler.compute(range(125, 130), learn=True)
+    pooler.compute(list(range(125, 130)), learn=True)
 
     for cell in pooler.getActiveCells():
       self.assertEqual(pooler.numberOfProximalSynapses([cell]), 35,
@@ -376,7 +376,7 @@ class ColumnPoolerTest(unittest.TestCase):
       sampleSizeProximal=10,
     )
 
-    feedforwardInput = range(10)
+    feedforwardInput = list(range(10))
 
     pooler.compute(feedforwardInput, learn=True)
 
@@ -407,11 +407,11 @@ class ColumnPoolerTest(unittest.TestCase):
     )
 
     # Grow some synapses.
-    pooler.compute(range(0, 10), learn=True)
-    pooler.compute(range(10, 20), learn=True)
+    pooler.compute(list(range(0, 10)), learn=True)
+    pooler.compute(list(range(10, 20)), learn=True)
 
     # Reinforce some of them.
-    pooler.compute(range(0, 15), learn=True)
+    pooler.compute(list(range(0, 15)), learn=True)
 
     activeCells = pooler.getActiveCells()
     self.assertEqual(len(activeCells), 40)
@@ -425,14 +425,14 @@ class ColumnPoolerTest(unittest.TestCase):
       (presynapticCells,
        permanences) = pooler.proximalPermanences.rowNonZeros(cell)
 
-      d = dict(zip(presynapticCells, permanences))
-      for presynapticCell in xrange(0, 15):
+      d = dict(list(zip(presynapticCells, permanences)))
+      for presynapticCell in range(0, 15):
         perm = d[presynapticCell]
         self.assertAlmostEqual(
           perm, 0.55,
           msg=("Should have permanence of 'initialProximalPermanence'"
                " + 'synPermProximalInc'."))
-      for presynapticCell in xrange(15, 20):
+      for presynapticCell in range(15, 20):
         perm = d[presynapticCell]
         self.assertAlmostEqual(
           perm, 0.45,
@@ -455,10 +455,10 @@ class ColumnPoolerTest(unittest.TestCase):
     )
 
     # Grow some synapses.
-    pooler.compute(range(0, 10), learn=True)
+    pooler.compute(list(range(0, 10)), learn=True)
 
     # Punish some of them.
-    pooler.compute(range(0, 5), learn=True)
+    pooler.compute(list(range(0, 5)), learn=True)
 
     activeCells = pooler.getActiveCells()
     self.assertEqual(len(activeCells), 40)
@@ -473,13 +473,13 @@ class ColumnPoolerTest(unittest.TestCase):
       (presynapticCells,
        permanences) = pooler.proximalPermanences.rowNonZeros(cell)
 
-      d = dict(zip(presynapticCells, permanences))
-      for presynapticCell in xrange(0, 5):
+      d = dict(list(zip(presynapticCells, permanences)))
+      for presynapticCell in range(0, 5):
         perm = d[presynapticCell]
         self.assertAlmostEqual(
           perm, 0.55,
           msg="Should have permanence of 'initialProximalPermanence'")
-      for presynapticCell in xrange(5, 10):
+      for presynapticCell in range(5, 10):
         perm = d[presynapticCell]
         self.assertAlmostEqual(
           perm, 0.45,
@@ -495,8 +495,8 @@ class ColumnPoolerTest(unittest.TestCase):
     pooler = self._initializeDefaultPooler(lateralInputWidths=[512])
 
     # Object 1
-    lateralInput1 = range(100, 140)
-    pooler.compute(range(0, 40), [lateralInput1], learn=True)
+    lateralInput1 = list(range(100, 140))
+    pooler.compute(list(range(0, 40)), [lateralInput1], learn=True)
 
     # Get initial SDR for first object from pooler.
     activeCells = pooler.getActiveCells()
@@ -512,7 +512,7 @@ class ColumnPoolerTest(unittest.TestCase):
 
     # When the cells have been active for another timestep, they should grow
     # internal distal connections, using a new segment on each cell.
-    pooler.compute(range(40, 80), [lateralInput1], learn=True)
+    pooler.compute(list(range(40, 80)), [lateralInput1], learn=True)
     self.assertEqual(pooler.numberOfDistalSegments(activeCells),
                      80,
                      "Incorrect number of segments after learning")
@@ -523,12 +523,12 @@ class ColumnPoolerTest(unittest.TestCase):
     # Cells corresponding to that initial SDR should continue to learn new
     # synapses on that same set of segments. There should be no segments on any
     # other cells.
-    pooler.compute(range(80, 120), [lateralInput1], learn=True)
+    pooler.compute(list(range(80, 120)), [lateralInput1], learn=True)
 
     self.assertEqual(pooler.numberOfDistalSegments(activeCells),
                      80,
                      "Incorrect number of segments after learning")
-    self.assertEqual(pooler.numberOfDistalSegments(range(2048)),
+    self.assertEqual(pooler.numberOfDistalSegments(list(range(2048))),
                      80,
                      "Extra segments on other cells after learning")
     self.assertEqual(pooler.numberOfDistalSynapses(activeCells),
@@ -538,8 +538,8 @@ class ColumnPoolerTest(unittest.TestCase):
 
     # Object 2
     pooler.reset()
-    lateralInput2 = range(200, 240)
-    pooler.compute(range(120, 160), [lateralInput2], learn=True)
+    lateralInput2 = list(range(200, 240))
+    pooler.compute(list(range(120, 160)), [lateralInput2], learn=True)
 
     # Get initial SDR for second object from pooler.
     activeCellsObject2 = set(pooler.getActiveCells())
@@ -559,7 +559,7 @@ class ColumnPoolerTest(unittest.TestCase):
 
     # When the cells have been active for another timestep, they should grow
     # internal distal connections, using a new segment on each cell.
-    pooler.compute(range(160, 200), [lateralInput2], learn=True)
+    pooler.compute(list(range(160, 200)), [lateralInput2], learn=True)
     self.assertEqual(pooler.numberOfDistalSegments(uniqueCellsObject2),
                      len(uniqueCellsObject2)*2,
                      "Incorrect number of segments after learning")
@@ -570,7 +570,7 @@ class ColumnPoolerTest(unittest.TestCase):
     # Cells corresponding to that initial SDR should continue to learn new
     # synapses on that same set of segments. There should be no segments on any
     # other cells.
-    pooler.compute(range(200, 240), [lateralInput2], learn=True)
+    pooler.compute(list(range(200, 240)), [lateralInput2], learn=True)
     self.assertEqual(pooler.numberOfDistalSegments(uniqueCellsObject2),
                      len(uniqueCellsObject2)*2,
                      "Incorrect number of segments after learning")
@@ -592,8 +592,8 @@ class ColumnPoolerTest(unittest.TestCase):
     # Object 1 = union(range(0,40), range(40,80), range(80,120))
     # Object 2 = union(range(120, 160), range(160,200), range(200,240))
     feedforwardInputs = [
-      [range(0, 40), range(40, 80), range(80, 120)],
-      [range(120, 160), range(160, 200), range(200, 240)]
+      [list(range(0, 40)), list(range(40, 80)), list(range(80, 120))],
+      [list(range(120, 160)), list(range(160, 200)), list(range(200, 240))]
     ]
 
     # Lateral representations:
@@ -602,13 +602,13 @@ class ColumnPoolerTest(unittest.TestCase):
     # Object 1, Col 2 = range(100,140)
     # Object 2, Col 2 = range(140,180)
     objectLateralInputs = [
-      [range(200, 240), range(100, 140)],  # Object 1
-      [range(240, 280), range(140, 180)],  # Object 2
+      [list(range(200, 240)), list(range(100, 140))],  # Object 1
+      [list(range(240, 280)), list(range(140, 180))],  # Object 2
     ]
 
     # Train pooler on two objects, three iterations per object
     objectRepresentations = []
-    for obj in xrange(2):
+    for obj in range(2):
       pooler.reset()
       for i in range(3): # three iterations
         for f in range(3): # three features per object
@@ -724,8 +724,8 @@ class ColumnPoolerTest(unittest.TestCase):
     # Object 1 = union(range(0,40), range(40,80), range(80,120))
     # Object 2 = union(range(120, 160), range(160,200), range(200,240))
     feedforwardInputs = [
-      [range(0, 40), range(40, 80), range(80, 120)],
-      [range(120, 160), range(160, 200), range(200, 240)]
+      [list(range(0, 40)), list(range(40, 80)), list(range(80, 120))],
+      [list(range(120, 160)), list(range(160, 200)), list(range(200, 240))]
     ]
 
     # Lateral representations:
@@ -734,8 +734,8 @@ class ColumnPoolerTest(unittest.TestCase):
     # Object 1, Col 2 = range(100,140)
     # Object 2, Col 2 = range(140,180)
     objectLateralInputs = [
-      [range(200, 240), range(100, 140)],  # Object 1
-      [range(240, 280), range(140, 180)],  # Object 2
+      [list(range(200, 240)), list(range(100, 140))],  # Object 1
+      [list(range(240, 280)), list(range(140, 180))],  # Object 2
     ]
 
     # Train pooler on two objects. For each object we go through three

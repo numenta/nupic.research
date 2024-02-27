@@ -156,7 +156,7 @@ def createRandomObjects(numObjects,
 
   # Return sequences of random feature-location pairs.  Each sequence will
   # contain a number of pairs defined by 'numPointsPerObject'
-  return zip(*[iter(randomFeatureLocPairs)] * numPointsPerObject)
+  return list(zip(*[iter(randomFeatureLocPairs)] * numPointsPerObject))
 
 
 
@@ -177,13 +177,13 @@ def createRandomObjectsSharedPairs(numObjects,
 
   objects = []
   objectsSets = set()
-  for _ in xrange(numObjects):
+  for _ in range(numObjects):
     objectLocations = np.random.choice(locations, numPointsPerObject,
                                        replace=False)
     objectFeatures = np.random.choice(features, numPointsPerObject,
                                       replace=True)
 
-    o = zip(objectLocations, objectFeatures)
+    o = list(zip(objectLocations, objectFeatures))
 
     # Make sure this is a unique object.
     objectAsSet = frozenset(o)
@@ -226,7 +226,7 @@ def testNetworkWithOneObject(objects, exp, testObject, numTestPoints):
 
   for step, pair in enumerate(testPairs):
     (locationIdx, featureIdx) = pair
-    for colIdx in xrange(exp.numColumns):
+    for colIdx in range(exp.numColumns):
       feature = objects.features[colIdx][featureIdx]
       location = objects.locations[colIdx][locationIdx]
 
@@ -235,7 +235,7 @@ def testNetworkWithOneObject(objects, exp, testObject, numTestPoints):
 
     exp.network.run(1)
 
-    for colIdx in xrange(exp.numColumns):
+    for colIdx in range(exp.numColumns):
       numL2ActiveCells[step] += float(len(exp.getL2Representations()[colIdx]))
       numL4ActiveCells[step] += float(len(exp.getL4Representations()[colIdx]))
 
@@ -285,11 +285,11 @@ def testOnSingleRandomSDR(objects, exp, numRepeats=100, repeatID=0):
   numConnectedDistal = columnPooler.numberOfConnectedDistalSynapses()
 
   result = None
-  for i in xrange(numRepeats):
+  for i in range(numRepeats):
     targetObject = np.random.choice(np.arange(numObjects))
 
     nonTargetObjs = np.array(
-      [obj for obj in xrange(numObjects) if obj != targetObject]
+      [obj for obj in range(numObjects) if obj != targetObject]
     )
 
     overlap, numActiveL2Cells, numL4ActiveCells = testNetworkWithOneObject(
@@ -683,7 +683,7 @@ def runExperiment1(numObjects=2,
   l4Params["sampleSize"] = int(2 * l4Params["activationThreshold"])
 
   for sampleSize in sampleSizeRange:
-    print "sampleSize: {}".format(sampleSize)
+    print("sampleSize: {}".format(sampleSize))
     l2Params['sampleSizeProximal'] = sampleSize
     expName = "capacity_varying_object_size_synapses_{}".format(sampleSize)
     runCapacityTestVaryingObjectSize(numObjects,
@@ -751,13 +751,13 @@ def runExperiment2(numCorticalColumns=DEFAULT_NUM_CORTICAL_COLUMNS,
                   'uniquePairs': True,}
 
   for sampleSize in sampleSizeRange:
-    print "sampleSize: {}".format(sampleSize)
+    print("sampleSize: {}".format(sampleSize))
     l2Params['sampleSizeProximal'] = sampleSize
     expName = "capacity_varying_object_num_synapses_{}".format(sampleSize)
 
-    print "l4Params: "
+    print("l4Params: ")
     pprint(l4Params)
-    print "l2Params: "
+    print("l2Params: ")
     pprint(l2Params)
 
     runCapacityTestVaryingObjectNum(numPointsPerObject,
@@ -784,7 +784,7 @@ def runExperiment2(numCorticalColumns=DEFAULT_NUM_CORTICAL_COLUMNS,
 
   legendEntries = []
   for sampleSize in sampleSizeRange:
-    print "sampleSize: {}".format(sampleSize)
+    print("sampleSize: {}".format(sampleSize))
     l2Params['sampleSizeProximal'] = sampleSize
     expName = "capacity_varying_object_num_synapses_{}".format(sampleSize)
 
@@ -858,9 +858,9 @@ def runExperiment3(numCorticalColumns=DEFAULT_NUM_CORTICAL_COLUMNS,
                     'numLocations': DEFAULT_NUM_LOCATIONS,
                     'uniquePairs': True,}
 
-    print "l4Params: "
+    print("l4Params: ")
     pprint(l4Params)
-    print "l2Params: "
+    print("l2Params: ")
     pprint(l2Params)
 
     expname = "multiple_column_capacity_varying_object_num_synapses_{}_thresh_{}_l4column_{}".format(
@@ -964,9 +964,9 @@ def runExperiment4(resultDirName=DEFAULT_RESULT_DIR_NAME,
                     'numLocations': DEFAULT_NUM_LOCATIONS,
                     'uniquePairs': True,}
 
-    print "l4Params: "
+    print("l4Params: ")
     pprint(l4Params)
-    print "l2Params: "
+    print("l2Params: ")
     pprint(l2Params)
 
     expName = "multiple_column_capacity_varying_object_num_synapses_{}_thresh_{}_l4column_{}_l2column_{}".format(
@@ -1071,9 +1071,9 @@ def runExperiment5(resultDirName=DEFAULT_RESULT_DIR_NAME,
                     'numLocations': DEFAULT_NUM_LOCATIONS,
                     'uniquePairs': True,}
 
-    print "l4Params: "
+    print("l4Params: ")
     pprint(l4Params)
-    print "l2Params: "
+    print("l2Params: ")
     pprint(l2Params)
 
     expName = "multiple_column_capacity_varying_object_num_synapses_{}_thresh_{}_l2Cells_{}_l2column_{}".format(
@@ -1183,9 +1183,9 @@ def runExperiment6(resultDirName=DEFAULT_RESULT_DIR_NAME,
                     'numLocations': DEFAULT_NUM_LOCATIONS,
                     'uniquePairs': True,}
 
-    print "l4Params: "
+    print("l4Params: ")
     pprint(l4Params)
-    print "l2Params: "
+    print("l2Params: ")
     pprint(l2Params)
 
     expName = "multiple_column_capacity_varying_object_sdrSize_{}_l2Cells_{}_l2column_{}".format(
@@ -1288,9 +1288,9 @@ def runExperiment7(numCorticalColumns=DEFAULT_NUM_CORTICAL_COLUMNS,
       'uniquePairs': False
     }
 
-    print "l4Params: "
+    print("l4Params: ")
     pprint(l4Params)
-    print "l2Params: "
+    print("l2Params: ")
     pprint(l2Params)
 
     expname = "multiple_column_capacity_varying_object_num_locations_{}_num_features_{}_l4column_{}".format(
@@ -1396,9 +1396,9 @@ def runExperiment8(numCorticalColumns=DEFAULT_NUM_CORTICAL_COLUMNS,
       'uniquePairs': False
     }
 
-    print "l4Params: "
+    print("l4Params: ")
     pprint(l4Params)
-    print "l2Params: "
+    print("l2Params: ")
     pprint(l2Params)
 
     expname = "multiple_column_capacity_varying_object_num_locations_{}_num_features_{}_l4column_{}".format(
@@ -1468,7 +1468,7 @@ def runExperiment9(resultDirName=DEFAULT_RESULT_DIR_NAME,
 
   numPointsPerObject = 10
   numRpts = 3
-  objectNumRange = range(10, 1000, 50)
+  objectNumRange = list(range(10, 1000, 50))
 
   l4Params = getL4Params()
   l2Params = getL2Params()
@@ -1515,7 +1515,7 @@ def runExperiment9(resultDirName=DEFAULT_RESULT_DIR_NAME,
                         'numLocations': DEFAULT_NUM_LOCATIONS,
                         'uniquePairs': True,}
 
-        print "Experiment Params: "
+        print("Experiment Params: ")
         pprint(expParam)
 
         expName = "multiple_column_capacity_varying_object_num_synapses_{}_thresh_{}_l4column_{}_l2column_{}_{}".format(
@@ -1640,9 +1640,9 @@ def runExperiment10(numCorticalColumns=DEFAULT_NUM_CORTICAL_COLUMNS,
                     'numLocations': DEFAULT_NUM_LOCATIONS,
                     'uniquePairs': True,}
 
-    print "l4Params: "
+    print("l4Params: ")
     pprint(l4Params)
-    print "l2Params: "
+    print("l2Params: ")
     pprint(l2Params)
 
     expname = "multiple_column_capacity_varying_object_num_synapses_{}_thresh_{}_l4column_{}_l2cell_{}".format(

@@ -67,7 +67,7 @@ class PhysicalObjectsTest(unittest.TestCase):
     box = Box(dimensions=[10, 20, 30, 40], dimension=4)
     cube = Cube(width=20, dimension=2)
 
-    for i in xrange(50):
+    for i in range(50):
       self.assertTrue(sphere.contains(sphere.sampleLocation()))
       self.assertTrue(cylinder.contains(cylinder.sampleLocation()))
       self.assertTrue(box.contains(box.sampleLocation()))
@@ -95,10 +95,10 @@ class PhysicalObjectsTest(unittest.TestCase):
     objects.append(Cube(width=20, dimension=3))
     numPoints = 500
 
-    for i in xrange(4):
+    for i in range(4):
       fig = plt.figure()
       ax = fig.add_subplot(111, projection='3d')
-      for _ in xrange(numPoints):
+      for _ in range(numPoints):
         x, y, z = tuple(objects[i].sampleLocation())
         ax.scatter(x, y, z)
 
@@ -119,12 +119,12 @@ class PhysicalObjectsTest(unittest.TestCase):
     objects.append(Cube(width=20, dimension=3))
     numPoints = 500
 
-    for i in xrange(4):
+    for i in range(4):
 
       for feature in objects[i].features:
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-        for _ in xrange(numPoints):
+        for _ in range(numPoints):
           x, y, z = tuple(objects[i].sampleLocationFromFeature(feature))
           ax.scatter(x, y, z)
 

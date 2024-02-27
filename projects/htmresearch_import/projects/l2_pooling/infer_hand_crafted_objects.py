@@ -32,7 +32,7 @@ from htmresearch.frameworks.layers.sensor_placement import greedySensorPositions
 
 FEATURES = ("A", "B")
 
-LOCATIONS = tuple(xrange(9))
+LOCATIONS = tuple(range(9))
 
 # Every object shares 3 feature-locations with every other object.
 OBJECTS = {"Object 1": ("A", "A", "A",
@@ -52,14 +52,14 @@ TIMESTEPS_PER_SENSATION = 3
 
 def experiment(numColumns, sampleSize):
   locationSDRsByColumn = [dict((name,
-                                set(random.sample(xrange(1024), 40)))
+                                set(random.sample(range(1024), 40)))
                                for name in LOCATIONS)
-                          for _ in xrange(numColumns)]
+                          for _ in range(numColumns)]
 
   featureSDRsByColumn = [dict((name,
-                               set(random.sample(xrange(1024), 40)))
+                               set(random.sample(range(1024), 40)))
                               for name in FEATURES)
-                         for _ in xrange(numColumns)]
+                         for _ in range(numColumns)]
 
   exp = L4L2Experiment(
     "Hello",
@@ -74,9 +74,9 @@ def experiment(numColumns, sampleSize):
                          [dict((column,
                                 (locationSDRsByColumn[column][location],
                                  featureSDRsByColumn[column][features[location]]))
-                               for column in xrange(numColumns))
+                               for column in range(numColumns))
                           for location in LOCATIONS])
-                        for objectName, features in OBJECTS.iteritems()))
+                        for objectName, features in OBJECTS.items()))
 
   objectName = "Object 1"
   features = OBJECTS[objectName]
@@ -89,23 +89,23 @@ def experiment(numColumns, sampleSize):
       (column,
        (locationSDRsByColumn[column][sensorPositions[column]],
         featureSDRsByColumn[column][features[sensorPositions[column]]]))
-      for column in xrange(numColumns))
+      for column in range(numColumns))
     exp.infer([sensation]*TIMESTEPS_PER_SENSATION,
               reset=False, objectName=objectName)
 
     touchCount += 1
 
     if exp.getL2Representations() == inferredL2:
-      print "Inferred object after %d touches" % touchCount
+      print("Inferred object after %d touches" % touchCount)
       return touchCount
 
     if touchCount >= 60:
-      print "Never inferred object"
+      print("Never inferred object")
       return None
 
 
 def go():
-  numColumnsOptions = range(1, len(LOCATIONS) + 1)
+  numColumnsOptions = list(range(1, len(LOCATIONS) + 1))
   configs = (
     ("Placeholder 13", 13),
     ("Placeholder 20", 20),
@@ -117,24 +117,24 @@ def go():
 
   for config in configs:
     _, sampleSize = config
-    print "sampleSize %d" % sampleSize
+    print("sampleSize %d" % sampleSize)
 
     for numColumns in numColumnsOptions:
-      print "%d columns" % numColumns
+      print("%d columns" % numColumns)
 
-      for _ in xrange(10):
+      for _ in range(10):
         numTouches = experiment(numColumns, sampleSize)
         numTouchesLog[(numColumns, config)].append(numTouches)
 
   averages = dict((k,
                    sum(numsTouches) / float(len(numsTouches)))
-                  for k, numsTouches in numTouchesLog.iteritems())
+                  for k, numsTouches in numTouchesLog.items())
 
   plt.figure()
-  colorList = dict(zip(configs,
-                       ('r', 'k', 'g', 'b')))
-  markerList = dict(zip(configs,
-                        ('o', '*', 'D', 'x')))
+  colorList = dict(list(zip(configs,
+                       ('r', 'k', 'g', 'b'))))
+  markerList = dict(list(zip(configs,
+                        ('o', '*', 'D', 'x'))))
 
   for config in configs:
     plt.plot(numColumnsOptions,

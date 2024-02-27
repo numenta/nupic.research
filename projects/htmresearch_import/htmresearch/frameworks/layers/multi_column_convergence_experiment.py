@@ -24,7 +24,7 @@ convergence of L4-L2 as you increase the number of columns under various
 scenarios.
 """
 
-import cPickle
+import pickle
 from multiprocessing import Pool
 import random
 import time
@@ -116,8 +116,8 @@ def runExperiment(args):
                                     numFeatures=numFeatures)
 
   r = objects.objectConfusion()
-  print "Average common pairs in objects=", r[0],
-  print ", locations=",r[1],", features=",r[2]
+  print("Average common pairs in objects=", r[0], end=' ')
+  print(", locations=",r[1],", features=",r[2])
 
   # print "Total number of objects created:",len(objects.getObjects())
   # print "Objects are:"
@@ -172,7 +172,7 @@ def runExperiment(args):
         random.shuffle(objectCopy)
         for c in range(numColumns):
           # stay multiple steps on each sensation
-          for _ in xrange(settlingTime):
+          for _ in range(settlingTime):
             objectSensations[c].append(objectCopy[c])
 
     else:
@@ -183,7 +183,7 @@ def runExperiment(args):
       random.shuffle(objectCopy)
       for pair in objectCopy:
         # stay multiple steps on each sensation
-        for _ in xrange(settlingTime):
+        for _ in range(settlingTime):
           objectSensations[0].append(pair)
 
     inferConfig = {
@@ -221,11 +221,11 @@ def runExperiment(args):
   classificationAccuracy = float(numCorrectClassifications) / numObjects
   classificationPerSensation = classificationPerSensation / numObjects
 
-  print "# objects {} # features {} # locations {} # columns {} trial # {} network type {}".format(
-    numObjects, numFeatures, numLocations, numColumns, trialNum, networkType)
-  print "Average convergence point=",convergencePoint
-  print "Classification accuracy=",classificationAccuracy
-  print
+  print("# objects {} # features {} # locations {} # columns {} trial # {} network type {}".format(
+    numObjects, numFeatures, numLocations, numColumns, trialNum, networkType))
+  print("Average convergence point=",convergencePoint)
+  print("Classification accuracy=",classificationAccuracy)
+  print()
 
   # Return our convergence point as well as all the parameters and objects
   args.update({"objects": objects.getObjects()})
@@ -308,7 +308,7 @@ def runExperimentPool(numObjects,
                          }
               )
   numExperiments = len(args)
-  print "{} experiments to run, {} workers".format(numExperiments, numWorkers)
+  print("{} experiments to run, {} workers".format(numExperiments, numWorkers))
   # Run the pool
   if numWorkers > 1:
     pool = Pool(processes=numWorkers)
@@ -316,7 +316,7 @@ def runExperimentPool(numObjects,
     while not rs.ready():
       remaining = rs._number_left
       pctDone = 100.0 - (100.0*remaining) / numExperiments
-      print "    =>", remaining, "experiments remaining, percent complete=",pctDone
+      print("    =>", remaining, "experiments remaining, percent complete=",pctDone)
       time.sleep(5)
     pool.close()  # No more work
     pool.join()
@@ -331,7 +331,7 @@ def runExperimentPool(numObjects,
 
   # Pickle results for later use
   with open(resultsName,"wb") as f:
-    cPickle.dump(result,f)
+    pickle.dump(result,f)
 
   return result
 

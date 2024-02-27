@@ -297,7 +297,7 @@ class L4L2Experiment(object):
     self.L4Regions = []
     self.L2Regions = []
 
-    for i in xrange(self.numColumns):
+    for i in range(self.numColumns):
       self.sensorInputs.append(
         self.network.regions["sensorInput_" + str(i)].getSelf()
       )
@@ -318,7 +318,7 @@ class L4L2Experiment(object):
     self.objectL2Representations = {}
     self.objectL2RepresentationsMatrices = [
       SparseMatrix(0, self.config["L2Params"]["cellCount"])
-      for _ in xrange(self.numColumns)]
+      for _ in range(self.numColumns)]
     self.objectNameToIndex = {}
     self.resetStatistics()
 
@@ -367,7 +367,7 @@ class L4L2Experiment(object):
     """
     self._setLearningMode()
 
-    for objectName, sensationList in objects.iteritems():
+    for objectName, sensationList in objects.items():
 
       # ignore empty sensation lists
       if len(sensationList) == 0:
@@ -378,9 +378,9 @@ class L4L2Experiment(object):
 
       for sensations in sensationList:
         # learn each pattern multiple times
-        for _ in xrange(self.numLearningPoints):
+        for _ in range(self.numLearningPoints):
 
-          for col in xrange(self.numColumns):
+          for col in range(self.numColumns):
             location, feature = sensations[col]
             self.sensorInputs[col].addDataToQueue(list(feature), 0, 0)
             self.externalInputs[col].addDataToQueue(list(location), 0, 0)
@@ -447,7 +447,7 @@ class L4L2Experiment(object):
     for sensations in sensationList:
 
       # feed all columns with sensations
-      for col in xrange(self.numColumns):
+      for col in range(self.numColumns):
         location, feature = sensations[col]
         self.sensorInputs[col].addDataToQueue(list(feature), 0, 0)
         self.externalInputs[col].addDataToQueue(list(location), 0, 0)
@@ -497,7 +497,7 @@ class L4L2Experiment(object):
     """
     Sends a reset signal to the network.
     """
-    for col in xrange(self.numColumns):
+    for col in range(self.numColumns):
       self.sensorInputs[col].addResetToQueue(sequenceId)
       self.externalInputs[col].addResetToQueue(sequenceId)
     self.network.run(1)
@@ -542,7 +542,7 @@ class L4L2Experiment(object):
     stats = self.statistics[experimentID]
     objectName = stats["object"]
 
-    for i in xrange(self.numColumns):
+    for i in range(self.numColumns):
       if not onePlot:
         plt.figure()
 
@@ -554,7 +554,7 @@ class L4L2Experiment(object):
       # format
       plt.legend(loc="upper right")
       plt.xlabel("Sensation #")
-      plt.xticks(range(stats["numSteps"]))
+      plt.xticks(list(range(stats["numSteps"])))
       plt.ylabel("Number of active bits")
       plt.ylim(plt.ylim()[0] - 5, plt.ylim()[1] + 5)
       plt.title("Object inference for object {}".format(objectName))
@@ -619,7 +619,7 @@ class L4L2Experiment(object):
 
       # For each L2 column locate convergence time
       convergencePoint = 0.0
-      for key in stats.iterkeys():
+      for key in stats.keys():
         if prefix in key:
           inferenceLength = len(stats[key])
           columnConvergence = L4L2Experiment._locateConvergencePoint(
@@ -649,9 +649,9 @@ class L4L2Experiment(object):
              If set to True, the profiling will be reset.
 
     """
-    print "Profiling information for {}".format(type(self).__name__)
+    print("Profiling information for {}".format(type(self).__name__))
     totalTime = 0.000001
-    for region in self.network.regions.values():
+    for region in list(self.network.regions.values()):
       timer = region.getComputeTimer()
       totalTime += timer.getElapsed()
 
@@ -679,13 +679,13 @@ class L4L2Experiment(object):
 
     profileInfo.append(
       ["Total time", "", totalTime, "100.0", totalTime / count])
-    print tabulate(profileInfo, headers=["Region", "Count",
+    print(tabulate(profileInfo, headers=["Region", "Count",
                                          "Elapsed", "Pct of total",
                                          "Secs/iteration"],
-                   tablefmt="grid", floatfmt="6.3f")
-    print
-    print "Total time in L2 =", L2Time
-    print "Total time in L4 =", L4Time
+                   tablefmt="grid", floatfmt="6.3f"))
+    print()
+    print("Total time in L2 =", L2Time)
+    print("Total time in L4 =", L4Time)
 
     if reset:
       self.resetProfile()
@@ -788,10 +788,10 @@ class L4L2Experiment(object):
     if minOverlap is None:
       minOverlap = sdrSize / 2
 
-    for objectName, objectSdr in self.objectL2Representations.iteritems():
+    for objectName, objectSdr in self.objectL2Representations.items():
       count = 0
       score = 0.0
-      for col in xrange(self.numColumns):
+      for col in range(self.numColumns):
         # Ignore inactive column
         if len(l2sdr[col]) == 0:
           continue
@@ -835,7 +835,7 @@ class L4L2Experiment(object):
       maxL2Size = 1.5*sdrSize
 
     numCorrectClassifications = 0
-    for col in xrange(self.numColumns):
+    for col in range(self.numColumns):
       overlapWithObject = len(objectRepresentation[col] & L2Representation[col])
 
       if ( overlapWithObject >= minOverlap  and
@@ -1002,7 +1002,7 @@ class L4L2Experiment(object):
     L4PredictedCells = self.getL4PredictedCells()
     L2Representation = self.getL2Representations()
 
-    for i in xrange(self.numColumns):
+    for i in range(self.numColumns):
       statistics["L4 Representation C" + str(i)].append(
         len(L4Representations[i])
       )

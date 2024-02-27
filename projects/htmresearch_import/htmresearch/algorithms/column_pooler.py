@@ -462,7 +462,7 @@ class ColumnPooler(object):
             Indices of the cells. If None return count for all cells.
     """
     if cells is None:
-      cells = xrange(self.numberOfCells())
+      cells = range(self.numberOfCells())
 
     return _countWhereGreaterEqualInRows(self.proximalPermanences, cells,
                                          self.connectedPermanenceProximal)
@@ -478,7 +478,7 @@ class ColumnPooler(object):
             Indices of the cells. If None return count for all cells.
     """
     if cells is None:
-      cells = xrange(self.numberOfCells())
+      cells = range(self.numberOfCells())
 
     n = 0
     for cell in cells:
@@ -498,7 +498,7 @@ class ColumnPooler(object):
             Indices of the cells
     """
     if cells is None:
-      cells = xrange(self.numberOfCells())
+      cells = range(self.numberOfCells())
 
     n = 0
 
@@ -523,7 +523,7 @@ class ColumnPooler(object):
             Indices of the cells. If None return count for all cells.
     """
     if cells is None:
-      cells = xrange(self.numberOfCells())
+      cells = range(self.numberOfCells())
 
     n = _countWhereGreaterEqualInRows(self.internalDistalPermanences, cells,
                                       self.connectedPermanenceDistal)
@@ -545,7 +545,7 @@ class ColumnPooler(object):
             Indices of the cells
     """
     if cells is None:
-      cells = xrange(self.numberOfCells())
+      cells = range(self.numberOfCells())
     n = 0
     for cell in cells:
       n += self.internalDistalPermanences.nNonZerosOnRow(cell)

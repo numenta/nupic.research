@@ -26,7 +26,7 @@ or adjust the confusion between objects.
 
 import os
 import numpy
-import cPickle
+import pickle
 from multiprocessing import cpu_count
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -55,9 +55,9 @@ def plotConvergenceByColumn(results, columnRange, featureRange, numTrials):
   convergence /= numTrials
   # For each column, print convergence as fct of number of unique features
   for c in range(1, max(columnRange) + 1):
-    print c, convergence[:, c]
+    print(c, convergence[:, c])
   # Print everything anyway for debugging
-  print "Average convergence array=", convergence
+  print("Average convergence array=", convergence)
   ########################################################################
   #
   # Create the plot. x-axis=
@@ -68,8 +68,8 @@ def plotConvergenceByColumn(results, columnRange, featureRange, numTrials):
   colorList = ['r', 'b', 'g', 'm', 'c', 'k', 'y']
   for i in range(len(featureRange)):
     f = featureRange[i]
-    print columnRange
-    print convergence[f-1,columnRange]
+    print(columnRange)
+    print(convergence[f-1,columnRange])
     legendList.append('Unique features={}'.format(f))
     plt.plot(columnRange, convergence[f-1,columnRange],
              color=colorList[i])
@@ -77,7 +77,7 @@ def plotConvergenceByColumn(results, columnRange, featureRange, numTrials):
   plt.legend(legendList, loc="upper right")
   plt.xlabel("Number of columns")
   plt.xticks(columnRange)
-  plt.yticks(range(0,int(convergence.max())+1))
+  plt.yticks(list(range(0,int(convergence.max())+1)))
   plt.ylabel("Average number of touches")
   plt.title("Number of touches to recognize one object (multiple columns)")
     # save
@@ -116,8 +116,8 @@ def plotConvergenceByObject(results, objectRange, featureRange):
 
   for i in range(len(featureRange)):
     f = featureRange[i]
-    print "features={} objectRange={} convergence={}".format(
-      f,objectRange, convergence[f-1,objectRange])
+    print("features={} objectRange={} convergence={}".format(
+      f,objectRange, convergence[f-1,objectRange]))
     legendList.append('Unique features={}'.format(f))
     plt.plot(objectRange, convergence[f-1,objectRange],
              color=colorList[i])
@@ -125,8 +125,8 @@ def plotConvergenceByObject(results, objectRange, featureRange):
   # format
   plt.legend(legendList, loc="lower right", prop={'size':10})
   plt.xlabel("Number of objects in training set")
-  plt.xticks(range(0,max(objectRange)+1,10))
-  plt.yticks(range(0,int(convergence.max())+2))
+  plt.xticks(list(range(0,max(objectRange)+1,10)))
+  plt.yticks(list(range(0,int(convergence.max())+2)))
   plt.ylabel("Average number of touches")
   plt.title("Number of touches to recognize one object (single column)")
 
@@ -168,8 +168,8 @@ def plotConvergenceByObjectMultiColumn(results, objectRange, columnRange):
 
   for i in range(len(columnRange)):
     c = columnRange[i]
-    print "columns={} objectRange={} convergence={}".format(
-      c, objectRange, convergence[c-1,objectRange])
+    print("columns={} objectRange={} convergence={}".format(
+      c, objectRange, convergence[c-1,objectRange]))
     if c == 1:
       legendList.append('1 column')
     else:
@@ -180,8 +180,8 @@ def plotConvergenceByObjectMultiColumn(results, objectRange, columnRange):
   # format
   plt.legend(legendList, loc="upper left", prop={'size':10})
   plt.xlabel("Number of objects in training set")
-  plt.xticks(range(0,max(objectRange)+1,10))
-  plt.yticks(range(0,int(convergence.max())+2))
+  plt.xticks(list(range(0,max(objectRange)+1,10)))
+  plt.yticks(list(range(0,int(convergence.max())+2)))
   plt.ylabel("Average number of touches")
   plt.title("Object recognition with multiple columns (unique features = 5)")
 
@@ -235,7 +235,7 @@ if __name__ == "__main__":
 
     # Analyze results
     with open("object_convergence_results.pkl","rb") as f:
-      results = cPickle.load(f)
+      results = pickle.load(f)
 
     plotConvergenceByObject(results, objectRange, featureRange)
 
@@ -263,6 +263,6 @@ if __name__ == "__main__":
 
     # Analyze results
     with open("object_convergence_multi_column_results.pkl","rb") as f:
-      results = cPickle.load(f)
+      results = pickle.load(f)
 
     plotConvergenceByObjectMultiColumn(results, objectRange, columnRange)

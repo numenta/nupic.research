@@ -114,7 +114,7 @@ class Sphere(PhysicalObject):
     In the case of a sphere, there is only one feature.
     """
     if feature == "surface":
-      coordinates = [random.gauss(0, 1.) for _ in xrange(self.dimension)]
+      coordinates = [random.gauss(0, 1.) for _ in range(self.dimension)]
       norm = sqrt(sum([coord ** 2 for coord in coordinates]))
       return [self.radius * coord / norm for coord in coordinates]
     elif feature == "random":
@@ -450,7 +450,7 @@ class Box(PhysicalObject):
     the other dimensions' values.
     """
     coordinates = [random.uniform(-1, 1) * dim / 2. for dim in self.dimensions]
-    dim = random.choice(range(self.dimension))
+    dim = random.choice(list(range(self.dimension)))
     coordinates[dim] = self.dimensions[dim] / 2. * random.choice([-1, 1])
     return coordinates
 
@@ -460,7 +460,7 @@ class Box(PhysicalObject):
     We start by sampling dimensions to "max out", then sample the sign and
     the other dimensions' values.
     """
-    dimensionsToChooseFrom = range(self.dimension)
+    dimensionsToChooseFrom = list(range(self.dimension))
     random.shuffle(dimensionsToChooseFrom)
     dim1, dim2 = dimensionsToChooseFrom[0], dimensionsToChooseFrom[1]
     coordinates = [random.uniform(-1, 1) * dim / 2. for dim in self.dimensions]
@@ -614,7 +614,7 @@ class PlyModel(PhysicalObject):
       self.faces = self.model['face']
     except IOError as e:
       print("Something went wrong!")
-      print("Please check if file exists at {}".format(file))
+      print(("Please check if file exists at {}".format(file)))
       raise IOError
     self.graphicsWindow = None
     self.mesh = None
@@ -680,7 +680,7 @@ class PlyModel(PhysicalObject):
       if np.allclose(location, V, rtol=1.e-3):
         return "vertex"
     for face in self.faces:
-      edges = np.choose(np.array(list(combinations(range(3),2))), self.vertices[face])
+      edges = np.choose(np.array(list(combinations(list(range(3)),2))), self.vertices[face])
       for edge in edges:
         if self._containsOnEdge(location, edge):
           return "edge"
@@ -705,18 +705,18 @@ class PlyModel(PhysicalObject):
     if feature == "surface":
       return self.sampleLocationFromFeature('face') # Temporary workaround for surfaces
     elif feature=="face":
-      indx = self.rng.choice(range(self.faces.count))
+      indx = self.rng.choice(list(range(self.faces.count)))
       rndFace = self.faces[indx]
       return self._sampleLocationOnFace(rndFace)
 
     elif feature == "edge":
-      indx = self.rng.choice(range(self.faces.count))
+      indx = self.rng.choice(list(range(self.faces.count)))
       rndFace = self.faces[indx]
       rndVertices = self.rng.sample(self.vertices[rndFace],2)
       return self._sampleLocationOnEdge(rndVertices)
 
     elif feature == "vertex":
-      rndVertexIndx = self.rng.choice(range(self.vertices.count))
+      rndVertexIndx = self.rng.choice(list(range(self.vertices.count)))
       return np.array(self.vertices[rndVertexIndx].tolist())
 
     elif feature == "surface":

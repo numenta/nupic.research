@@ -67,7 +67,7 @@ def noisy(pattern, noiseLevel, totalNumCells):
 
   noised.difference_update(random.sample(noised, n))
 
-  for _ in xrange(n):
+  for _ in range(n):
     while True:
       v = random.randint(0, totalNumCells - 1)
       if v not in pattern and v not in noised:
@@ -98,11 +98,11 @@ def createRandomObjects(numObjects, locationsPerObject, featurePoolSize):
   Location 1, Feature 2 at location 2, etc.
   """
 
-  allFeatures = range(featurePoolSize)
-  allLocations = range(locationsPerObject)
+  allFeatures = list(range(featurePoolSize))
+  allLocations = list(range(locationsPerObject))
   objects = dict((name,
-                     [random.choice(allFeatures) for _ in xrange(locationsPerObject)])
-                    for name in xrange(numObjects))
+                     [random.choice(allFeatures) for _ in range(locationsPerObject)])
+                    for name in range(numObjects))
 
   return objects
 
@@ -138,11 +138,11 @@ def doExperiment(numColumns, objects, l2Overrides, noiseLevels, numInitialTraver
   Whether to use a noisy location
   """
 
-  featureSDR = lambda : set(random.sample(xrange(NUM_L4_COLUMNS), 40))
-  locationSDR = lambda : set(random.sample(xrange(1024), 40))
+  featureSDR = lambda : set(random.sample(range(NUM_L4_COLUMNS), 40))
+  locationSDR = lambda : set(random.sample(range(1024), 40))
 
-  featureSDRsByColumn = [defaultdict(featureSDR) for _ in xrange(numColumns)]
-  locationSDRsByColumn = [defaultdict(locationSDR) for _ in xrange(numColumns)]
+  featureSDRsByColumn = [defaultdict(featureSDR) for _ in range(numColumns)]
+  locationSDRsByColumn = [defaultdict(locationSDR) for _ in range(numColumns)]
 
   exp = L4L2Experiment(
     "Experiment",
@@ -157,15 +157,15 @@ def doExperiment(numColumns, objects, l2Overrides, noiseLevels, numInitialTraver
           [dict((column,
                  (locationSDRsByColumn[column][location],
                   featureSDRsByColumn[column][features[location]]))
-                for column in xrange(numColumns))
-           for location in xrange(len(features))])
-         for objectName, features in objects.iteritems()))
+                for column in range(numColumns))
+           for location in range(len(features))])
+         for objectName, features in objects.items()))
 
   results = defaultdict(list)
 
   for noiseLevel in noiseLevels:
     # Try to infer the objects
-    for objectName, features in objects.iteritems():
+    for objectName, features in objects.items():
       exp.sendReset()
 
       inferredL2 = exp.objectL2Representations[objectName]
@@ -180,14 +180,14 @@ def doExperiment(numColumns, objects, l2Overrides, noiseLevels, numInitialTraver
       numInitialTouches = int(math.ceil(numInitialTraversals * numTouchesPerTraversal))
       numTestTouches = len(features)
 
-      for touch in xrange(numInitialTouches + numTestTouches):
+      for touch in range(numInitialTouches + numTestTouches):
         sensorPositions = next(sensorPositionsIterator)
 
         sensation = dict(
           (column,
            (locationSDRsByColumn[column][sensorPositions[column]],
             featureSDRsByColumn[column][features[sensorPositions[column]]]))
-          for column in xrange(1, numColumns))
+          for column in range(1, numColumns))
 
         # Add noise to the first column.
         featureSDR = featureSDRsByColumn[0][features[sensorPositions[0]]]
@@ -225,22 +225,22 @@ def logCellActivity_noisyFeature_varyNumColumns(name="cellActivity"):
 
   results = defaultdict(list)
 
-  for trial in xrange(1):
-    print "trial", trial
+  for trial in range(1):
+    print("trial", trial)
 
     objects = createRandomObjects(10, 10, 10)
 
     for numColumns in columnCounts:
-      print "numColumns", numColumns
+      print("numColumns", numColumns)
       r = doExperiment(numColumns, objects, l2Overrides, noiseLevels,
                        numInitialTraversals=6, noisyFeature=True,
                        noisyLocation=False)
 
-      for noiseLevel, counts in r.iteritems():
+      for noiseLevel, counts in r.items():
         results[(numColumns, noiseLevel)].extend(counts)
 
   d = []
-  for (numColumns, noiseLevel), cellCounts in results.iteritems():
+  for (numColumns, noiseLevel), cellCounts in results.items():
     d.append({"numColumns": numColumns,
               "noiseLevel": noiseLevel,
               "results": cellCounts})
@@ -251,8 +251,8 @@ def logCellActivity_noisyFeature_varyNumColumns(name="cellActivity"):
   with open(filename, "w") as fout:
     json.dump(d, fout)
 
-  print "Wrote to", filename
-  print "Visualize this file at: http://numenta.github.io/htmresearch/visualizations/grid-of-scatterplots/L2-columns-with-noise.html"
+  print("Wrote to", filename)
+  print("Visualize this file at: http://numenta.github.io/htmresearch/visualizations/grid-of-scatterplots/L2-columns-with-noise.html")
 
 
 def logCellActivity_noisyLocation_varyNumColumns(name, objects):
@@ -267,19 +267,19 @@ def logCellActivity_noisyLocation_varyNumColumns(name, objects):
 
   results = defaultdict(list)
 
-  for trial in xrange(1):
-    print "trial", trial
+  for trial in range(1):
+    print("trial", trial)
 
     for numColumns in columnCounts:
-      print "numColumns", numColumns
+      print("numColumns", numColumns)
       r = doExperiment(numColumns, objects, l2Overrides, noiseLevels, numInitialTraversals=6,
                        noisyFeature=False, noisyLocation=True)
 
-      for noiseLevel, counts in r.iteritems():
+      for noiseLevel, counts in r.items():
         results[(numColumns, noiseLevel)].extend(counts)
 
   d = []
-  for (numColumns, noiseLevel), cellCounts in results.iteritems():
+  for (numColumns, noiseLevel), cellCounts in results.items():
     d.append({"numColumns": numColumns,
               "noiseLevel": noiseLevel,
               "results": cellCounts})
@@ -290,8 +290,8 @@ def logCellActivity_noisyLocation_varyNumColumns(name, objects):
   with open(filename, "w") as fout:
     json.dump(d, fout)
 
-  print "Wrote to", filename
-  print "Visualize this file at: http://numenta.github.io/htmresearch/visualizations/grid-of-scatterplots/L2-columns-with-noise.html"
+  print("Wrote to", filename)
+  print("Visualize this file at: http://numenta.github.io/htmresearch/visualizations/grid-of-scatterplots/L2-columns-with-noise.html")
 
 
 
@@ -305,7 +305,7 @@ if __name__ == "__main__":
   # cells inhibit cells that shouldn't be active, but it doesn't help increase
   # the number of correctly active cells. So the accuracy of inference is
   # improved, but the confidence of the inference isn't.
-  print "Test: Noisy L4 minicolumn SDR"
+  print("Test: Noisy L4 minicolumn SDR")
   logCellActivity_noisyFeature_varyNumColumns(name="noisyFeatureSDR")
 
 

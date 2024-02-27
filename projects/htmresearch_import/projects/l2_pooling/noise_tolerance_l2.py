@@ -50,10 +50,10 @@ def createRandomObjectDescriptions(numObjects,
            "Object 2": [(0, "C"), (1, "A"), (2, "B"), ...]}
   """
   return dict(("Object %d" % i,
-               zip(xrange(numLocationsPerObject),
+               list(zip(list(range(numLocationsPerObject)),
                    [random.choice(featurePool)
-                    for _ in xrange(numLocationsPerObject)]))
-              for i in xrange(1, numObjects + 1))
+                    for _ in range(numLocationsPerObject)])))
+              for i in range(1, numObjects + 1))
 
 
 def noisy(pattern, noiseLevel, totalNumCells):
@@ -81,7 +81,7 @@ def noisy(pattern, noiseLevel, totalNumCells):
 
   noised.difference_update(random.sample(noised, n))
 
-  for _ in xrange(n):
+  for _ in range(n):
     while True:
       v = random.randint(0, totalNumCells - 1)
       if v not in pattern and v not in noised:
@@ -128,9 +128,9 @@ def doExperiment(numColumns, l2Overrides, objectDescriptions, noiseMu,
   """
 
   # For each column, keep a mapping from feature-location names to their SDRs
-  layer4sdr = lambda : np.array(sorted(random.sample(xrange(L4_CELL_COUNT),
+  layer4sdr = lambda : np.array(sorted(random.sample(range(L4_CELL_COUNT),
                                                      40)), dtype="uint32")
-  featureLocationSDRs = [defaultdict(layer4sdr) for _ in xrange(numColumns)]
+  featureLocationSDRs = [defaultdict(layer4sdr) for _ in range(numColumns)]
 
   params = {"inputWidth": L4_CELL_COUNT,
             "lateralInputWidths": [4096]*(numColumns-1),
@@ -138,15 +138,15 @@ def doExperiment(numColumns, l2Overrides, objectDescriptions, noiseMu,
   params.update(l2Overrides)
 
   l2Columns = [ColumnPooler(**params)
-               for _ in xrange(numColumns)]
+               for _ in range(numColumns)]
 
   # Learn the objects
   objectL2Representations = {}
-  for objectName, featureLocations in  objectDescriptions.iteritems():
+  for objectName, featureLocations in  objectDescriptions.items():
     for featureLocationName in featureLocations:
       # Touch it enough times for the distal synapses to reach the
       # connected permanence, and then once more.
-      for _ in xrange(4):
+      for _ in range(4):
         allLateralInputs = [l2.getActiveCells() for l2 in l2Columns]
         for columnNumber, l2 in enumerate(l2Columns):
           feedforwardInput = featureLocationSDRs[columnNumber][featureLocationName]
@@ -162,7 +162,7 @@ def doExperiment(numColumns, l2Overrides, objectDescriptions, noiseMu,
   results = []
 
   # Try to infer the objects
-  for objectName, featureLocations in objectDescriptions.iteritems():
+  for objectName, featureLocations in objectDescriptions.items():
     for l2 in l2Columns:
       l2.reset()
 
@@ -180,12 +180,12 @@ def doExperiment(numColumns, l2Overrides, objectDescriptions, noiseMu,
     else:
       numTestTouches = len(featureLocations)
 
-    for touch in xrange(numInitialTouches + numTestTouches):
+    for touch in range(numInitialTouches + numTestTouches):
       sensorPositions = next(sensorPositionsIterator)
 
       # Give the system a few timesteps to settle, allowing lateral connections
       # to cause cells to be inhibited.
-      for _ in xrange(3):
+      for _ in range(3):
         allLateralInputs = [l2.getActiveCells() for l2 in l2Columns]
         for columnNumber, l2 in enumerate(l2Columns):
           position = sensorPositions[columnNumber]
@@ -227,18 +227,18 @@ def plotSuccessRate_varyNumColumns(noiseSigma, noiseEverywhere):
   #
   # Run the experiment
   #
-  noiseLevels = [x * 0.01 for x in xrange(0, 101, 5)]
+  noiseLevels = [x * 0.01 for x in range(0, 101, 5)]
   l2Overrides = {"sampleSizeDistal": 20}
   columnCounts = [1, 2, 3, 4]
 
   results = defaultdict(list)
 
-  for trial in xrange(1):
-    print "trial", trial
+  for trial in range(1):
+    print("trial", trial)
     objectDescriptions = createRandomObjectDescriptions(10, 10)
 
     for numColumns in columnCounts:
-      print "numColumns", numColumns
+      print("numColumns", numColumns)
       for noiseLevel in noiseLevels:
         r = doExperiment(numColumns, l2Overrides, objectDescriptions,
                          noiseLevel, noiseSigma, numInitialTraversals=6,
@@ -252,10 +252,10 @@ def plotSuccessRate_varyNumColumns(noiseSigma, noiseEverywhere):
   numIncorrectActiveThreshold = 10
 
   plt.figure()
-  colors = dict(zip(columnCounts,
-                    ('r', 'k', 'g', 'b')))
-  markers = dict(zip(columnCounts,
-                     ('o', '*', 'D', 'x')))
+  colors = dict(list(zip(columnCounts,
+                    ('r', 'k', 'g', 'b'))))
+  markers = dict(list(zip(columnCounts,
+                     ('o', '*', 'D', 'x'))))
 
   for numColumns in columnCounts:
     y = []
@@ -274,7 +274,7 @@ def plotSuccessRate_varyNumColumns(noiseSigma, noiseEverywhere):
                      for numColumns in columnCounts],
                     bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0)
   plt.xlabel("Mean feedforward noise level")
-  plt.xticks([0.01 * n for n in xrange(0, 101, 10)])
+  plt.xticks([0.01 * n for n in range(0, 101, 10)])
   plt.ylabel("Success rate")
   plt.yticks([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
   plt.title("Inference with normally distributed noise (stdev=%.2f)" % noiseSigma)
@@ -283,7 +283,7 @@ def plotSuccessRate_varyNumColumns(noiseSigma, noiseEverywhere):
                           "successRate_varyColumnCount_sigma%.2f_%s.pdf"
                           % (noiseSigma, time.strftime("%Y%m%d-%H%M%S")))
   plt.savefig(plotPath, bbox_extra_artists=(lgnd,), bbox_inches="tight")
-  print "Saved file %s" % plotPath
+  print("Saved file %s" % plotPath)
 
 
 def plotSuccessRate_varyDistalSampleSize(noiseSigma, noiseEverywhere):
@@ -294,19 +294,19 @@ def plotSuccessRate_varyDistalSampleSize(noiseSigma, noiseEverywhere):
   #
   # Run the experiment
   #
-  noiseLevels = [x * 0.01 for x in xrange(0, 101, 5)]
+  noiseLevels = [x * 0.01 for x in range(0, 101, 5)]
   noiseSigma = 0.1
   sampleSizes = [13, 20, 30, 40]
   numColumns = 3
 
   results = defaultdict(list)
 
-  for trial in xrange(1):
-    print "trial", trial
+  for trial in range(1):
+    print("trial", trial)
     objectDescriptions = createRandomObjectDescriptions(10, 10)
 
     for sampleSizeDistal in sampleSizes:
-      print "sampleSizeDistal", sampleSizeDistal
+      print("sampleSizeDistal", sampleSizeDistal)
       l2Overrides = {"sampleSizeDistal": sampleSizeDistal}
       for noiseLevel in noiseLevels:
         r = doExperiment(numColumns, l2Overrides, objectDescriptions,
@@ -321,10 +321,10 @@ def plotSuccessRate_varyDistalSampleSize(noiseSigma, noiseEverywhere):
   numIncorrectActiveThreshold = 10
 
   plt.figure()
-  colorList = dict(zip(sampleSizes,
-                       ('r', 'k', 'g', 'b')))
-  markerList = dict(zip(sampleSizes,
-                        ('o', '*', 'D', 'x')))
+  colorList = dict(list(zip(sampleSizes,
+                       ('r', 'k', 'g', 'b'))))
+  markerList = dict(list(zip(sampleSizes,
+                        ('o', '*', 'D', 'x'))))
 
   for sampleSizeDistal in sampleSizes:
     y = []
@@ -343,7 +343,7 @@ def plotSuccessRate_varyDistalSampleSize(noiseSigma, noiseEverywhere):
                      for sampleSizeDistal in sampleSizes],
                     bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0)
   plt.xlabel("Mean feedforward noise level")
-  plt.xticks([0.01 * n for n in xrange(0, 101, 10)])
+  plt.xticks([0.01 * n for n in range(0, 101, 10)])
   plt.ylabel("Success rate")
   plt.yticks([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
   plt.title("Inference with normally distributed noise (stdev=0.1)")
@@ -352,7 +352,7 @@ def plotSuccessRate_varyDistalSampleSize(noiseSigma, noiseEverywhere):
                           "successRate_varyDistalSampleSize_sigma%.2f_%s.pdf"
                           % (noiseSigma, time.strftime("%Y%m%d-%H%M%S")))
   plt.savefig(plotPath, bbox_extra_artists=(lgnd,), bbox_inches="tight")
-  print "Saved file %s" % plotPath
+  print("Saved file %s" % plotPath)
 
 
 def plotSuccessRate_varyProximalSampleSize(noiseSigma, noiseEverywhere):
@@ -363,19 +363,19 @@ def plotSuccessRate_varyProximalSampleSize(noiseSigma, noiseEverywhere):
   #
   # Run the experiment
   #
-  noiseLevels = [x * 0.01 for x in xrange(0, 101, 5)]
+  noiseLevels = [x * 0.01 for x in range(0, 101, 5)]
   noiseSigma = 0.1
   sampleSizes = [13, 20, 30, 40]
   numColumns = 3
 
   results = defaultdict(list)
 
-  for trial in xrange(1):
-    print "trial", trial
+  for trial in range(1):
+    print("trial", trial)
     objectDescriptions = createRandomObjectDescriptions(10, 10)
 
     for sampleSizeProximal in sampleSizes:
-      print "sampleSizeProximal", sampleSizeProximal
+      print("sampleSizeProximal", sampleSizeProximal)
       l2Overrides = {"sampleSizeProximal": sampleSizeProximal}
       for noiseLevel in noiseLevels:
         r = doExperiment(numColumns, l2Overrides, objectDescriptions,
@@ -390,10 +390,10 @@ def plotSuccessRate_varyProximalSampleSize(noiseSigma, noiseEverywhere):
   numIncorrectActiveThreshold = 10
 
   plt.figure()
-  colorList = dict(zip(sampleSizes,
-                       ('r', 'k', 'g', 'b')))
-  markerList = dict(zip(sampleSizes,
-                        ('o', '*', 'D', 'x')))
+  colorList = dict(list(zip(sampleSizes,
+                       ('r', 'k', 'g', 'b'))))
+  markerList = dict(list(zip(sampleSizes,
+                        ('o', '*', 'D', 'x'))))
 
   for sampleSizeProximal in sampleSizes:
     y = []
@@ -412,7 +412,7 @@ def plotSuccessRate_varyProximalSampleSize(noiseSigma, noiseEverywhere):
                      for sampleSizeProximal in sampleSizes],
                     bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0)
   plt.xlabel("Mean feedforward noise level")
-  plt.xticks([0.01 * n for n in xrange(0, 101, 10)])
+  plt.xticks([0.01 * n for n in range(0, 101, 10)])
   plt.ylabel("Success rate")
   plt.yticks([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
   plt.title("Inference with normally distributed noise (stdev=0.1)")
@@ -421,7 +421,7 @@ def plotSuccessRate_varyProximalSampleSize(noiseSigma, noiseEverywhere):
                           "successRate_varyProximalSampleSize_sigma%.2f_%s.pdf"
                           % (noiseSigma, time.strftime("%Y%m%d-%H%M%S")))
   plt.savefig(plotPath, bbox_extra_artists=(lgnd,), bbox_inches="tight")
-  print "Saved file %s" % plotPath
+  print("Saved file %s" % plotPath)
 
 
 def logCellActivity_varyNumColumns(noiseSigma, noiseEverywhere):
@@ -436,12 +436,12 @@ def logCellActivity_varyNumColumns(noiseSigma, noiseEverywhere):
 
   results = defaultdict(list)
 
-  for trial in xrange(1):
-    print "trial", trial
+  for trial in range(1):
+    print("trial", trial)
     objectDescriptions = createRandomObjectDescriptions(10, 10)
 
     for numColumns in columnCounts:
-      print "numColumns", numColumns
+      print("numColumns", numColumns)
       for noiseLevel in noiseLevels:
         r = doExperiment(numColumns, l2Overrides, objectDescriptions,
                          noiseLevel, noiseSigma, numInitialTraversals=6,
@@ -449,7 +449,7 @@ def logCellActivity_varyNumColumns(noiseSigma, noiseEverywhere):
         results[(numColumns, noiseLevel)].extend(r)
 
   d = []
-  for (numColumns, noiseLevel), cellCounts in results.iteritems():
+  for (numColumns, noiseLevel), cellCounts in results.items():
     d.append({"numColumns": numColumns,
               "noiseLevel": noiseLevel,
               "results": cellCounts})
@@ -460,8 +460,8 @@ def logCellActivity_varyNumColumns(noiseSigma, noiseEverywhere):
   with open(filename, "w") as fout:
     json.dump(d, fout)
 
-  print "Wrote to", filename
-  print "Visualize this file at: http://numenta.github.io/htmresearch/visualizations/grid-of-scatterplots/L2-columns-with-noise.html"
+  print("Wrote to", filename)
+  print("Visualize this file at: http://numenta.github.io/htmresearch/visualizations/grid-of-scatterplots/L2-columns-with-noise.html")
 
 
 

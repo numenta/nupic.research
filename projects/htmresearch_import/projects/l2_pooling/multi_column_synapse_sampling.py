@@ -32,7 +32,7 @@ import os
 import pprint
 import numpy as np
 import pandas as pd
-import cPickle
+import pickle
 from multiprocessing import Pool
 import matplotlib.pyplot as plt
 plt.ion()
@@ -187,7 +187,7 @@ def runExperiment(args):
       # stay multiple steps on each sensation
       sensations = []
       for pair in objectCopy:
-        for _ in xrange(2):
+        for _ in range(2):
           sensations.append(pair)
       objectSensations[c] = sensations
 
@@ -208,12 +208,12 @@ def runExperiment(args):
     args.update({"L2TimeInfer": L2TimeInfer})
 
   convergencePoint, _ = exp.averageConvergencePoint("L2 Representation", 40, 40)
-  print "objectSeed {} # distal syn {} # proximal syn {}, " \
+  print("objectSeed {} # distal syn {} # proximal syn {}, " \
         "# convergence point={:4.2f} train time {:4.3f} infer time {:4.3f}".format(
     objectSeed,
     l2Params["sampleSizeDistal"],
     l2Params["sampleSizeProximal"],
-    convergencePoint, L2TimeLearn, L2TimeInfer)
+    convergencePoint, L2TimeLearn, L2TimeInfer))
 
   # Return our convergence point as well as all the parameters and objects
   args.update({"objects": objects.getObjects()})
@@ -252,7 +252,7 @@ def getProfileInfo(exp):
   """
 
   totalTime = 0.000001
-  for region in exp.network.regions.values():
+  for region in list(exp.network.regions.values()):
     timer = region.getComputeTimer()
     totalTime += timer.getElapsed()
 
@@ -351,7 +351,7 @@ def experimentVaryingDistalSynapseNumber(expParams):
                 'numFeature_{}_numColumn_{}'.format(expParams['numFeatures'],
                                                     expParams['numColumns'])
   with open(resultsName,"wb") as f:
-    cPickle.dump(result, f)
+    pickle.dump(result, f)
   return result
 
 
@@ -370,7 +370,7 @@ def experimentVaryingProximalSynapseNumber(expParams):
                 'numFeature_{}_numColumn_{}'.format(expParams['numFeatures'],
                                                     expParams['numColumns'])
   with open(resultsName,"wb") as f:
-    cPickle.dump(result, f)
+    pickle.dump(result, f)
 
 
 def plotDistalSynSamplingResult():
@@ -381,7 +381,7 @@ def plotDistalSynSamplingResult():
                   'numFeature_{}_numColumn_{}'.format(expParams['numFeatures'],
                                                       numColumns)
     with open(resultsName, "rb") as f:
-      results = cPickle.load(f)
+      results = pickle.load(f)
 
     df = convertResultsToDataFrames(results)
 
@@ -435,7 +435,7 @@ def plotProximalSynSamplingResult():
                   'numFeature_{}_numColumn_{}'.format(expParams['numFeatures'],
                                                       numColumns)
     with open(resultsName, "rb") as f:
-      results = cPickle.load(f)
+      results = pickle.load(f)
 
     df = convertResultsToDataFrames(results)
 

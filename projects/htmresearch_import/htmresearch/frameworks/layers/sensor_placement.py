@@ -46,9 +46,9 @@ def greedySensorPositions(numSensors, numLocations):
 
   locationViewCounts = [0] * numLocations
   locationViewCountsBySensor = [[0] * numLocations
-                                for _ in xrange(numSensors)]
+                                for _ in range(numSensors)]
 
-  placement = random.sample(xrange(numLocations), numSensors)
+  placement = random.sample(range(numLocations), numSensors)
 
   while True:
     yield tuple(placement)
@@ -59,14 +59,14 @@ def greedySensorPositions(numSensors, numLocations):
       locationViewCountsBySensor[sensor][location] += 1
 
     # Choose the locations with the lowest view counts. Break ties randomly.
-    nextLocationsRanked = sorted(xrange(numLocations),
+    nextLocationsRanked = sorted(range(numLocations),
                                  key=lambda x: (locationViewCounts[x],
                                                 random.random()))
     nextLocations = nextLocationsRanked[:numSensors]
 
     # For each sensor (in random order), choose the location that has touched
     # the least, breaking ties randomly.
-    sensors = range(numSensors)
+    sensors = list(range(numSensors))
     random.shuffle(sensors)
     for sensor in sensors:
       viewCount = min(locationViewCountsBySensor[sensor][location]

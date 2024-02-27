@@ -36,7 +36,7 @@ def createThreeObjects():
 
   :return:   (list(list(tuple))  List of lists of feature / location pairs.
   """
-  objectA = zip(range(10), range(10))
+  objectA = list(zip(list(range(10)), list(range(10))))
   objectB = [(0, 0), (2, 2), (1, 1), (1, 4), (4, 2), (4, 1)]
   objectC = [(0, 0), (1, 1), (3, 1), (0, 1)]
   return [objectA, objectB, objectC]
@@ -81,7 +81,7 @@ def runSharedFeatures(noiseLevel=None, profile=False):
     "numSteps": 10,
     "noiseLevel": noiseLevel,
     "pairs": {
-      0: zip(range(10), range(10))
+      0: list(zip(list(range(10)), list(range(10))))
     }
   }
 
@@ -135,7 +135,7 @@ def runUncertainLocations(missingLoc=None, profile=False):
 
   # create pairs with missing locations
   objectA = objects[0]
-  for key, val in missingLoc.iteritems():
+  for key, val in missingLoc.items():
     objectA[key] = (val, key)
 
   inferConfig = {

@@ -248,7 +248,7 @@ def plotL2ObjectRepresentations(exp1):
   }
   plotPath = plotly.offline.plot(fig, filename='plots/shapes-rectangle.html',
                                   auto_open=True)
-  print "url=", plotPath
+  print("url=", plotPath)
 
   # Can't save image files in offline mode
   plotly.plotly.image.save_as(
@@ -299,9 +299,9 @@ if __name__ == "__main__":
     seed=1
   )
 
-  print "train single column "
+  print("train single column ")
   exp1.learnObjects(objectsSingleColumn)
-  print "train multi-column "
+  print("train multi-column ")
   exp3.learnObjects(objects)
 
   # test on the first object
@@ -319,21 +319,21 @@ if __name__ == "__main__":
     # stay multiple steps on each sensation
     sensations = []
     for pair in objectCopy:
-      for _ in xrange(numRptsPerSensation):
+      for _ in range(numRptsPerSensation):
         sensations.append(pair)
     objectSensations[c] = sensations
 
   sensationStepsSingleColumn = []
   sensationStepsMultiColumn = []
-  for step in xrange(len(objectSensations[0])):
+  for step in range(len(objectSensations[0])):
     pairs = [
-      objectSensations[col][step] for col in xrange(numColumns)
+      objectSensations[col][step] for col in range(numColumns)
       ]
     sdrs = objectMachine._getSDRPairs(pairs)
     sensationStepsMultiColumn.append(sdrs)
     sensationStepsSingleColumn.append({0: sdrs[0]})
 
-  print "inference: multi-columns "
+  print("inference: multi-columns ")
   exp3.sendReset()
   l2ActiveCellsMultiColumn = []
   L2ActiveCellNVsTimeMultiColumn = []
@@ -345,7 +345,7 @@ if __name__ == "__main__":
       activeCellNum += len(exp3.getL2Representations()[c])
     L2ActiveCellNVsTimeMultiColumn.append(activeCellNum/numColumns)
 
-  print "inference: single column "
+  print("inference: single column ")
   exp1.sendReset()
   l2ActiveCellsSingleColumn = []
   L2ActiveCellNVsTimeSingleColumn = []
@@ -355,9 +355,9 @@ if __name__ == "__main__":
     L2ActiveCellNVsTimeSingleColumn.append(len(exp1.getL2Representations()[0]))
 
   # Used to figure out where to put the red rectangle!
-  print numFeatures
+  print(numFeatures)
   for i,sdrs in enumerate(l2ActiveCellsSingleColumn):
-    print i,len(l2ActiveCellsSingleColumn[i][0]),len(l2ActiveCellsMultiColumn[i][0])
+    print(i,len(l2ActiveCellsSingleColumn[i][0]),len(l2ActiveCellsMultiColumn[i][0]))
 
   plotActivity(l2ActiveCellsMultiColumn)
   plotActivity(l2ActiveCellsSingleColumn)

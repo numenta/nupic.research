@@ -321,7 +321,7 @@ class ExtensiveColumnPoolerTest(unittest.TestCase):
     self.learn(objectC, numRepetitions=3, randomOrder=True, newObject=True)
     representationC = self._getActiveRepresentation()
 
-    self.assertNotEquals(representationA, representationB, representationC)
+    self.assertNotEqual(representationA, representationB, representationC)
     # very small overlap
     self.assertLessEqual(len(representationA & representationB), 3)
     self.assertLessEqual(len(representationB & representationC), 3)
@@ -420,7 +420,7 @@ class ExtensiveColumnPoolerTest(unittest.TestCase):
     self.learn(objectC, numRepetitions=3, randomOrder=True, newObject=True)
     representationC = self._getActiveRepresentation()
 
-    self.assertNotEquals(representationA, representationB, representationC)
+    self.assertNotEqual(representationA, representationB, representationC)
     # very small overlap
     self.assertLessEqual(len(representationA & representationB), 3)
     self.assertLessEqual(len(representationB & representationC), 3)
@@ -509,7 +509,7 @@ class ExtensiveColumnPoolerTest(unittest.TestCase):
     """Infer an object after touching only ambiguous points."""
     self.init()
 
-    patterns = [self.generatePattern() for _ in xrange(3)]
+    patterns = [self.generatePattern() for _ in range(3)]
 
     objectA = [patterns[0], patterns[1]]
     objectB = [patterns[1], patterns[2]]
@@ -552,7 +552,7 @@ class ExtensiveColumnPoolerTest(unittest.TestCase):
       pooler.reset()
 
     for patterns in objectA:
-      for i in xrange(3):
+      for i in range(3):
         activeRepresentations = self._getActiveRepresentations()
 
         self.inferMultipleColumns(
@@ -600,7 +600,7 @@ class ExtensiveColumnPoolerTest(unittest.TestCase):
 
     # check inference for object A
     for patternsA in objectA:
-      for i in xrange(3):
+      for i in range(3):
         activeRepresentations = self._getActiveRepresentations()
         self.inferMultipleColumns(
           feedforwardPatterns=patternsA,
@@ -617,7 +617,7 @@ class ExtensiveColumnPoolerTest(unittest.TestCase):
 
     # check inference for object B
     for patternsB in objectB:
-      for i in xrange(3):
+      for i in range(3):
         activeRepresentations = self._getActiveRepresentations()
         self.inferMultipleColumns(
           feedforwardPatterns=patternsB,
@@ -670,7 +670,7 @@ class ExtensiveColumnPoolerTest(unittest.TestCase):
       pooler.reset()
 
     for patternsA in objectA:
-      for i in xrange(3):
+      for i in range(3):
         activeRepresentations = self._getActiveRepresentations()
         self.inferMultipleColumns(
           feedforwardPatterns=patternsA,
@@ -687,7 +687,7 @@ class ExtensiveColumnPoolerTest(unittest.TestCase):
 
     # check inference for object B
     for patternsB in objectB:
-      for i in xrange(3):
+      for i in range(3):
         activeRepresentations = self._getActiveRepresentations()
         self.inferMultipleColumns(
           feedforwardPatterns=patternsB,
@@ -780,7 +780,7 @@ class ExtensiveColumnPoolerTest(unittest.TestCase):
       pooler.reset()
 
     for patterns in objectA:
-      for i in xrange(3):
+      for i in range(3):
 
         # replace third pattern for column 2 by empty pattern
         if i == 2:
@@ -807,7 +807,7 @@ class ExtensiveColumnPoolerTest(unittest.TestCase):
     })
 
     objectA = self.generateObject(numPatterns=5)
-    lateralInputA = [[set()]] + [[self.generatePattern()] for _ in xrange(4)]
+    lateralInputA = [[set()]] + [[self.generatePattern()] for _ in range(4)]
     self.learn(objectA,
                lateralPatterns=lateralInputA,
                numRepetitions=3,
@@ -817,7 +817,7 @@ class ExtensiveColumnPoolerTest(unittest.TestCase):
 
     objectB = self.generateObject(numPatterns=5)
     objectB[3] = objectA[3]
-    lateralInputB = [[set()]] + [[self.generatePattern()] for _ in xrange(4)]
+    lateralInputB = [[set()]] + [[self.generatePattern()] for _ in range(4)]
     self.learn(objectB,
                lateralPatterns=lateralInputB,
                numRepetitions=3,
@@ -860,7 +860,7 @@ class ExtensiveColumnPoolerTest(unittest.TestCase):
     self.init(overrides={"lateralInputWidths": [self.inputWidth,
                                                 self.inputWidth]})
 
-    patterns = [self.generatePattern() for _ in xrange(3)]
+    patterns = [self.generatePattern() for _ in range(3)]
 
     objectA = [patterns[0], patterns[1]]
     objectB = [patterns[1], patterns[2]]
@@ -1145,11 +1145,11 @@ class ExtensiveColumnPoolerTest(unittest.TestCase):
       self.pooler.reset()
 
     # set-up
-    indices = range(len(feedforwardPatterns))
+    indices = list(range(len(feedforwardPatterns)))
     if lateralPatterns is None:
-      lateralPatterns = [[] for _ in xrange(len(feedforwardPatterns))]
+      lateralPatterns = [[] for _ in range(len(feedforwardPatterns))]
 
-    for _ in xrange(numRepetitions):
+    for _ in range(numRepetitions):
       if randomOrder:
         np.random.shuffle(indices)
 
@@ -1187,9 +1187,9 @@ class ExtensiveColumnPoolerTest(unittest.TestCase):
                         learn=False)
 
     if printMetrics:
-      print self.pooler.mmPrettyPrintMetrics(
+      print(self.pooler.mmPrettyPrintMetrics(
         self.pooler.mmGetDefaultMetrics()
-      )
+      ))
 
 
   # Helper functions
@@ -1210,12 +1210,12 @@ class ExtensiveColumnPoolerTest(unittest.TestCase):
     If numCols > 1 is given, a list of list of patterns will be returned.
     """
     if numCols == 1:
-      return [self.generatePattern() for _ in xrange(numPatterns)]
+      return [self.generatePattern() for _ in range(numPatterns)]
 
     else:
       patterns = []
-      for i in xrange(numPatterns):
-        patterns.append([self.generatePattern() for _ in xrange(numCols)])
+      for i in range(numPatterns):
+        patterns.append([self.generatePattern() for _ in range(numCols)])
       return patterns
 
 
@@ -1251,7 +1251,7 @@ class ExtensiveColumnPoolerTest(unittest.TestCase):
       # outputs an identical representation. Use random seed for now but ideally
       # we would set different specific seeds for each pooler
       params['seed']=0
-      self.poolers = [MonitoredColumnPooler(**params) for _ in xrange(numCols)]
+      self.poolers = [MonitoredColumnPooler(**params) for _ in range(numCols)]
 
 
   def _getActiveRepresentation(self):
@@ -1300,24 +1300,24 @@ class ExtensiveColumnPoolerTest(unittest.TestCase):
         pooler.reset()
 
     # use different set of pattern indices to allow random orders
-    indices = [range(len(feedforwardPatterns))] * len(self.poolers)
-    prevActiveCells = [set() for _ in xrange(len(self.poolers))]
+    indices = [list(range(len(feedforwardPatterns)))] * len(self.poolers)
+    prevActiveCells = [set() for _ in range(len(self.poolers))]
 
     # by default, all columns are neighbors
     if neighborsIndices is None:
       neighborsIndices = [
-        range(i) + range(i+1, len(self.poolers))
-        for i in xrange(len(self.poolers))
+        list(range(i)) + list(range(i+1, len(self.poolers)))
+        for i in range(len(self.poolers))
       ]
 
-    for _ in xrange(numRepetitions):
+    for _ in range(numRepetitions):
 
       # independently shuffle pattern orders if necessary
       if randomOrder:
         for idx in indices:
           np.random.shuffle(idx)
 
-      for i in xrange(len(indices[0])):
+      for i in range(len(indices[0])):
         # Train each column
         for col, pooler in enumerate(self.poolers):
           # get union of relevant lateral representations
@@ -1364,8 +1364,8 @@ class ExtensiveColumnPoolerTest(unittest.TestCase):
     # by default, all columns are neighbors
     if neighborsIndices is None:
       neighborsIndices = [
-        range(i) + range(i+1, len(self.poolers))
-        for i in xrange(len(self.poolers))
+        list(range(i)) + list(range(i+1, len(self.poolers)))
+        for i in range(len(self.poolers))
       ]
 
     for col, pooler in enumerate(self.poolers):
@@ -1380,9 +1380,9 @@ class ExtensiveColumnPoolerTest(unittest.TestCase):
 
     if printMetrics:
       for pooler in self.poolers:
-        print pooler.mmPrettyPrintMetrics(
+        print(pooler.mmPrettyPrintMetrics(
           pooler.mmGetDefaultMetrics()
-        )
+        ))
 
 
   def _getActiveRepresentations(self):

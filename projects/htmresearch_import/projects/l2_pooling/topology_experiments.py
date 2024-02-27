@@ -26,7 +26,7 @@ or adjust the confusion between objects.
 
 import os
 import numpy
-import cPickle
+import pickle
 from multiprocessing import Pool, cpu_count
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -96,7 +96,7 @@ def runExperimentPool(numObjects,
                    "l4Params": l4Params
                    }
                 )
-  print "{} experiments to run, {} workers".format(len(args), numWorkers)
+  print("{} experiments to run, {} workers".format(len(args), numWorkers))
   # Run the pool
   if numWorkers > 1:
     pool = Pool(processes=numWorkers)
@@ -111,7 +111,7 @@ def runExperimentPool(numObjects,
 
   # Pickle results for later use
   with open(resultsName,"wb") as f:
-    cPickle.dump(result,f)
+    pickle.dump(result,f)
 
   return result
 
@@ -143,10 +143,10 @@ def plotConvergenceByColumnTopology(results, columnRange, featureRange, networkT
   # For each column, print convergence as fct of number of unique features
   for c in range(1, max(columnRange) + 1):
     for t in range(len(networkType)):
-      print c, convergence[:, c, t]
+      print(c, convergence[:, c, t])
 
   # Print everything anyway for debugging
-  print "Average convergence array=", convergence
+  print("Average convergence array=", convergence)
 
   ########################################################################
   #
@@ -163,8 +163,8 @@ def plotConvergenceByColumnTopology(results, columnRange, featureRange, networkT
   for i in range(len(featureRange)):
     for t in range(len(networkType)):
       f = featureRange[i]
-      print columnRange
-      print convergence[f-1,columnRange, t]
+      print(columnRange)
+      print(convergence[f-1,columnRange, t])
       legendList.append('Unique features={}, topology={}'.format(f, networkTypeNames[t]))
       plt.plot(columnRange, convergence[f-1,columnRange, t],
                color=colorList[i*len(networkType) + t])
@@ -173,7 +173,7 @@ def plotConvergenceByColumnTopology(results, columnRange, featureRange, networkT
   plt.legend(legendList, loc="upper right")
   plt.xlabel("Number of columns")
   plt.xticks(columnRange)
-  plt.yticks(range(0,int(convergence.max())+1))
+  plt.yticks(list(range(0,int(convergence.max())+1)))
   plt.ylabel("Average number of touches")
   plt.title("Number of touches to recognize one object (multiple columns)")
 
@@ -197,8 +197,8 @@ def plotConvergenceByDistantConnectionChance(results, featureRange, columnRange,
   convergence = numpy.zeros((len(featureRange), len(longDistanceConnectionsRange), len(columnRange)))
 
   for r in results:
-      print longDistanceConnectionsRange.index(r["longDistanceConnections"])
-      print columnRange.index(r["numColumns"])
+      print(longDistanceConnectionsRange.index(r["longDistanceConnections"]))
+      print(columnRange.index(r["numColumns"]))
       convergence[featureRange.index(r["numFeatures"]),
           longDistanceConnectionsRange.index(r["longDistanceConnections"]),
           columnRange.index(r["numColumns"])] += r["convergencePoint"]
@@ -208,10 +208,10 @@ def plotConvergenceByDistantConnectionChance(results, featureRange, columnRange,
   # For each column, print convergence as fct of number of unique features
   for i, c in enumerate(columnRange):
     for j, r in enumerate(longDistanceConnectionsRange):
-      print c, r, convergence[:, j, i]
+      print(c, r, convergence[:, j, i])
 
   # Print everything anyway for debugging
-  print "Average convergence array=", convergence
+  print("Average convergence array=", convergence)
 
   ########################################################################
   #
@@ -228,8 +228,8 @@ def plotConvergenceByDistantConnectionChance(results, featureRange, columnRange,
   for i, r in enumerate(longDistanceConnectionsRange):
     for j, f in enumerate(featureRange):
       currentColor = i*len(featureRange) + j
-      print columnRange
-      print convergence[j, i, :]
+      print(columnRange)
+      print(convergence[j, i, :])
       legendList.append('Connection_prob = {}, num features = {}'.format(r, f))
       plt.plot(columnRange, convergence[j, i, :], color=colorList[currentColor])
 
@@ -237,7 +237,7 @@ def plotConvergenceByDistantConnectionChance(results, featureRange, columnRange,
   plt.legend(legendList, loc = "lower left")
   plt.xlabel("Number of columns")
   plt.xticks(columnRange)
-  plt.yticks(range(0,int(convergence.max())+1))
+  plt.yticks(list(range(0,int(convergence.max())+1)))
   plt.ylabel("Average number of touches")
   plt.title("Number of touches to recognize one object (multiple columns)")
 
@@ -275,7 +275,7 @@ if __name__ == "__main__":
   # Here we want to see how the number of columns affects convergence.
   # This experiment is run using a process pool
   if False:
-    columnRange = range(1, 10)
+    columnRange = list(range(1, 10))
     featureRange = [5]
     objectRange = [100]
     networkType = ["MultipleL4L2Columns", "MultipleL4L2ColumnsWithTopology"]
@@ -295,7 +295,7 @@ if __name__ == "__main__":
       resultsName="column_convergence_results.pkl")
 
     with open("column_convergence_results.pkl","rb") as f:
-      results = cPickle.load(f)
+      results = pickle.load(f)
 
     plotConvergenceByColumnTopology(results, columnRange, featureRange, networkType,
                             numTrials=numTrials)
@@ -325,7 +325,7 @@ if __name__ == "__main__":
       resultsName="random_long_distance_connection_column_convergence_results.pkl")
 
     with open("random_long_distance_connection_column_convergence_results.pkl","rb") as f:
-      results = cPickle.load(f)
+      results = pickle.load(f)
 
     plotConvergenceByDistantConnectionChance(results, featureRange, columnRange,
         longDistanceConnectionsRange, numTrials=numTrials)

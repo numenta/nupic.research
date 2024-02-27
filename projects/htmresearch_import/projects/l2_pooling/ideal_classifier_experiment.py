@@ -32,7 +32,7 @@ python ideal_classifier_experiment.py --location 1
 python ideal_classifier_experiment.py  --location 0
 """
 
-import cPickle
+import pickle
 import math
 from optparse import OptionParser
 import os
@@ -156,7 +156,7 @@ def run_ideal_classifier(args={}):
                               numFeatures=numFeatures)
 
   objectSDRs = objects.provideObjectsToLearn()
-  objectNames = objectSDRs.keys()
+  objectNames = list(objectSDRs.keys())
   featureWidth = objects.sensorInputSize
   locationWidth = objects.externalInputSize
 
@@ -264,12 +264,12 @@ def run_ideal_classifier(args={}):
       convergencePoint[i] = 11
 
   args.update({"accuracy": accuracyList})
-  args.update({"numTouches": range(1, 11)})
+  args.update({"numTouches": list(range(1, 11))})
   args.update({"convergencePoint": np.mean(convergencePoint)})
   args.update({"classificationOutcome": classificationOutcome})
-  print "objects={}, features={}, locations={}, distinct words={}, numColumns={}".format(
-    numObjects, numFeatures, numLocations, numWords, numColumns),
-  print "==> convergencePoint:", args["convergencePoint"]
+  print("objects={}, features={}, locations={}, distinct words={}, numColumns={}".format(
+    numObjects, numFeatures, numLocations, numWords, numColumns), end=' ')
+  print("==> convergencePoint:", args["convergencePoint"])
 
   return args
 
@@ -304,8 +304,8 @@ def plotConvergenceByObject(results, objectRange, featureRange, numTrials,
 
   for i in range(len(featureRange)):
     f = featureRange[i]
-    print "features={} objectRange={} convergence={}".format(
-      f,objectRange, convergence[f-1,objectRange])
+    print("features={} objectRange={} convergence={}".format(
+      f,objectRange, convergence[f-1,objectRange]))
     legendList.append('Unique features={}'.format(f))
     plt.plot(objectRange, convergence[f-1, objectRange],
              color=colorList[i], linestyle=linestyle)
@@ -313,8 +313,8 @@ def plotConvergenceByObject(results, objectRange, featureRange, numTrials,
   # format
   plt.legend(legendList, loc="lower right", prop={'size':10})
   plt.xlabel("Number of objects in training set")
-  plt.xticks(range(0,max(objectRange)+1,10))
-  plt.yticks(range(0,int(convergence.max())+2))
+  plt.xticks(list(range(0,max(objectRange)+1,10)))
+  plt.yticks(list(range(0,int(convergence.max())+2)))
   plt.ylabel("Average number of touches")
   plt.title("Number of touches to recognize one object (single column)")
 
@@ -352,18 +352,18 @@ def plotConvergenceByColumn(results, columnRange, featureRange, numTrials, lineS
   colorList = ['r', 'b', 'g', 'm', 'c', 'k', 'y']
   for i in range(len(featureRange)):
     f = featureRange[i]
-    print f, columnRange
-    print convergence[f-1,columnRange]
+    print(f, columnRange)
+    print(convergence[f-1,columnRange])
     legendList.append('Unique features={}'.format(f))
     plt.plot(columnRange, convergence[f-1,columnRange],
              color=colorList[i], linestyle=lineStype)
-  print
+  print()
   # format
   plt.legend(legendList, loc="upper right")
   plt.xlabel("Number of columns")
   plt.xticks(columnRange)
   plt.ylim([0, 4])
-  plt.yticks(range(0,int(convergence.max())+1))
+  plt.yticks(list(range(0,int(convergence.max())+1)))
   plt.ylabel("Average number of sensations")
   plt.title("Number of sensations to recognize one object (multiple columns)")
     # save
@@ -403,8 +403,8 @@ def run_bow_experiment_single_column(options):
           )
 
   numWorkers = cpu_count()
-  print "{} experiments to run, {} workers".format(len(args), numWorkers)
-  print "useLocation: ", useLocation
+  print("{} experiments to run, {} workers".format(len(args), numWorkers))
+  print("useLocation: ", useLocation)
 
   pool = Pool(processes=numWorkers)
   result = pool.map(run_ideal_classifier, args)
@@ -412,16 +412,16 @@ def run_bow_experiment_single_column(options):
   resultsName = "bag_of_words_useLocation_{}.pkl".format(useLocation)
   # Pickle results for later use
   with open(resultsName, "wb") as f:
-    cPickle.dump(result, f)
+    pickle.dump(result, f)
 
 
   plt.figure()
   with open("object_convergence_results.pkl", "rb") as f:
-    results = cPickle.load(f)
+    results = pickle.load(f)
   plotConvergenceByObject(results, objectRange, featureRange, linestyle='-')
 
   with open(resultsName, "rb") as f:
-    resultsBOW = cPickle.load(f)
+    resultsBOW = pickle.load(f)
   plotConvergenceByObject(resultsBOW, objectRange, featureRange, numTrials,
                           linestyle='--')
   plotPath = os.path.join("plots",
@@ -463,7 +463,7 @@ def run_multiple_column_experiment():
                }
             )
 
-  print "Number of experiments:",len(args)
+  print("Number of experiments:",len(args))
   idealResultsFile = os.path.join(resultsDir,
            "ideal_multi_column_useLocation_{}.pkl".format(useLocation))
   pool = Pool(processes=cpu_count())
@@ -471,7 +471,7 @@ def run_multiple_column_experiment():
 
   # Pickle results for later use
   with open(idealResultsFile, "wb") as f:
-    cPickle.dump(result, f)
+    pickle.dump(result, f)
 
   htmResultsFile = os.path.join(resultsDir, "column_convergence_results.pkl")
   runExperimentPool(
@@ -485,10 +485,10 @@ def run_multiple_column_experiment():
     resultsName=htmResultsFile)
 
   with open(htmResultsFile, "rb") as f:
-    results = cPickle.load(f)
+    results = pickle.load(f)
 
   with open(idealResultsFile, "rb") as f:
-    resultsIdeal = cPickle.load(f)
+    resultsIdeal = pickle.load(f)
 
   plt.figure()
   plotConvergenceByColumn(results, columnRange, featureRange, numTrials)
@@ -522,7 +522,7 @@ def single_column_accuracy_comparison():
          }
       )
 
-  print "{} experiments to run, {} workers".format(len(args), cpu_count())
+  print("{} experiments to run, {} workers".format(len(args), cpu_count()))
 
   idealResultsFile = os.path.join(resultsDir, "ideal_model_result.pkl")
 
@@ -531,7 +531,7 @@ def single_column_accuracy_comparison():
   resultsIdeal = pool.map(run_ideal_classifier, args)
 
   with open(idealResultsFile, "wb") as f:
-    cPickle.dump(resultsIdeal, f)
+    pickle.dump(resultsIdeal, f)
 
   # run HTM network
   columnRange = [1]
@@ -552,9 +552,9 @@ def single_column_accuracy_comparison():
 
   # Read results from pickle files
   with open(idealResultsFile, "rb") as f:
-    resultsIdeal = cPickle.load(f)
+    resultsIdeal = pickle.load(f)
   with open(htmResultsFile, "rb") as f:
-    resultsModel = cPickle.load(f)
+    resultsModel = pickle.load(f)
 
   # plot accuracy across sensations
   accuracyIdeal = 0

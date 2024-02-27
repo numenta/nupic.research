@@ -19,7 +19,7 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-import cPickle
+import pickle
 
 
 
@@ -98,7 +98,7 @@ class LoggingDecorator(object):
 
     """
     with open(logFilename, "wb") as outp:
-      cPickle.dump(callLog, outp)
+      pickle.dump(callLog, outp)
 
 
   @staticmethod
@@ -111,4 +111,4 @@ class LoggingDecorator(object):
             Filename from which to load a pickled version of the call logs.
     """
     with open(logFilename, "rb") as inp:
-      return cPickle.load(inp)
+      return pickle.load(inp)

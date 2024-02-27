@@ -25,7 +25,7 @@ This file plots the convergence of L4-L2 as you increase the amount of noise.
 
 import os
 import numpy
-import cPickle
+import pickle
 from multiprocessing import cpu_count
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -69,8 +69,8 @@ def plotConvergenceByObjectMultiColumn(results, objectRange, columnRange):
 
   for i in range(len(columnRange)):
     c = columnRange[i]
-    print "columns={} objectRange={} convergence={}".format(
-      c, objectRange, convergence[c-1,objectRange])
+    print("columns={} objectRange={} convergence={}".format(
+      c, objectRange, convergence[c-1,objectRange]))
     if c == 1:
       legendList.append('1 column')
     else:
@@ -81,8 +81,8 @@ def plotConvergenceByObjectMultiColumn(results, objectRange, columnRange):
   # format
   plt.legend(legendList, loc="upper left", prop={'size':10})
   plt.xlabel("Number of objects in training set")
-  plt.xticks(range(0,max(objectRange)+1,10))
-  plt.yticks(range(0,int(convergence.max())+2))
+  plt.xticks(list(range(0,max(objectRange)+1,10)))
+  plt.yticks(list(range(0,int(convergence.max())+2)))
   plt.ylabel("Average number of touches")
   plt.title("Object recognition with multiple columns (unique features = 5)")
 
@@ -208,7 +208,7 @@ if __name__ == "__main__":
 
     # Analyze results
     with open("object_convergence_noise_results.pkl","rb") as f:
-      results = cPickle.load(f)
+      results = pickle.load(f)
     # print results
 
     plotAccuracyByNoiseLevelAndColumnRange(results, noiseRange, columnRange)
