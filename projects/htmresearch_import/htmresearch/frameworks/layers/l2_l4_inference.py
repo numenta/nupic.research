@@ -20,10 +20,7 @@
 # ----------------------------------------------------------------------
 
 """
-This class allows to easily create experiments using a L4-L2 network for
-inference over objects. It uses the network API and multiple regions (raw
-sensors for sensor and external input, column pooler region, extended temporal
-memory region).
+This class implements an L4-L2 network.
 
 Here is a sample use of this class, to learn two very simple objects
 and infer one of them. In this case, we use a SimpleObjectMachine to generate
@@ -50,7 +47,6 @@ information).
 
   # Do the learning phase
   exp.learnObjects(objectsToLearn, reset=True)
-  exp.printProfile()
 
   # Set up inputs for inference
   inferConfig = {
@@ -89,11 +85,12 @@ import numpy as np
 from math import ceil
 from tabulate import tabulate
 
+from nupic.bindings.algorithms import SpatialPooler
 from nupic.bindings.math import SparseMatrix
 
+from htmresearch.algorithms.column_pooler import ColumnPooler
 from htmresearch.support.logging_decorator import LoggingDecorator
-from htmresearch.support.register_regions import registerAllResearchRegions
-from htmresearch.frameworks.layers.laminar_network import createNetwork
+from nupic.research.frameworks.columns import ApicalTiebreakPairMemory
 
 
 
@@ -119,11 +116,11 @@ def rerunExperimentFromLogfile(logFilename):
 
 class L4L2Experiment(object):
   """
-  L4-L2 experiment.
+  This class implements an L4-L2 network.
 
-  This experiment uses the network API to test out various properties of
-  inference and learning using a sensors and an L4-L2 network. For now,
-  we directly use the locations on the object.
+  We use it to test out various properties of inference and learning using a
+  sensors and an L4-L2 network. For now, we directly use the locations on the
+  object.
 
   """
 
@@ -137,8 +134,6 @@ class L4L2Experiment(object):
                externalInputSize=1024,
                numExternalInputBits=20,
                L2Overrides=None,
-               L4RegionType="py.ApicalTMPairRegion",
-               networkType = "MultipleL4L2Columns",
                longDistanceConnections = 0,
                maxConnectionDistance = 1,
                columnPositions = None,
@@ -178,15 +173,6 @@ class L4L2Experiment(object):
 
     @param   L2Overrides (dict)
              Parameters to override in the L2 region
-
-    @param   L4RegionType (string)
-             The type of region to use for L4
-
-    @param   networkType (string)
-             Which type of L2L4 network to create.  If topology is being used,
-             it should be specified here.  Possible values for this parameter
-             are "MultipleL4L2Columns", "MultipleL4L2ColumnsWithTopology" and
-             "L4L2Column"
 
     @param  longDistanceConnections (float)
              The probability that a column will randomly connect to a distant
@@ -232,7 +218,6 @@ class L4L2Experiment(object):
     # Handle logging - this has to be done first
     self.logCalls = logCalls
 
-    registerAllResearchRegions()
     self.name = name
 
     self.numLearningPoints = numLearningPoints
@@ -246,30 +231,33 @@ class L4L2Experiment(object):
     self.seed = seed
     random.seed(seed)
 
-    # update parameters with overrides
-    self.config = {
-      "networkType": networkType,
-      "longDistanceConnections": longDistanceConnections,
-      "enableFeedback": enableFeedback,
-      "numCorticalColumns": numCorticalColumns,
-      "externalInputSize": externalInputSize,
-      "sensorInputSize": inputSize,
-      "L4RegionType": L4RegionType,
-      "L4Params": self.getDefaultL4Params(inputSize, numExternalInputBits),
-      "L2Params": self.getDefaultL2Params(inputSize, numInputBits),
-    }
-
-    if enableLateralSP:
-      self.config["lateralSPParams"] = self.getDefaultLateralSPParams(inputSize)
-      if lateralSPOverrides:
-        self.config["lateralSPParams"].update(lateralSPOverrides)
-
+    # SP on L4's sensory input
     if enableFeedForwardSP:
-      self.config["feedForwardSPParams"] = self.getDefaultFeedForwardSPParams(inputSize)
+      SPParams = self.getDefaultFeedForwardSPParams(inputSize)
       if feedForwardSPOverrides:
-        self.config["feedForwardSPParams"].update(feedForwardSPOverrides)
+        SPParams.update(feedForwardSPOverrides)
 
-    if "Topology" in self.config["networkType"]:
+      self.L4FeedforwardSPs = [SpatialPooler(**SPParams)
+                               for _ in range(numCorticalColumns)]
+    else:
+      self.L4FeedforwardSPs = None
+
+    self.enableFeedback = enableFeedback
+
+    # SP on L4's location input
+    if enableLateralSP:
+      SPParams = self.getDefaultLateralSPParams(externalInputSize)
+      if lateralSPOverrides:
+        SPParams.update(lateralSPOverrides)
+
+      self.L4LateralSPs = [SpatialPooler(**SPParams)
+                           for _ in range(numCorticalColumns)]
+    else:
+      self.L4LateralSPs = None
+
+    # Support for topology hasn't been re-added since the port to Python 3.
+    if False:
+    # if "Topology" in self.config["networkType"]:
       self.config["maxConnectionDistance"] = maxConnectionDistance
 
       # Generate a grid for cortical columns.  Will attempt to generate a full
@@ -284,43 +272,97 @@ class L4L2Experiment(object):
       self.config["columnPositions"] = columnPositions[:numCorticalColumns]
       self.config["longDistanceConnections"] = longDistanceConnections
 
-    if L2Overrides is not None:
-      self.config["L2Params"].update(L2Overrides)
-
+    # L4
+    self.L4Params = self.getDefaultL4Params(inputSize, externalInputSize,
+                                            numExternalInputBits)
     if L4Overrides is not None:
-      self.config["L4Params"].update(L4Overrides)
+      self.L4Params.update(L4Overrides)
+    self.L4Columns = [ApicalTiebreakPairMemory(**self.L4Params)
+                      for _ in range(numCorticalColumns)]
 
-    # create network
-    self.network = createNetwork(self.config)
-    self.sensorInputs = []
-    self.externalInputs = []
-    self.L4Regions = []
-    self.L2Regions = []
 
-    for i in range(self.numColumns):
-      self.sensorInputs.append(
-        self.network.regions["sensorInput_" + str(i)].getSelf()
-      )
-      self.externalInputs.append(
-        self.network.regions["externalInput_" + str(i)].getSelf()
-      )
-      self.L4Regions.append(
-        self.network.regions["L4Column_" + str(i)]
-      )
-      self.L2Regions.append(
-        self.network.regions["L2Column_" + str(i)]
-      )
-
-    self.L4Columns = [region.getSelf() for region in self.L4Regions]
-    self.L2Columns = [region.getSelf() for region in self.L2Regions]
+    # L2
+    self.L2Params = self.getDefaultL2Params(numCorticalColumns, inputSize,
+                                            numInputBits)
+    if L2Overrides is not None:
+      self.L2Params.update(L2Overrides)
+    self.L2Columns = [ColumnPooler(**self.L2Params)
+                      for _ in range(numCorticalColumns)]
 
     # will be populated during training
     self.objectL2Representations = {}
     self.objectL2RepresentationsMatrices = [
-      SparseMatrix(0, self.config["L2Params"]["cellCount"])
+      SparseMatrix(0, self.L2Params["cellCount"])
       for _ in range(self.numColumns)]
     self.objectNameToIndex = {}
     self.resetStatistics()
+
+
+  def doTimestep(self, sensations, learn):
+    """
+    Run the network for one timestep.
+    The format of sensations is:
+    sensations = {
+      0: (set([1, 5, 10]), set([6, 12, 52]),  # location, feature for CC0
+      1: (set([6, 2, 15]), set([64, 1, 5]),  # location, feature for CC1
+    }
+    Parameters:
+    ----------------------------
+    @param   sensations (dict)
+             The feature/location pair for each column.
+    @param   learn (bool)
+             Whether to allow learning for this timestep
+    """
+
+    prevL2Representations = [L2.getActiveCells() for L2 in self.L2Columns]
+
+    for col in range(self.numColumns):
+      location, feature = sensations[col]
+      location = sorted(location)
+      feature = sorted(feature)
+      L2 = self.L2Columns[col]
+      L4 = self.L4Columns[col]
+
+      # Compute L4's active columns
+      if self.L4FeedforwardSPs is not None:
+        featureDense = np.zeros(self.inputSize, dtype="uint32")
+        featureDense[feature] = 1
+
+        spOutput = np.zeros(self.inputSize, dtype="uint32")
+        self.L4FeedforwardSPs[col].compute(featureDense, learn, spOutput)
+
+        activeColumns = spOutput.nonzero()[0]
+      else:
+        activeColumns = np.asarray(feature, dtype="uint32")
+
+      # Compute L4's distal basal input
+      if self.L4LateralSPs is not None:
+        locationDense = np.zeros(self.externalInputSize, dtype="uint32")
+        locationDense[location] = 1
+
+        spOutput = np.zeros(self.externalInputSize, dtype="uint32")
+        self.L4LateralSPs[col].compute(locationDense, learn, spOutput)
+
+        basalInput = spOutput.nonzero()[0]
+      else:
+        basalInput = np.asarray(location, dtype="uint32")
+
+      # Compute L4's active cells
+      if self.enableFeedback:
+        apicalInput = L2.getActiveCells()
+      else:
+        apicalInput = ()
+      L4.compute(activeColumns, basalInput, apicalInput, learn=learn)
+
+      # Compute L2's active cells
+      lateralInputs = [prevActiveCells
+                       for i, prevActiveCells in enumerate(
+                           prevL2Representations)
+                       if i != col]
+      L2.compute(feedforwardInput=L4.getActiveCells(),
+                 feedforwardGrowthCandidates=L4.getPredictedActiveCells(),
+                 lateralInputs=lateralInputs,
+                 learn=learn)
 
 
   @LoggingDecorator()
@@ -365,26 +407,16 @@ class L4L2Experiment(object):
              be reset after learning.
 
     """
-    self._setLearningMode()
-
     for objectName, sensationList in objects.items():
 
       # ignore empty sensation lists
       if len(sensationList) == 0:
         continue
 
-      # keep track of numbers of iterations to run
-      iterations = 0
-
       for sensations in sensationList:
         # learn each pattern multiple times
         for _ in range(self.numLearningPoints):
-
-          for col in range(self.numColumns):
-            location, feature = sensations[col]
-            self.sensorInputs[col].addDataToQueue(list(feature), 0, 0)
-            self.externalInputs[col].addDataToQueue(list(location), 0, 0)
-          iterations += 1
+          self.doTimestep(sensations, learn=True)
 
       # actually learn the objects
       if iterations > 0:
@@ -488,7 +520,7 @@ class L4L2Experiment(object):
       self.objectNameToIndex[objectName] = objectIndex
 
     for colIdx, matrix in enumerate(self.objectL2RepresentationsMatrices):
-      activeCells = self.L2Columns[colIdx]._pooler.getActiveCells()
+      activeCells = self.L2Columns[colIdx].getActiveCells()
       matrix.setRowFromSparse(objectIndex, activeCells,
                               np.ones(len(activeCells), dtype="float32"))
 
@@ -498,9 +530,8 @@ class L4L2Experiment(object):
     Sends a reset signal to the network.
     """
     for col in range(self.numColumns):
-      self.sensorInputs[col].addResetToQueue(sequenceId)
-      self.externalInputs[col].addResetToQueue(sequenceId)
-    self.network.run(1)
+      self.L4Columns[col].reset()
+      self.L2Columns[col].reset()
 
 
   @LoggingDecorator()
@@ -639,79 +670,18 @@ class L4L2Experiment(object):
             numCorrect / len(self.statistics[firstStat:lastStat]) )
 
 
-  def printProfile(self, reset=False):
-    """
-    Prints profiling information.
-
-    Parameters:
-    ----------------------------
-    @param   reset (bool)
-             If set to True, the profiling will be reset.
-
-    """
-    print("Profiling information for {}".format(type(self).__name__))
-    totalTime = 0.000001
-    for region in list(self.network.regions.values()):
-      timer = region.getComputeTimer()
-      totalTime += timer.getElapsed()
-
-    # Sort the region names
-    regionNames = list(self.network.regions.keys())
-    regionNames.sort()
-
-    count = 1
-    profileInfo = []
-    L2Time = 0.0
-    L4Time = 0.0
-    for regionName in regionNames:
-      region = self.network.regions[regionName]
-      timer = region.getComputeTimer()
-      count = max(timer.getStartCount(), count)
-      profileInfo.append([region.name,
-                          timer.getStartCount(),
-                          timer.getElapsed(),
-                          100.0 * timer.getElapsed() / totalTime,
-                          timer.getElapsed() / max(timer.getStartCount(), 1)])
-      if "L2Column" in regionName:
-        L2Time += timer.getElapsed()
-      elif "L4Column" in regionName:
-        L4Time += timer.getElapsed()
-
-    profileInfo.append(
-      ["Total time", "", totalTime, "100.0", totalTime / count])
-    print(tabulate(profileInfo, headers=["Region", "Count",
-                                         "Elapsed", "Pct of total",
-                                         "Secs/iteration"],
-                   tablefmt="grid", floatfmt="6.3f"))
-    print()
-    print("Total time in L2 =", L2Time)
-    print("Total time in L4 =", L4Time)
-
-    if reset:
-      self.resetProfile()
-
-
-  def resetProfile(self):
-    """
-    Resets the network profiling.
-    """
-    self.network.resetProfiling()
-
-
   def getL4Representations(self):
     """
     Returns the active representation in L4.
     """
-    return [set(column.getOutputData("activeCells").nonzero()[0])
-            for column in self.L4Regions]
+    return [set(L4.getActiveCells()) for L4 in self.L4Columns]
 
 
   def getL4PredictedCells(self):
     """
     Returns the cells in L4 that were predicted by the location input.
     """
-    return [set(column.getOutputData("predictedCells").nonzero()[0])
-            for column in self.L4Regions]
+    return [set(L4.getPredictedCells()) for L4 in self.L4Columns]
 
 
   def getL4PredictedActiveCells(self):
@@ -719,15 +689,14 @@ class L4L2Experiment(object):
     Returns the cells in L4 that were predicted by the location signal
     and are currently active.  Does not consider apical input.
     """
-    return [set(column.getOutputData("predictedActiveCells").nonzero()[0])
-            for column in self.L4Regions]
+    return [set(L4.getPredictedActiveCells()) for L4 in self.L4Columns]
 
 
   def getL2Representations(self):
     """
     Returns the active representation in L2.
     """
-    return [set(column._pooler.getActiveCells()) for column in self.L2Columns]
+    return [set(L2.getActiveCells()) for L2 in self.L2Columns]
 
 
   def getAlgorithmInstance(self, layer="L2", column=0):
@@ -784,7 +753,7 @@ class L4L2Experiment(object):
     """
     results = {}
     l2sdr = self.getL2Representations()
-    sdrSize = self.config["L2Params"]["sdrSize"]
+    sdrSize = self.L2Params["sdrSize"]
     if minOverlap is None:
       minOverlap = sdrSize / 2
 
@@ -845,7 +814,7 @@ class L4L2Experiment(object):
     return numCorrectClassifications == self.numColumns
 
 
-  def getDefaultL4Params(self, inputSize, numInputBits):
+  def getDefaultL4Params(self, inputSize, externalInputSize, numInputBits):
     """
     Returns a good default set of parameters to use in the L4 region.
     """
@@ -863,8 +832,11 @@ class L4L2Experiment(object):
 
     return {
       "columnCount": inputSize,
-      "cellsPerColumn": 16,
-      "learn": True,
+      "basalInputSize": externalInputSize,
+      "apicalInputSize": (4096  # Keep synced with L2 "cellCount"
+                          if self.enableFeedback
+                          else 0),
+      "cellsPerColumn": 16, # Keep synced with L2 "inputWidth"
       "initialPermanence": 0.51,
       "connectedPermanence": 0.6,
       "permanenceIncrement": 0.1,
@@ -875,12 +847,11 @@ class L4L2Experiment(object):
       "activationThreshold": activationThreshold,
       "reducedBasalThreshold": int(activationThreshold*0.6),
       "sampleSize": sampleSize,
-      "implementation": "ApicalTiebreak",
       "seed": self.seed
     }
 
 
-  def getDefaultL2Params(self, inputSize, numInputBits):
+  def getDefaultL2Params(self, numCorticalColumns, inputSize, numInputBits):
     """
     Returns a good default set of parameters to use in the L2 region.
     """
@@ -895,8 +866,9 @@ class L4L2Experiment(object):
       minThresholdProximal = int(sampleSizeProximal * .6)
 
     return {
-      "inputWidth": inputSize * 16,
-      "cellCount": 4096,
+      "inputWidth": inputSize * 16, # Keep synced with L4 "cellsPerColumn"
+      "cellCount": 4096, # Keep synced with L4 "apicalInputDimensions"
+      "lateralInputWidths": [4096]*(numCorticalColumns-1),
       "sdrSize": 40,
       "synPermProximalInc": 0.1,
       "synPermProximalDec": 0.001,
@@ -917,10 +889,10 @@ class L4L2Experiment(object):
 
   def getDefaultLateralSPParams(self, inputSize):
     return {
-      "spatialImp": "cpp",
-      "globalInhibition": 1,
-      "columnCount": 1024,
-      "inputWidth": inputSize,
+      "globalInhibition": True,
+      "columnDimensions": (inputSize,),
+      "inputDimensions": (inputSize,),
+      "potentialRadius": inputSize,
       "numActiveColumnsPerInhArea": 40,
       "seed": self.seed,
       "potentialPct": 0.8,
@@ -933,10 +905,10 @@ class L4L2Experiment(object):
 
   def getDefaultFeedForwardSPParams(self, inputSize):
     return {
-      "spatialImp": "cpp",
-      "globalInhibition": 1,
-      "columnCount": 1024,
-      "inputWidth": inputSize,
+      "globalInhibition": True,
+      "columnDimensions": (inputSize,),
+      "inputDimensions": (inputSize,),
+      "potentialRadius": inputSize,
       "numActiveColumnsPerInhArea": 40,
       "seed": self.seed,
       "potentialPct": 0.8,
@@ -960,29 +932,6 @@ class L4L2Experiment(object):
 
     # Never differs - converged in one iteration
     return 1
-
-
-
-
-  def _unsetLearningMode(self):
-    """
-    Unsets the learning mode, to start inference.
-    """
-
-    for region in self.L4Regions:
-      region.setParameter("learn", False)
-    for region in self.L2Regions:
-      region.setParameter("learningMode", False)
-
-
-  def _setLearningMode(self):
-    """
-    Sets the learning mode.
-    """
-    for region in self.L4Regions:
-      region.setParameter("learn", True)
-    for region in self.L2Regions:
-      region.setParameter("learningMode", True)
 
 
   def _updateInferenceStats(self, statistics, objectName=None):
@@ -1017,7 +966,7 @@ class L4L2Experiment(object):
         # random.sample(L2Representation[i], min(len(L2Representation[i]), 500))
       )
       statistics["L4 Apical Segments C" + str(i)].append(
-        len(self.L4Columns[i]._tm.getActiveApicalSegments())
+        len(self.L4Columns[i].getActiveApicalSegments())
       )
 
       # add true overlap and classification result if objectName was learned
