@@ -140,6 +140,54 @@ class L4L2ExperimentTest(unittest.TestCase):
     sensationC0 = [(1, 1), (1, 1), (1, 1)]
     sensationC1 = [(3, 2), (3, 2), (3, 2)]
 
+    def record_l2(prev_inputs, l2_column):
+      l2_compute = l2_column.compute
+
+      def l2_compute_wrapped(feedforwardInput,
+                             feedforwardGrowthCandidates,
+                             lateralInputs,
+                             learn):
+        prev_inputs.clear()
+        prev_inputs.update({
+          "feedforwardInput": feedforwardInput,
+          "lateralInputs": lateralInputs
+        })
+        return l2_compute(feedforwardInput=feedforwardInput,
+                          feedforwardGrowthCandidates=feedforwardGrowthCandidates,
+                          lateralInputs=lateralInputs,
+                          learn=learn)
+
+      l2_column.compute = l2_compute_wrapped
+
+    def record_l4(prev_inputs, l4_column):
+      l4_compute = l4_column.compute
+
+      def l4_compute_wrapped(activeColumns,
+                             basalInput,
+                             apicalInput,
+                             learn):
+        prev_inputs.clear()
+        prev_inputs.update({
+          "basalInput": basalInput,
+          "apicalInput": apicalInput
+        })
+        return l4_compute(activeColumns=activeColumns,
+                          basalInput=basalInput,
+                          apicalInput=apicalInput,
+                          learn=learn)
+
+      l4_column.compute = l4_compute_wrapped
+
+    column0_l2_prev_inputs = {}
+    column1_l2_prev_inputs = {}
+    column0_l4_prev_inputs = {}
+    column1_l4_prev_inputs = {}
+
+    record_l2(column0_l2_prev_inputs, exp.L2Columns[0])
+    record_l2(column1_l2_prev_inputs, exp.L2Columns[1])
+    record_l4(column0_l4_prev_inputs, exp.L4Columns[0])
+    record_l4(column1_l4_prev_inputs, exp.L4Columns[1])
+
     lateralInputs = []
     apicalInputs = []
     activeCells = []
@@ -154,47 +202,47 @@ class L4L2ExperimentTest(unittest.TestCase):
                 objectName=1, reset=False)
 
       lateralInputs.append(
-        {0: copy.copy(
-          exp.network.regions['L2Column_0'].getInputData("lateralInput")),
-         1: copy.copy(
-           exp.network.regions['L2Column_1'].getInputData("lateralInput"))}
+        {0: column0_l2_prev_inputs["lateralInputs"],
+         1: column1_l2_prev_inputs["lateralInputs"]}
       )
       activeCells.append(
-        {0: copy.copy(
-          exp.network.regions['L2Column_0'].getOutputData("feedForwardOutput")),
-         1: copy.copy(
-           exp.network.regions['L2Column_1'].getOutputData("feedForwardOutput"))}
+        {0: exp.L2Columns[0].getActiveCells(),
+         1: exp.L2Columns[1].getActiveCells()}
       )
       apicalInputs.append((
-        {0: copy.copy(
-          exp.network.regions['L4Column_0'].getInputData("apicalInput")),
-          1: copy.copy(
-            exp.network.regions['L4Column_1'].getInputData("apicalInput"))}
+        {0: column0_l4_prev_inputs["apicalInput"],
+         1: column1_l4_prev_inputs["apicalInput"]}
       ))
 
     # no lateral inputs on first iteration
-    self.assertEqual(numpy.sum(numpy.abs(lateralInputs[0][0])), 0)
-    self.assertEqual(numpy.sum(numpy.abs(lateralInputs[0][1])), 0)
+    self.assertEqual(lateralInputs[0][0][0].size, 0)
+    self.assertEqual(lateralInputs[0][1][0].size, 0)
 
     # no apical inputs to L4 on first iteration
-    self.assertEqual(numpy.sum(numpy.abs(apicalInputs[0][0])), 0)
-    self.assertEqual(numpy.sum(numpy.abs(apicalInputs[0][1])), 0)
+    self.assertEqual(len(apicalInputs[0][0]), 0)
+    self.assertEqual(len(apicalInputs[0][1]), 0)
 
     # lateral inputs of C0 at time t+1 = active cells of C1 at time t
     for step in range(2):
-      self.assertEqual(
-        numpy.sum(numpy.abs(lateralInputs[step+1][0]-activeCells[step][1])), 0)
-      self.assertEqual(
-        numpy.sum(numpy.abs(lateralInputs[step+1][1]-activeCells[step][0])), 0)
+      numpy.testing.assert_equal(
+        lateralInputs[step+1][0][0],
+        activeCells[step][1]
+      )
+      numpy.testing.assert_equal(
+        lateralInputs[step+1][1][0],
+        activeCells[step][0]
+      )
 
     # apical inputs of L4_0 at time t+1 = active cells of L2_0 at time t
     for step in range(2):
-      self.assertEqual(
-        numpy.sum(numpy.abs(apicalInputs[step + 1][0] - activeCells[step][0])),
-        0)
-      self.assertEqual(
-        numpy.sum(numpy.abs(apicalInputs[step + 1][1] - activeCells[step][1])),
-        0)
+      numpy.testing.assert_equal(
+        apicalInputs[step + 1][0],
+        activeCells[step][0]
+      )
+      numpy.testing.assert_equal(
+        apicalInputs[step + 1][1],
+        activeCells[step][1]
+      )
 
 
   def testCapacity(self):
@@ -218,13 +266,10 @@ class L4L2ExperimentTest(unittest.TestCase):
         "activationThresholdDistal": 3,
         "sampleSizeDistal": 5,
         "connectedPermanenceDistal": 0.5,
-        "learningMode": True,
     }
     l4Params = {
         "columnCount": 50,
         "cellsPerColumn": 4,
-        "learn": True,
-        "learnOnOneCell": False,
         "initialPermanence": 0.51,
         "connectedPermanence": 0.6,
         "permanenceIncrement": 0.1,
@@ -233,7 +278,6 @@ class L4L2ExperimentTest(unittest.TestCase):
         "basalPredictedSegmentDecrement": 0.002,
         "activationThreshold": 3,
         "sampleSize": 20,
-        "implementation": "ApicalTiebreakCPP",
     }
     l4ColumnCount = 50
     numCorticalColumns=2
@@ -653,13 +697,10 @@ class L4L2ExperimentTest(unittest.TestCase):
       numExternalInputBits=10,
       numLearningPoints=3,
     )
-    net = exp.network
 
     L4Params =  {
       "columnCount": 1024,
       "cellsPerColumn": 16,
-      "learn": True,
-      "learnOnOneCell": False,
       "initialPermanence": 0.51,
       "connectedPermanence": 0.6,
       "permanenceIncrement": 0.1,
@@ -686,18 +727,15 @@ class L4L2ExperimentTest(unittest.TestCase):
       "activationThresholdDistal": 13,
       "sampleSizeDistal": 20,
       "connectedPermanenceDistal": 0.5,
-      "learningMode": True,
     }
-    L4Column = net.regions["L4Column_0"].getSelf()
-    L2Column = net.regions["L2Column_0"].getSelf()
 
     # check the default parameters are correct in L4
     for param, value in L4Params.items():
-      self.assertEqual(L4Column.getParameter(param), value)
+      self.assertEqual(exp.L4Params[param], value)
 
     # check the default parameters are correct in L2
     for param, value in L2Params.items():
-      self.assertEqual(L2Column.getParameter(param), value)
+      self.assertEqual(exp.L2Params[param], value)
 
 
 
