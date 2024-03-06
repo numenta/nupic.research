@@ -25,15 +25,14 @@ scenarios.
 """
 
 import pickle
-from multiprocessing import Pool
 import random
 import time
+from multiprocessing import Pool
+
 import numpy
 
 from nupic.research.frameworks.columns.l2_l4_inference import L4L2Experiment
-from nupic.research.frameworks.columns.object_machine_factory import (
-  createObjectMachine
-)
+from nupic.research.frameworks.columns.object_machine_factory import createObjectMachine
 
 
 def runExperiment(args):
@@ -89,7 +88,6 @@ def runExperiment(args):
   includeRandomLocation = args.get("includeRandomLocation", False)
   enableFeedback = args.get("enableFeedback", True)
   numAmbiguousLocations = args.get("numAmbiguousLocations", 0)
-  numInferenceRpts = args.get("numInferenceRpts", 1)
   l2Params = args.get("l2Params", None)
   l4Params = args.get("l4Params", None)
 
@@ -106,12 +104,12 @@ def runExperiment(args):
   )
 
   objects.createRandomObjects(numObjects, numPoints=numPoints,
-                                    numLocations=numLocations,
-                                    numFeatures=numFeatures)
+                              numLocations=numLocations,
+                              numFeatures=numFeatures)
 
   r = objects.objectConfusion()
-  print("Average common pairs in objects=", r[0], end=' ')
-  print(", locations=",r[1],", features=",r[2])
+  print("Average common pairs in objects=", r[0], end="" "")
+  print(", locations=", r[1], ", features=", r[2])
 
   # print "Total number of objects created:",len(objects.getObjects())
   # print "Objects are:"
@@ -143,8 +141,8 @@ def runExperiment(args):
   # object, we create a sequence of random sensations for each column.  We will
   # present each sensation for settlingTime time steps to let it settle and
   # ensure it converges.
-  numCorrectClassifications=0
-  classificationPerSensation = numpy.zeros(settlingTime*numPoints)
+  numCorrectClassifications = 0
+  classificationPerSensation = numpy.zeros(settlingTime * numPoints)
   for objectId in objects:
     exp.sendReset()
 
@@ -159,7 +157,7 @@ def runExperiment(args):
       # on the object.  It is ok for a given column to sense a loc,feature pair
       # more than once. The total number of sensations is equal to the number of
       # points on the object.
-      for sensationNumber in range(len(obj)):
+      for _sensationNumber in range(len(obj)):
         # Randomly shuffle points for each sensation
         objectCopy = [pair for pair in obj]
         random.shuffle(objectCopy)
@@ -208,23 +206,22 @@ def runExperiment(args):
         onePlot=False,
       )
 
-
   convergencePoint, accuracy = exp.averageConvergencePoint("L2 Representation",
-                                                 30, 40, settlingTime)
+                                                           30, 40, settlingTime)
   classificationAccuracy = float(numCorrectClassifications) / numObjects
   classificationPerSensation = classificationPerSensation / numObjects
 
   print("# objects {} # features {} # locations {} # columns {} trial # {}".format(
     numObjects, numFeatures, numLocations, numColumns, trialNum))
-  print("Average convergence point=",convergencePoint)
-  print("Classification accuracy=",classificationAccuracy)
+  print("Average convergence point=", convergencePoint)
+  print("Classification accuracy=", classificationAccuracy)
   print()
 
   # Return our convergence point as well as all the parameters and objects
   args.update({"objects": objects.getObjects()})
-  args.update({"convergencePoint":convergencePoint})
-  args.update({"classificationAccuracy":classificationAccuracy})
-  args.update({"classificationPerSensation":classificationPerSensation.tolist()})
+  args.update({"convergencePoint": convergencePoint})
+  args.update({"classificationAccuracy": classificationAccuracy})
+  args.update({"classificationPerSensation": classificationPerSensation.tolist()})
 
   # Can't pickle experiment so can't return it for batch multiprocessing runs.
   # However this is very useful for debugging when running in a single thread.
@@ -237,14 +234,14 @@ def runExperimentPool(numObjects,
                       numLocations,
                       numFeatures,
                       numColumns,
-                      longDistanceConnectionsRange = [0.0],
+                      longDistanceConnectionsRange=(0.0),
                       numWorkers=7,
                       nTrials=1,
                       numPoints=10,
-                      locationNoiseRange=[0.0],
-                      featureNoiseRange=[0.0],
-                      enableFeedback=[True],
-                      ambiguousLocationsRange=[0],
+                      locationNoiseRange=(0.0),
+                      featureNoiseRange=(0.0),
+                      enableFeedback=(True),
+                      ambiguousLocationsRange=(0),
                       numInferenceRpts=1,
                       settlingTime=3,
                       l2Params=None,
@@ -273,7 +270,7 @@ def runExperimentPool(numObjects,
 
   for c in reversed(numColumns):
     for o in reversed(numObjects):
-      for l in numLocations:
+      for loc in numLocations:
         for f in numFeatures:
           for p in longDistanceConnectionsRange:
             for t in range(nTrials):
@@ -283,7 +280,7 @@ def runExperimentPool(numObjects,
                     for feedback in enableFeedback:
                       args.append(
                         {"numObjects": o,
-                         "numLocations": l,
+                         "numLocations": loc,
                          "numFeatures": f,
                          "numColumns": c,
                          "trialNum": t,
@@ -299,7 +296,7 @@ def runExperimentPool(numObjects,
                          "l4Params": l4Params,
                          "settlingTime": settlingTime,
                          }
-              )
+                      )
   numExperiments = len(args)
   print("{} experiments to run, {} workers".format(numExperiments, numWorkers))
   # Run the pool
@@ -308,8 +305,9 @@ def runExperimentPool(numObjects,
     rs = pool.map_async(runExperiment, args, chunksize=1)
     while not rs.ready():
       remaining = rs._number_left
-      pctDone = 100.0 - (100.0*remaining) / numExperiments
-      print("    =>", remaining, "experiments remaining, percent complete=",pctDone)
+      pctDone = 100.0 - (100.0 * remaining) / numExperiments
+      print("    =>", remaining, "experiments remaining, percent complete=",
+            pctDone)
       time.sleep(5)
     pool.close()  # No more work
     pool.join()
@@ -323,8 +321,7 @@ def runExperimentPool(numObjects,
   # pprint.pprint(result, width=150)
 
   # Pickle results for later use
-  with open(resultsName,"wb") as f:
-    pickle.dump(result,f)
+  with open(resultsName, "wb") as f:
+    pickle.dump(result, f)
 
   return result
-

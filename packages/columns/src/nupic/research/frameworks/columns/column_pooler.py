@@ -20,9 +20,7 @@
 # ----------------------------------------------------------------------
 
 import numpy
-
-from nupic.bindings.math import SparseMatrix, GetNTAReal, Random
-
+from nupic.bindings.math import Random, SparseMatrix
 
 
 class ColumnPooler(object):
@@ -37,9 +35,9 @@ class ColumnPooler(object):
                lateralInputWidths=(),
                cellCount=4096,
                sdrSize=40,
-               onlineLearning = False,
-               maxSdrSize = None,
-               minSdrSize = None,
+               onlineLearning=False,
+               maxSdrSize=None,
+               minSdrSize=None,
 
                # Proximal
                synPermProximalInc=0.1,
@@ -187,12 +185,11 @@ class ColumnPooler(object):
     self.distalPermanences = tuple(SparseMatrix(cellCount, n)
                                    for n in lateralInputWidths)
 
-    self.useInertia=True
-
+    self.useInertia = True
 
   def compute(self, feedforwardInput=(), lateralInputs=(),
               feedforwardGrowthCandidates=None, learn=True,
-              predictedInput = None,):
+              predictedInput=None,):
     """
     Runs one time step of the column pooler algorithm.
 
@@ -227,12 +224,10 @@ class ColumnPooler(object):
                                 feedforwardGrowthCandidates)
     # online learning step
     else:
-      if (predictedInput is not None and
-          len(predictedInput) > self.predictedInhibitionThreshold):
+      if predictedInput is not None \
+         and len(predictedInput) > self.predictedInhibitionThreshold:
         predictedActiveInput = numpy.intersect1d(feedforwardInput,
                                                  predictedInput)
-        predictedGrowthCandidates = numpy.intersect1d(
-            feedforwardGrowthCandidates, predictedInput)
         self._computeInferenceMode(predictedActiveInput, lateralInputs)
         self._computeLearningMode(predictedActiveInput, lateralInputs,
                                   feedforwardGrowthCandidates)
@@ -248,9 +243,8 @@ class ColumnPooler(object):
         self._computeLearningMode(feedforwardInput, lateralInputs,
                                   feedforwardGrowthCandidates)
 
-
   def _computeLearningMode(self, feedforwardInput, lateralInputs,
-                                 feedforwardGrowthCandidates):
+                           feedforwardGrowthCandidates):
     """
     Learning mode: we are learning a new object in an online fashion. If there
     is no prior activity, we randomly activate 'sdrSize' cells and create
@@ -317,7 +311,6 @@ class ColumnPooler(object):
                   self.synPermDistalInc, self.synPermDistalDec,
                   self.connectedPermanenceDistal)
 
-
   def _computeInferenceMode(self, feedforwardInput, lateralInputs):
     """
     Inference mode: if there is some feedforward activity, perform
@@ -369,8 +362,9 @@ class ColumnPooler(object):
       # quorum - but will exclude cells with 0 lateral active segments.
       ttop = numpy.max(numActiveSegsForFFSuppCells)
       while ttop > 0 and len(chosenCells) < self.sdrSize:
-        chosenCells = numpy.union1d(chosenCells,
-                    feedforwardSupportedCells[numActiveSegsForFFSuppCells >= ttop])
+        chosenCells = numpy.union1d(
+          chosenCells,
+          feedforwardSupportedCells[numActiveSegsForFFSuppCells >= ttop])
         ttop -= 1
 
     # If we haven't filled the sdrSize quorum, add in inertial cells.
@@ -396,8 +390,9 @@ class ColumnPooler(object):
           # support until we either meet quota or run out of cells.
           ttop = numpy.max(numActiveSegsForPrevCells)
           while ttop >= 0 and len(chosenCells) < self.sdrSize:
-            chosenCells = numpy.union1d(chosenCells,
-                        prevCells[numActiveSegsForPrevCells >= ttop])
+            chosenCells = numpy.union1d(
+              chosenCells,
+              prevCells[numActiveSegsForPrevCells >= ttop])
             ttop -= 1
 
     # If we haven't filled the sdrSize quorum, add cells that have feedforward
@@ -428,13 +423,11 @@ class ColumnPooler(object):
     chosenCells.sort()
     self.activeCells = numpy.asarray(chosenCells, dtype="uint32")
 
-
   def numberOfInputs(self):
     """
     Returns the number of inputs into this layer
     """
     return self.inputWidth
-
 
   def numberOfCells(self):
     """
@@ -443,14 +436,12 @@ class ColumnPooler(object):
     """
     return self.cellCount
 
-
   def getActiveCells(self):
     """
     Returns the indices of the active cells.
     @return (list) Indices of active cells.
     """
     return self.activeCells
-
 
   def numberOfConnectedProximalSynapses(self, cells=None):
     """
@@ -466,7 +457,6 @@ class ColumnPooler(object):
 
     return _countWhereGreaterEqualInRows(self.proximalPermanences, cells,
                                          self.connectedPermanenceProximal)
-
 
   def numberOfProximalSynapses(self, cells=None):
     """
@@ -484,7 +474,6 @@ class ColumnPooler(object):
     for cell in cells:
       n += self.proximalPermanences.nNonZerosOnRow(cell)
     return n
-
 
   def numberOfDistalSegments(self, cells=None):
     """
@@ -512,7 +501,6 @@ class ColumnPooler(object):
 
     return n
 
-
   def numberOfConnectedDistalSynapses(self, cells=None):
     """
     Returns the number of connected distal synapses on these cells.
@@ -534,7 +522,6 @@ class ColumnPooler(object):
 
     return n
 
-
   def numberOfDistalSynapses(self, cells=None):
     """
     Returns the total number of distal synapses for these cells.
@@ -553,7 +540,6 @@ class ColumnPooler(object):
       for permanences in self.distalPermanences:
         n += permanences.nNonZerosOnRow(cell)
     return n
-
 
   def reset(self):
     """
@@ -581,8 +567,7 @@ class ColumnPooler(object):
     self.useInertia = useInertia
 
   @staticmethod
-  def _learn(# mutated args
-             permanences, rng,
+  def _learn(permanences, rng,  # mutated args
 
              # activity
              activeCells, activeInput, growthCandidateInput,
@@ -674,7 +659,7 @@ def _countWhereGreaterEqualInRows(sparseMatrix, rows, threshold):
   Like countWhereGreaterOrEqual, but for an arbitrary selection of rows, and
   without any column filtering.
   """
-  return sum(sparseMatrix.countWhereGreaterEqual(row, row+1,
+  return sum(sparseMatrix.countWhereGreaterEqual(row, row + 1,
                                                  0, sparseMatrix.nCols(),
                                                  threshold)
              for row in rows)

@@ -20,10 +20,10 @@
 # ----------------------------------------------------------------------
 
 import random
+
 import numpy
 
 from nupic.research.frameworks.columns.object_machine_base import ObjectMachineBase
-
 
 
 class SimpleObjectMachine(ObjectMachineBase):
@@ -33,7 +33,6 @@ class SimpleObjectMachine(ObjectMachineBase):
   Each feature (resp. location) index corresponds to a randomly-generated SDR
   in the machine.
   """
-
 
   def __init__(self,
                numInputBits=40,
@@ -89,7 +88,6 @@ class SimpleObjectMachine(ObjectMachineBase):
     self._generateFeatures()
     numpy.random.seed(seed)
 
-
   def provideObjectsToLearn(self, objectNames=None):
     """
     Returns the objects in a canonical format to be sent to an experiment.
@@ -127,12 +125,11 @@ class SimpleObjectMachine(ObjectMachineBase):
 
     objects = {}
     for name in objectNames:
-      objects[name] = [self._getSDRPairs([pair] * self.numColumns) \
+      objects[name] = [self._getSDRPairs([pair] * self.numColumns)
                        for pair in self.objects[name]]
 
     self._checkObjectsToLearn(objects)
     return objects
-
 
   def provideObjectToInfer(self, inferenceConfig):
     """
@@ -198,7 +195,6 @@ class SimpleObjectMachine(ObjectMachineBase):
     self._checkObjectToInfer(sensationSteps)
     return sensationSteps
 
-
   def addObject(self, pairs, name=None):
     """
     Adds an object to the Machine.
@@ -207,7 +203,6 @@ class SimpleObjectMachine(ObjectMachineBase):
       name = len(self.objects)
 
     self.objects[name] = pairs
-
 
   def createRandomObjects(self,
                           numObjects,
@@ -226,7 +221,7 @@ class SimpleObjectMachine(ObjectMachineBase):
         numFeatures = numPoints
 
       assert(numPoints <= numLocations), ("Number of points in object cannot be "
-            "greater than number of locations")
+                                          "greater than number of locations")
 
       locationArray = numpy.array(list(range(numLocations)))
       numpy.random.seed(self.seed)
@@ -238,7 +233,6 @@ class SimpleObjectMachine(ObjectMachineBase):
             numpy.random.randint(0, numFeatures)) for p in range(numPoints)],
         )
 
-
   def getDistinctPairs(self):
     """
     Return a set consisting of unique feature/location pairs across all
@@ -248,7 +242,6 @@ class SimpleObjectMachine(ObjectMachineBase):
     for pairs in self.objects.values():
       distinctPairs = distinctPairs.union(set(pairs))
     return distinctPairs
-
 
   def getUniqueFeaturesLocationsInObject(self, name):
     """
@@ -262,7 +255,6 @@ class SimpleObjectMachine(ObjectMachineBase):
       uniqueFeatures = uniqueFeatures.union({pair[1]})
 
     return uniqueLocations, uniqueFeatures
-
 
   def _getSDRPairs(self,
                    pairs,
@@ -322,7 +314,6 @@ class SimpleObjectMachine(ObjectMachineBase):
 
     return sensations
 
-
   def _addNoise(self, pattern, noiseLevel, inputSize):
     """
     Adds noise to the given pattern and returns the new one.
@@ -348,7 +339,6 @@ class SimpleObjectMachine(ObjectMachineBase):
 
     return newBits
 
-
   def _generateLocations(self):
     """
     Generates a pool of locations to be used for the experiments.
@@ -365,7 +355,6 @@ class SimpleObjectMachine(ObjectMachineBase):
         [self._generatePattern(bits, size) for _ in range(self.numLocations)]
       )
 
-
   def _generateFeatures(self):
     """
     Generates a pool of features to be used for the experiments.
@@ -380,4 +369,4 @@ class SimpleObjectMachine(ObjectMachineBase):
     for _ in range(self.numColumns):
       self.features.append(
         [self._generatePattern(bits, size) for _ in range(self.numFeatures)]
-    )
+      )

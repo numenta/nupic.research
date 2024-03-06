@@ -22,12 +22,11 @@
 import math
 import random
 
-import numpy as np
 import matplotlib.pyplot as plt
-
+import numpy as np
 from nupic.encoders.coordinate import CoordinateEncoder
-from nupic.research.frameworks.columns.object_machine_base import ObjectMachineBase
 
+from nupic.research.frameworks.columns.object_machine_base import ObjectMachineBase
 
 
 class ContinuousLocationObjectMachine(ObjectMachineBase):
@@ -94,7 +93,6 @@ class ContinuousLocationObjectMachine(ObjectMachineBase):
       n=externalInputSize,
       name="locationEncoder"
     )
-
 
   def provideObjectsToLearn(self, learningConfig, plot=False):
     """
@@ -183,7 +181,6 @@ class ContinuousLocationObjectMachine(ObjectMachineBase):
     self._checkObjectsToLearn(objects)
     return objects
 
-
   def provideObjectToInfer(self, inferenceConfig, plot=False):
     """
     Returns the sensations in a canonical format to be sent to an experiment.
@@ -268,14 +265,13 @@ class ContinuousLocationObjectMachine(ObjectMachineBase):
       plt.title("Inference points for object {}".format(
         inferenceConfig["objectName"])
       )
-      plt.savefig("infer_{}.png".format( inferenceConfig["objectName"]))
+      plt.savefig("infer_{}.png".format(inferenceConfig["objectName"]))
       plt.close()
 
     self._checkObjectToInfer(sensationSteps)
     return sensationSteps
 
-
-  def addObject(self, object, name=None):
+  def addObject(self, obj, name=None):
     """
     Adds an object to the Machine.
 
@@ -284,8 +280,7 @@ class ContinuousLocationObjectMachine(ObjectMachineBase):
     if name is None:
       name = len(self.objects)
 
-    self.objects[name] = object
-
+    self.objects[name] = obj
 
   def _getSDRPairs(self, pairs, noise=None):
     """
@@ -325,7 +320,6 @@ class ContinuousLocationObjectMachine(ObjectMachineBase):
 
     return sensations
 
-
   def _getRadius(self, location):
     """
     Returns the radius associated with the given location.
@@ -338,7 +332,6 @@ class ContinuousLocationObjectMachine(ObjectMachineBase):
     """
     # TODO: find better heuristic
     return int(math.sqrt(sum([coord ** 2 for coord in location])))
-
 
   def _addNoise(self, pattern, noiseLevel):
     """
@@ -356,7 +349,6 @@ class ContinuousLocationObjectMachine(ObjectMachineBase):
 
     return set(newBits)
 
-
   def _generatePattern(self, numBits, totalSize):
     """
     Generates a random SDR with specified number of bits and total size.
@@ -364,7 +356,6 @@ class ContinuousLocationObjectMachine(ObjectMachineBase):
     cellsIndices = list(range(totalSize))
     random.shuffle(cellsIndices)
     return set(cellsIndices[:numBits])
-
 
   def _generateFeatures(self):
     """
@@ -380,4 +371,4 @@ class ContinuousLocationObjectMachine(ObjectMachineBase):
     for _ in range(self.numColumns):
       self.features.append(
         [self._generatePattern(bits, size) for _ in range(self.numFeatures)]
-    )
+      )

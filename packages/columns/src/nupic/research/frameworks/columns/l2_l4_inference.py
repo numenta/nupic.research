@@ -80,19 +80,15 @@ projects/layers/multi_column.py
 import collections
 import os
 import random
-import matplotlib.pyplot as plt
-import numpy as np
 from math import ceil
 
-# from nupic.bindings.algorithms import SpatialPooler
+import matplotlib.pyplot as plt
+import numpy as np
+from nupic.bindings.algorithms import SpatialPooler
 from nupic.bindings.math import SparseMatrix
 
+from nupic.research.frameworks.columns import ApicalTiebreakPairMemory, ColumnPooler
 from nupic.research.frameworks.columns.support.logging_decorator import LoggingDecorator
-from nupic.research.frameworks.columns import (
-  ApicalTiebreakPairMemory,
-  ColumnPooler,
-)
-
 
 
 def rerunExperimentFromLogfile(logFilename):
@@ -114,7 +110,6 @@ def rerunExperimentFromLogfile(logFilename):
   return exp
 
 
-
 class L4L2Experiment(object):
   """
   This class implements an L4-L2 network.
@@ -125,7 +120,6 @@ class L4L2Experiment(object):
 
   """
 
-
   @LoggingDecorator()
   def __init__(self,
                name,
@@ -135,9 +129,9 @@ class L4L2Experiment(object):
                externalInputSize=1024,
                numExternalInputBits=20,
                L2Overrides=None,
-               longDistanceConnections = 0,
-               maxConnectionDistance = 1,
-               columnPositions = None,
+               longDistanceConnections=0,
+               maxConnectionDistance=1,
+               columnPositions=None,
                L4Overrides=None,
                numLearningPoints=3,
                seed=42,
@@ -258,7 +252,7 @@ class L4L2Experiment(object):
 
     # Support for topology hasn't been re-added since the port to Python 3.
     if False:
-    # if "Topology" in self.config["networkType"]:
+      # if "Topology" in self.config["networkType"]:
       self.config["maxConnectionDistance"] = maxConnectionDistance
 
       # Generate a grid for cortical columns.  Will attempt to generate a full
@@ -301,7 +295,6 @@ class L4L2Experiment(object):
       for _ in range(self.numColumns)]
     self.objectNameToIndex = {}
     self.resetStatistics()
-
 
   def doTimestep(self, sensations, learn):
     """
@@ -368,7 +361,6 @@ class L4L2Experiment(object):
                  feedforwardGrowthCandidates=L4.getPredictedActiveCells(),
                  lateralInputs=lateralInputs,
                  learn=learn)
-
 
   @LoggingDecorator()
   def learnObjects(self, objects, reset=True):
@@ -490,7 +482,6 @@ class L4L2Experiment(object):
 
     self.statistics.append(statistics)
 
-
   def _saveL2Representation(self, objectName):
     """
     Record the current active L2 cells as the representation for 'objectName'.
@@ -518,7 +509,6 @@ class L4L2Experiment(object):
       matrix.setRowFromSparse(objectIndex, activeCells,
                               np.ones(len(activeCells), dtype="float32"))
 
-
   def _sendReset(self, sequenceId=0):
     """
     Sends a reset signal to the network.
@@ -527,7 +517,6 @@ class L4L2Experiment(object):
       self.L4Columns[col].reset()
       self.L2Columns[col].reset()
 
-
   @LoggingDecorator()
   def sendReset(self, *args, **kwargs):
     """
@@ -535,10 +524,8 @@ class L4L2Experiment(object):
     """
     self._sendReset(*args, **kwargs)
 
-
   def resetStatistics(self):
     self.statistics = []
-
 
   def plotInferenceStats(self,
                          fields,
@@ -574,7 +561,7 @@ class L4L2Experiment(object):
       # plot request stats
       for field in fields:
         fieldKey = field + " C" + str(i)
-        plt.plot(stats[fieldKey], marker='+', label=fieldKey)
+        plt.plot(stats[fieldKey], marker="+", label=fieldKey)
 
       # format
       plt.legend(loc="upper right")
@@ -597,7 +584,6 @@ class L4L2Experiment(object):
       plt.savefig(path)
       plt.close()
 
-
   def getInferenceStats(self, experimentID=None):
     """
     Returns the statistics for the desired experiment. If experimentID is None
@@ -613,7 +599,6 @@ class L4L2Experiment(object):
       return self.statistics
     else:
       return self.statistics[experimentID]
-
 
   def averageConvergencePoint(self, prefix, minOverlap, maxOverlap,
                               settlingTime=1, firstStat=0, lastStat=None):
@@ -661,8 +646,7 @@ class L4L2Experiment(object):
       return 10000.0, 0.0
 
     return (convergenceSum / len(self.statistics[firstStat:lastStat]),
-            numCorrect / len(self.statistics[firstStat:lastStat]) )
-
+            numCorrect / len(self.statistics[firstStat:lastStat]))
 
   def getL4Representations(self):
     """
@@ -670,13 +654,11 @@ class L4L2Experiment(object):
     """
     return [set(L4.getActiveCells()) for L4 in self.L4Columns]
 
-
   def getL4PredictedCells(self):
     """
     Returns the cells in L4 that were predicted by the location input.
     """
     return [set(L4.getPredictedCells()) for L4 in self.L4Columns]
-
 
   def getL4PredictedActiveCells(self):
     """
@@ -685,13 +667,11 @@ class L4L2Experiment(object):
     """
     return [set(L4.getPredictedActiveCells()) for L4 in self.L4Columns]
 
-
   def getL2Representations(self):
     """
     Returns the active representation in L2.
     """
     return [set(L2.getActiveCells()) for L2 in self.L2Columns]
-
 
   def getAlgorithmInstance(self, layer="L2", column=0):
     """
@@ -699,8 +679,8 @@ class L4L2Experiment(object):
     layer=L2 and column=1 could return the actual instance of ColumnPooler
     that is responsible for column 1.
     """
-    assert ( (column>=0) and (column<self.numColumns)), ("Column number not "
-                          "in valid range")
+    assert ((column >= 0) and (column < self.numColumns)), ("Column number not "
+                                                            "in valid range")
 
     if layer == "L2":
       return self.L2Columns[column].getAlgorithmInstance()
@@ -708,7 +688,6 @@ class L4L2Experiment(object):
       return self.L4Columns[column].getAlgorithmInstance()
     else:
       raise Exception("Invalid layer. Must be 'L4' or 'L2'")
-
 
   def getCurrentObjectOverlaps(self):
     """
@@ -729,7 +708,6 @@ class L4L2Experiment(object):
       overlaps[i, :] = representations.rightVecSumAtNZSparse(activeCells)
 
     return overlaps
-
 
   def getCurrentClassification(self, minOverlap=None, includeZeros=True):
     """
@@ -768,11 +746,10 @@ class L4L2Experiment(object):
         if includeZeros:
           results[objectName] = 0
       else:
-        if includeZeros or score>0.0:
+        if includeZeros or score > 0.0:
           results[objectName] = score / count
 
     return results
-
 
   def isObjectClassified(self, objectName, minOverlap=None, maxL2Size=None):
     """
@@ -795,20 +772,20 @@ class L4L2Experiment(object):
     if minOverlap is None:
       minOverlap = sdrSize / 2
     if maxL2Size is None:
-      maxL2Size = 1.5*sdrSize
+      maxL2Size = 1.5 * sdrSize
 
     numCorrectClassifications = 0
     for col in range(self.numColumns):
       overlapWithObject = len(objectRepresentation[col] & L2Representation[col])
 
-      if ( overlapWithObject >= minOverlap  and
-           len(L2Representation[col]) <= maxL2Size ):
+      if overlapWithObject >= minOverlap \
+         and len(L2Representation[col]) <= maxL2Size:
         numCorrectClassifications += 1
 
     return numCorrectClassifications == self.numColumns
 
-
-  def getDefaultL4Params(self, inputSize, feedbackInputSize, externalInputSize, numInputBits):
+  def getDefaultL4Params(self, inputSize, feedbackInputSize, externalInputSize,
+                         numInputBits):
     """
     Returns a good default set of parameters to use in the L4 region.
     """
@@ -828,7 +805,7 @@ class L4L2Experiment(object):
       "columnCount": inputSize,
       "basalInputSize": externalInputSize,
       "apicalInputSize": feedbackInputSize,
-      "cellsPerColumn": 16, # Keep synced with L2 "inputWidth"
+      "cellsPerColumn": 16,  # Keep synced with L2 "inputWidth"
       "initialPermanence": 0.51,
       "connectedPermanence": 0.6,
       "permanenceIncrement": 0.1,
@@ -837,11 +814,10 @@ class L4L2Experiment(object):
       "basalPredictedSegmentDecrement": 0.0,
       "apicalPredictedSegmentDecrement": 0.0,
       "activationThreshold": activationThreshold,
-      "reducedBasalThreshold": int(activationThreshold*0.6),
+      "reducedBasalThreshold": int(activationThreshold * 0.6),
       "sampleSize": sampleSize,
       "seed": self.seed
     }
-
 
   def getDefaultL2Params(self, numCorticalColumns, inputSize, numInputBits):
     """
@@ -858,9 +834,9 @@ class L4L2Experiment(object):
       minThresholdProximal = int(sampleSizeProximal * .6)
 
     return {
-      "inputWidth": inputSize * 16, # Keep synced with L4 "cellsPerColumn"
-      "cellCount": 4096, # Keep synced with L4 "apicalInputDimensions"
-      "lateralInputWidths": [4096]*(numCorticalColumns-1),
+      "inputWidth": inputSize * 16,  # Keep synced with L4 "cellsPerColumn"
+      "cellCount": 4096,
+      "lateralInputWidths": [4096] * (numCorticalColumns - 1),
       "sdrSize": 40,
       "synPermProximalInc": 0.1,
       "synPermProximalDec": 0.001,
@@ -877,7 +853,6 @@ class L4L2Experiment(object):
       "seed": self.seed,
     }
 
-
   def getDefaultLateralSPParams(self, inputSize):
     return {
       "globalInhibition": True,
@@ -892,7 +867,6 @@ class L4L2Experiment(object):
       "synPermInactiveDec": 0.0005,
       "boostStrength": 0.0,
     }
-
 
   def getDefaultFeedForwardSPParams(self, inputSize):
     return {
@@ -923,7 +897,6 @@ class L4L2Experiment(object):
 
     # Never differs - converged in one iteration
     return 1
-
 
   def _updateInferenceStats(self, statistics, objectName=None):
     """
@@ -964,7 +937,7 @@ class L4L2Experiment(object):
       if objectName in self.objectL2Representations:
         objectRepresentation = self.objectL2Representations[objectName]
         statistics["Overlap L2 with object C" + str(i)].append(
-          len(objectRepresentation[i] & L2Representation[i]) )
+          len(objectRepresentation[i] & L2Representation[i]))
 
     if objectName in self.objectL2Representations:
       if self.isObjectClassified(objectName):

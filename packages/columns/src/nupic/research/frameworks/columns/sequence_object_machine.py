@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 import random
+
 import numpy
 
 from nupic.research.frameworks.columns.object_machine_base import ObjectMachineBase
@@ -34,7 +35,6 @@ class SequenceObjectMachine(ObjectMachineBase):
 
   Locations are generated as random vectors.
   """
-
 
   def __init__(self,
                numInputBits=40,
@@ -72,10 +72,10 @@ class SequenceObjectMachine(ObjectMachineBase):
 
     """
     super(SequenceObjectMachine, self).__init__(numInputBits,
-                                              sensorInputSize,
-                                              externalInputSize,
-                                              numCorticalColumns,
-                                              seed)
+                                                sensorInputSize,
+                                                externalInputSize,
+                                                numCorticalColumns,
+                                                seed)
 
     # features pool
     self.numLocations = numLocations
@@ -83,7 +83,6 @@ class SequenceObjectMachine(ObjectMachineBase):
     self._generateFeatures()
     self._generateLocations()
     numpy.random.seed(seed)
-
 
   def provideObjectsToLearn(self, objectNames=None):
     """
@@ -105,12 +104,11 @@ class SequenceObjectMachine(ObjectMachineBase):
     objects = {}
     for name in objectNames:
       objects[name] = [self._getSDRPairs([pair] * self.numColumns,
-                                         includeRandomLocation=True) \
+                                         includeRandomLocation=True)
                        for pair in self.objects[name]]
 
     self._checkObjectsToLearn(objects)
     return objects
-
 
   def provideObjectToInfer(self, inferenceConfig):
     """
@@ -168,7 +166,6 @@ class SequenceObjectMachine(ObjectMachineBase):
     self._checkObjectToInfer(sensationSteps)
     return sensationSteps
 
-
   def addObject(self, featureIndices, name=None):
     """
     Adds a sequence (list of feature indices) to the Machine.
@@ -177,14 +174,14 @@ class SequenceObjectMachine(ObjectMachineBase):
       name = len(self.objects)
 
     sequence = []
-    for f in featureIndices: sequence += [(0, f,)]
+    for f in featureIndices:
+      sequence += [(0, f,)]
 
     self.objects[name] = sequence
 
-
   def createRandomSequences(self,
-                          numSequences,
-                          sequenceLength):
+                            numSequences,
+                            sequenceLength):
     """
     Creates a set of random sequences, each with sequenceLength elements,
     and adds them to the machine.
@@ -192,9 +189,8 @@ class SequenceObjectMachine(ObjectMachineBase):
     for _ in range(numSequences):
       self.addObject(
         [numpy.random.randint(0, self.numFeatures)
-                                            for _ in range(sequenceLength)]
+         for _ in range(sequenceLength)]
       )
-
 
   def _getSDRPairs(self, pairs, noise=None, includeRandomLocation=False):
     """
@@ -208,7 +204,7 @@ class SequenceObjectMachine(ObjectMachineBase):
 
       # generate random location if requested
       if includeRandomLocation:
-        locationID = random.randint(0, self.numLocations-1)
+        locationID = random.randint(0, self.numLocations - 1)
         location = self.locations[col][locationID]
 
       # generate union of locations if requested
@@ -238,7 +234,6 @@ class SequenceObjectMachine(ObjectMachineBase):
 
     return sensations
 
-
   def _addNoise(self, pattern, noiseLevel, inputSize):
     """
     Adds noise to the given pattern and returns the new one.
@@ -264,7 +259,6 @@ class SequenceObjectMachine(ObjectMachineBase):
 
     return newBits
 
-
   def _generateFeatures(self):
     """
     Generates a pool of features to be used for the experiments.
@@ -279,8 +273,7 @@ class SequenceObjectMachine(ObjectMachineBase):
     for _ in range(self.numColumns):
       self.features.append(
         [self._generatePattern(bits, size) for _ in range(self.numFeatures)]
-    )
-
+      )
 
   def _generateLocations(self):
     """

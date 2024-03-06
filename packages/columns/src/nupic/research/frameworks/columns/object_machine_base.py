@@ -19,9 +19,10 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from abc import ABCMeta, abstractmethod
 import copy
 import random
+from abc import ABCMeta, abstractmethod
+
 import numpy
 
 
@@ -36,7 +37,6 @@ class ObjectMachineBase(object, metaclass=ABCMeta):
   This is the base class. It has a few generic methods and specifies
   required methods for any child class.
   """
-
 
   def __init__(self,
                numInputBits,
@@ -77,7 +77,6 @@ class ObjectMachineBase(object, metaclass=ABCMeta):
     # objects
     self.objects = {}
 
-
   @abstractmethod
   def provideObjectsToLearn(self, *args, **kwargs):
     """
@@ -94,7 +93,6 @@ class ObjectMachineBase(object, metaclass=ABCMeta):
              List of object names to provide to the experiment
 
     """
-
 
   @abstractmethod
   def provideObjectToInfer(self, inferenceConfig):
@@ -117,14 +115,12 @@ class ObjectMachineBase(object, metaclass=ABCMeta):
 
     """
 
-
   @abstractmethod
   def addObject(self, *args, **kwargs):
     """
     Adds an object to the Machine. The arguments are specific to each
     implementation.
     """
-
 
   @staticmethod
   def randomTraversal(sensations, numTraversals):
@@ -142,13 +138,11 @@ class ObjectMachineBase(object, metaclass=ABCMeta):
       newSensations += s
     return newSensations
 
-
   def getObjects(self):
     """
     Return internal dictionary containing all objects
     """
     return self.objects
-
 
   def objectConfusion(self):
     """
@@ -179,11 +173,14 @@ class ObjectMachineBase(object, metaclass=ABCMeta):
           commonFeatures = 0
           for pair1 in s1:
             for pair2 in s2:
-              if pair1[0] == pair2[0]: commonLocations += 1
-              if pair1[1] == pair2[1]: commonFeatures += 1
+              if pair1[0] == pair2[0]:
+                commonLocations += 1
+              if pair1[1] == pair2[1]:
+                commonFeatures += 1
 
           # print "Confusion",o1,o2,", common pairs=",len(set(s1)&set(s2)),
-          # print ", common locations=",commonLocations,"common features=",commonFeatures
+          # print ", common locations=",commonLocations
+          # ,"common features=",commonFeatures
 
           if len(set(s1) & set(s2)) == len(s1):
             raise RuntimeError("Two objects are identical!")
@@ -201,7 +198,6 @@ class ObjectMachineBase(object, metaclass=ABCMeta):
             sumCommonFeatures / float(numObjects)
             )
 
-
   def _checkObjectsToLearn(self, objects):
     """
     Checks that objects have the correct format before being sent to the
@@ -210,7 +206,7 @@ class ObjectMachineBase(object, metaclass=ABCMeta):
     for objectName, sensationList in objects.items():
       if objectName not in self.objects:
         raise ValueError(
-          "Invalid object name \"{}\" sent to experiment".format(objectName)
+          """Invalid object name "{}" sent to experiment""".format(objectName)
         )
 
       for sensations in sensationList:
@@ -223,7 +219,6 @@ class ObjectMachineBase(object, metaclass=ABCMeta):
                   not isinstance(pair[0], set) or \
                   not isinstance(pair[1], set):
             raise ValueError("Invalid SDR's sent to experiment")
-
 
   def _checkObjectToInfer(self, sensationList):
     """
@@ -241,7 +236,6 @@ class ObjectMachineBase(object, metaclass=ABCMeta):
                 not isinstance(pair[1], set):
           raise ValueError("Invalid SDR's sent to experiment")
 
-
   @staticmethod
   def _generatePattern(numBits, totalSize):
     """
@@ -250,20 +244,17 @@ class ObjectMachineBase(object, metaclass=ABCMeta):
     indices = random.sample(range(totalSize), numBits)
     return set(indices)
 
-
   def __len__(self):
     """
     Custom length method.
     """
     return len(self.objects)
 
-
   def __iter__(self):
     """
     Custom iteration method.
     """
     return self.objects.__iter__()
-
 
   def __getitem__(self, item):
     """

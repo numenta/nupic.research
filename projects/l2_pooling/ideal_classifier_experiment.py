@@ -32,31 +32,31 @@ python ideal_classifier_experiment.py --location 1
 python ideal_classifier_experiment.py  --location 0
 """
 
-import pickle
 import math
-from optparse import OptionParser
 import os
+import pickle
 import random
 from multiprocessing import Pool, cpu_count
+from optparse import OptionParser
 
-import numpy
-import numpy as np
-import  matplotlib.pyplot as plt
 import matplotlib as mpl
-mpl.rcParams['pdf.fonttype'] = 42
+import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib import rc
-rc('font',**{'family':'sans-serif','sans-serif':['Arial']})
-
-from nupic.research.frameworks.columns.object_machine_factory import (
-  createObjectMachine
-)
 
 from nupic.research.frameworks.columns.multi_column_convergence_experiment import (
-  runExperimentPool
+    runExperimentPool,
 )
+from nupic.research.frameworks.columns.object_machine_factory import createObjectMachine
+
+mpl.rcParams["pdf.fonttype"] = 42
+rc("font", **{"family": "sans-serif", "sans-serif": ["Arial"]})
+
 
 plt.ion()
-plt.close('all')
+plt.close("all")
+
+
 def _getArgs():
   parser = OptionParser(usage="Train classifier")
 
@@ -67,19 +67,17 @@ def _getArgs():
                     dest="useLocation",
                     help="Whether to use location signal")
 
-
   (options, remainder) = parser.parse_args()
   return options, remainder
 
 
-def findWordInVocabulary(input, wordList):
+def findWordInVocabulary(inp, wordList):
   findWord = None
   for j in range(wordList.shape[0]):
-    numBitDiff = np.sum(np.abs(input - wordList[j, :]))
+    numBitDiff = np.sum(np.abs(inp - wordList[j, :]))
     if numBitDiff == 0:
       findWord = j
   return findWord
-
 
 
 def classifierPredict(testVector, storedVectors):
@@ -104,7 +102,7 @@ def computeUniquePointsSensed(nCols, nPoints, s):
     return min(s, nPoints)
   elif nCols < nPoints:
     q = float(nCols) / nPoints
-    unique = min(int(round(( 1.0 - math.pow(1.0 - q, s)) * nPoints)),
+    unique = min(int(round((1.0 - math.pow(1.0 - q, s)) * nPoints)),
                  nPoints)
     return unique
   else:
@@ -120,18 +118,20 @@ def locateConvergencePoint(stats):
   """
   n = len(stats)
   for i in range(n):
-    if stats[n-i-1] < 1:
-      return n-i
+    if stats[n - i - 1] < 1:
+      return n - i
 
   # Never differs - converged in one iteration
   return 1
 
 
-
-def run_ideal_classifier(args={}):
+def run_ideal_classifier(args=None):
   """
   Create and train classifier using given parameters.
   """
+  if args is None:
+    args = {}
+
   numObjects = args.get("numObjects", 10)
   numLocations = args.get("numLocations", 10)
   numFeatures = args.get("numFeatures", 10)
@@ -186,14 +186,14 @@ def run_ideal_classifier(args={}):
   # enumerate number of distinct "words".
   # Note: this could be done much more easily if we simply use the
   # location/feature pairs that are stored in the object machine.
-  wordList = np.zeros((0, inputWidth), dtype='int32')
+  wordList = np.zeros((0, inputWidth), dtype="int32")
   featureList = np.zeros((numInputVectors,))
   for i in range(numInputVectors):
     index = findWordInVocabulary(data[i, :], wordList)
     if index is not None:
       featureList[i] = index
     else:
-      newWord = np.zeros((1, inputWidth), dtype='int32')
+      newWord = np.zeros((1, inputWidth), dtype="int32")
       newWord[0, :] = data[i, :]
       wordList = np.concatenate((wordList, newWord))
       featureList[i] = wordList.shape[0] - 1
@@ -205,7 +205,7 @@ def run_ideal_classifier(args={}):
   k = 0
   for i in range(numObjects):
     numSensations = len(objectSDRs[objectNames[i]])
-    for j in range(numSensations):
+    for _j in range(numSensations):
       index = findWordInVocabulary(data[k, :], wordList)
       storedObjectRepresentations[i, index] += 1
       k += 1
@@ -213,8 +213,8 @@ def run_ideal_classifier(args={}):
   # Cool plot of feature vectors
   # plt.figure()
   # plt.imshow(np.transpose(storedObjectRepresentations))
-  # plt.xlabel('Object #')
-  # plt.ylabel('Word #')
+  # plt.xlabel("Object #")
+  # plt.ylabel("Word #")
   # plt.title("Object representations")
 
   # Create random order of sensations for each object
@@ -225,20 +225,20 @@ def run_ideal_classifier(args={}):
     # An object can have multiple instances of a word, in which case we
     # add all of them
     for w in wordIndices:
-      senseList.extend(storedObjectRepresentations[i, w]*[w])
+      senseList.extend(storedObjectRepresentations[i, w] * [w])
     random.shuffle(senseList)
     objectSensations.append(senseList)
 
   # plot accuracy as a function of number of sensations
   accuracyList = []
-  classificationOutcome = np.zeros((numObjects, numPoints+1))
-  for sensationNumber in range(1, numPoints+1):
+  classificationOutcome = np.zeros((numObjects, numPoints + 1))
+  for sensationNumber in range(1, numPoints + 1):
     bowVectorsTest = np.zeros((numObjects, numWords), dtype=np.int32)
     for objectId in range(numObjects):
       # No. sensations for object objectId
       sensations = objectSensations[objectId]
-      numPointsToInclude = computeUniquePointsSensed(numColumns,
-                                             len(sensations), sensationNumber)
+      numPointsToInclude = computeUniquePointsSensed(
+        numColumns, len(sensations), sensationNumber)
       for j in range(numPointsToInclude):
         index = sensations[j]
         bowVectorsTest[objectId, index] += 1
@@ -249,8 +249,8 @@ def run_ideal_classifier(args={}):
     for i in range(numObjects):
       overlaps = classifierPredict(bowVectorsTest[i, :], storedObjectRepresentations)
       bestOverlap = max(overlaps)
-      outcome = ( (overlaps[i] == bestOverlap) and
-                  len(np.where(overlaps==bestOverlap)[0]) == 1)
+      outcome = ((overlaps[i] == bestOverlap)
+                 and len(np.where(overlaps == bestOverlap)[0]) == 1)
       numCorrect += outcome
       classificationOutcome[i, sensationNumber] = outcome
     accuracy = float(numCorrect) / numObjects
@@ -258,7 +258,7 @@ def run_ideal_classifier(args={}):
 
   convergencePoint = np.zeros((numObjects, ))
   for i in range(numObjects):
-    if np.max(classificationOutcome[i, :])>0:
+    if np.max(classificationOutcome[i, :]) > 0:
       convergencePoint[i] = locateConvergencePoint(classificationOutcome[i, :])
     else:
       convergencePoint[i] = 11
@@ -267,15 +267,16 @@ def run_ideal_classifier(args={}):
   args.update({"numTouches": list(range(1, 11))})
   args.update({"convergencePoint": np.mean(convergencePoint)})
   args.update({"classificationOutcome": classificationOutcome})
-  print("objects={}, features={}, locations={}, distinct words={}, numColumns={}".format(
-    numObjects, numFeatures, numLocations, numWords, numColumns), end=' ')
+  print(
+    "objects={}, features={}, locations={}, distinct words={}, numColumns={}".format(
+      numObjects, numFeatures, numLocations, numWords, numColumns), end=" ")
   print("==> convergencePoint:", args["convergencePoint"])
 
   return args
 
 
 def plotConvergenceByObject(results, objectRange, featureRange, numTrials,
-                            linestyle='-'):
+                            linestyle="-"):
   """
   Plots the convergence graph: iterations vs number of objects.
   Each curve shows the convergence for a given number of unique features.
@@ -287,7 +288,7 @@ def plotConvergenceByObject(results, objectRange, featureRange, numTrials,
   # Convergence[f,o] = how long it took it to converge with f unique features
   # and o objects.
 
-  convergence = numpy.zeros((max(featureRange), max(objectRange) + 1))
+  convergence = np.zeros((max(featureRange), max(objectRange) + 1))
   for r in results:
     if r["numFeatures"] in featureRange:
       convergence[r["numFeatures"] - 1, r["numObjects"]] += r["convergencePoint"]
@@ -300,28 +301,27 @@ def plotConvergenceByObject(results, objectRange, featureRange, numTrials,
 
   # Plot each curve
   legendList = []
-  colorList = ['r', 'b', 'g', 'm', 'c', 'k', 'y']
+  colorList = ["r", "b", "g", "m", "c", "k", "y"]
 
   for i in range(len(featureRange)):
     f = featureRange[i]
     print("features={} objectRange={} convergence={}".format(
-      f,objectRange, convergence[f-1,objectRange]))
-    legendList.append('Unique features={}'.format(f))
-    plt.plot(objectRange, convergence[f-1, objectRange],
+      f, objectRange, convergence[f - 1, objectRange]))
+    legendList.append("Unique features={}".format(f))
+    plt.plot(objectRange, convergence[f - 1, objectRange],
              color=colorList[i], linestyle=linestyle)
 
   # format
-  plt.legend(legendList, loc="lower right", prop={'size':10})
+  plt.legend(legendList, loc="lower right", prop={"size": 10})
   plt.xlabel("Number of objects in training set")
-  plt.xticks(list(range(0,max(objectRange)+1,10)))
-  plt.yticks(list(range(0,int(convergence.max())+2)))
+  plt.xticks(list(range(0, max(objectRange) + 1, 10)))
+  plt.yticks(list(range(0, int(convergence.max()) + 2)))
   plt.ylabel("Average number of touches")
   plt.title("Number of touches to recognize one object (single column)")
 
 
-
-
-def plotConvergenceByColumn(results, columnRange, featureRange, numTrials, lineStype='-'):
+def plotConvergenceByColumn(results, columnRange, featureRange, numTrials,
+                            lineStype="-"):
   """
   Plots the convergence graph: iterations vs number of columns.
   Each curve shows the convergence for a given number of unique features.
@@ -332,7 +332,7 @@ def plotConvergenceByColumn(results, columnRange, featureRange, numTrials, lineS
   #
   # Convergence[f,c] = how long it took it to  converge with f unique features
   # and c columns.
-  convergence = numpy.zeros((max(featureRange), max(columnRange) + 1))
+  convergence = np.zeros((max(featureRange), max(columnRange) + 1))
   for r in results:
     if r["numColumns"] > max(columnRange):
       continue
@@ -349,13 +349,13 @@ def plotConvergenceByColumn(results, columnRange, featureRange, numTrials, lineS
   # Create the plot. x-axis=
   # Plot each curve
   legendList = []
-  colorList = ['r', 'b', 'g', 'm', 'c', 'k', 'y']
+  colorList = ["r", "b", "g", "m", "c", "k", "y"]
   for i in range(len(featureRange)):
     f = featureRange[i]
     print(f, columnRange)
-    print(convergence[f-1,columnRange])
-    legendList.append('Unique features={}'.format(f))
-    plt.plot(columnRange, convergence[f-1,columnRange],
+    print(convergence[f - 1, columnRange])
+    legendList.append("Unique features={}".format(f))
+    plt.plot(columnRange, convergence[f - 1, columnRange],
              color=colorList[i], linestyle=lineStype)
   print()
   # format
@@ -363,14 +363,13 @@ def plotConvergenceByColumn(results, columnRange, featureRange, numTrials, lineS
   plt.xlabel("Number of columns")
   plt.xticks(columnRange)
   plt.ylim([0, 4])
-  plt.yticks(list(range(0,int(convergence.max())+1)))
+  plt.yticks(list(range(0, int(convergence.max()) + 1)))
   plt.ylabel("Average number of sensations")
   plt.title("Number of sensations to recognize one object (multiple columns)")
-    # save
+  # save
   # plotPath = os.path.join("plots", "bow_convergence_by_column.pdf")
   # plt.savefig(plotPath)
   # plt.close()
-
 
 
 def run_bow_experiment_single_column(options):
@@ -386,21 +385,19 @@ def run_bow_experiment_single_column(options):
   args = []
   for c in reversed(numColumns):
     for o in reversed(objectRange):
-      for l in numLocations:
+      for loc in numLocations:
         for f in featureRange:
           for t in range(numTrials):
             args.append(
               {"numObjects": o,
-               "numLocations": l,
+               "numLocations": loc,
                "numFeatures": f,
                "numColumns": c,
                "trialNum": t,
                "pointRange": pointRange,
                "numPoints": numPoints,
-               "useLocation": useLocation
-               }
-
-          )
+               "useLocation": useLocation}
+            )
 
   numWorkers = cpu_count()
   print("{} experiments to run, {} workers".format(len(args), numWorkers))
@@ -414,16 +411,15 @@ def run_bow_experiment_single_column(options):
   with open(resultsName, "wb") as f:
     pickle.dump(result, f)
 
-
   plt.figure()
   with open("object_convergence_results.pkl", "rb") as f:
     results = pickle.load(f)
-  plotConvergenceByObject(results, objectRange, featureRange, linestyle='-')
+  plotConvergenceByObject(results, objectRange, featureRange, linestyle="-")
 
   with open(resultsName, "rb") as f:
     resultsBOW = pickle.load(f)
   plotConvergenceByObject(resultsBOW, objectRange, featureRange, numTrials,
-                          linestyle='--')
+                          linestyle="--")
   plotPath = os.path.join("plots",
                           "convergence_by_object_random_location_bow.pdf")
   plt.savefig(plotPath)
@@ -448,12 +444,12 @@ def run_multiple_column_experiment():
   args = []
   for c in reversed(columnRange):
     for o in reversed(objectRange):
-      for l in numLocations:
+      for loc in numLocations:
         for f in featureRange:
           for t in range(numTrials):
             args.append(
               {"numObjects": o,
-               "numLocations": l,
+               "numLocations": loc,
                "numFeatures": f,
                "numColumns": c,
                "trialNum": t,
@@ -463,9 +459,10 @@ def run_multiple_column_experiment():
                }
             )
 
-  print("Number of experiments:",len(args))
-  idealResultsFile = os.path.join(resultsDir,
-           "ideal_multi_column_useLocation_{}.pkl".format(useLocation))
+  print("Number of experiments:", len(args))
+  idealResultsFile = os.path.join(
+    resultsDir,
+    "ideal_multi_column_useLocation_{}.pkl".format(useLocation))
   pool = Pool(processes=cpu_count())
   result = pool.map(run_ideal_classifier, args)
 
@@ -494,7 +491,7 @@ def run_multiple_column_experiment():
   plotConvergenceByColumn(results, columnRange, featureRange, numTrials)
   plotConvergenceByColumn(resultsIdeal, columnRange, featureRange, numTrials,
                           "--")
-  plt.savefig('plots/ideal_observer_multiple_column.pdf')
+  plt.savefig("plots/ideal_observer_multiple_column.pdf")
 
 
 def single_column_accuracy_comparison():
@@ -561,9 +558,9 @@ def single_column_accuracy_comparison():
   accuracyBOF = 0
   for r in resultsIdeal:
     if r["useLocation"]:
-      accuracyIdeal += np.array(r['accuracy'])
+      accuracyIdeal += np.array(r["accuracy"])
     else:
-      accuracyBOF += np.array(r['accuracy'])
+      accuracyBOF += np.array(r["accuracy"])
 
   accuracyIdeal /= len(resultsIdeal) / 2
   accuracyBOF /= len(resultsIdeal) / 2
@@ -571,17 +568,20 @@ def single_column_accuracy_comparison():
   numTouches = len(accuracyIdeal)
   accuracyModel = 0
   for r in resultsModel:
-    accuracyModel += np.array(r['classificationPerSensation'])
+    accuracyModel += np.array(r["classificationPerSensation"])
   accuracyModel /= len(resultsModel)
 
   plt.figure()
-  plt.plot(np.arange(numTouches)+1, accuracyIdeal, '-o', label='Ideal observer (with location')
-  plt.plot(np.arange(numTouches) + 1, accuracyBOF, '-s', label='Ideal observer (no location)')
-  plt.plot(np.arange(numTouches)+1, accuracyModel, '-^', label='Sensorimotor network')
+  plt.plot(np.arange(numTouches) + 1, accuracyIdeal, "-o",
+           label="Ideal observer (with location")
+  plt.plot(np.arange(numTouches) + 1, accuracyBOF, "-s",
+           label="Ideal observer (no location)")
+  plt.plot(np.arange(numTouches) + 1, accuracyModel, "-^",
+           label="Sensorimotor network")
   plt.xlabel("Number of sensations")
   plt.ylabel("Accuracy")
   plt.legend()
-  plt.savefig('plots/ideal_observer_comparison_single_column.pdf')
+  plt.savefig("plots/ideal_observer_comparison_single_column.pdf")
 
 
 def runTests():
@@ -628,6 +628,7 @@ def runTests():
     }
   )
 
+
 if __name__ == "__main__":
   (options, args) = _getArgs()
 
@@ -638,4 +639,3 @@ if __name__ == "__main__":
   single_column_accuracy_comparison()
 
   # runTests()
-

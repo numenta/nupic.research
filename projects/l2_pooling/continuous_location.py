@@ -25,88 +25,90 @@ objects.
 """
 
 from nupic.research.frameworks.columns.l2_l4_inference import L4L2Experiment
-from nupic.research.frameworks.columns.object_machine_factory import (
-  createObjectMachine
+from nupic.research.frameworks.columns.object_machine_factory import createObjectMachine
+from nupic.research.frameworks.columns.physical_objects import (
+    Box,
+    Cube,
+    Cylinder,
+    Sphere,
 )
-from nupic.research.frameworks.columns.physical_objects import *
-
 
 
 def runBasic(noiseLevel=None, profile=False):
-  """
-  Runs a basic experiment on continuous locations, learning a few locations on
-  four basic objects, and inferring one of them.
+    """
+    Runs a basic experiment on continuous locations, learning a few locations on
+    four basic objects, and inferring one of them.
 
-  This experiment is mostly used for testing the pipeline, as the learned
-  locations are too random and sparse to actually perform inference.
+    This experiment is mostly used for testing the pipeline, as the learned
+    locations are too random and sparse to actually perform inference.
 
-  Parameters:
-  ----------------------------
-  @param    noiseLevel (float)
-            Noise level to add to the locations and features during inference
+    Parameters:
+    ----------------------------
+    @param    noiseLevel (float)
+              Noise level to add to the locations and features during inference
 
-  @param    profile (bool)
-            If True, the network will be profiled after learning and inference
+    @param    profile (bool)
+              If True, the network will be profiled after learning and inference
 
-  """
-  exp = L4L2Experiment(
-    "basic_continuous",
-    numCorticalColumns=2
-  )
+    """
+    exp = L4L2Experiment("basic_continuous", numCorticalColumns=2)
 
-  objects = createObjectMachine(
-    machineType="continuous",
-    numInputBits=21,
-    sensorInputSize=1024,
-    externalInputSize=1024,
-    numCorticalColumns=2,
-  )
+    objects = createObjectMachine(
+        machineType="continuous",
+        numInputBits=21,
+        sensorInputSize=1024,
+        externalInputSize=1024,
+        numCorticalColumns=2,
+    )
 
-  objects.addObject(Sphere(radius=20), name="sphere")
-  objects.addObject(Cylinder(height=50, radius=20), name="cylinder")
-  objects.addObject(Box(dimensions=[10, 20, 30,]), name="box")
-  objects.addObject(Cube(width=20), name="cube")
+    objects.addObject(Sphere(radius=20), name="sphere")
+    objects.addObject(Cylinder(height=50, radius=20), name="cylinder")
+    objects.addObject(
+        Box(
+            dimensions=[
+                10,
+                20,
+                30,
+            ]
+        ),
+        name="box",
+    )
+    objects.addObject(Cube(width=20), name="cube")
 
-  learnConfig = {
-    "sphere": [("surface", 10)],
-    # the two learning config below will be exactly the same
-    "box": [("face", 5), ("edge", 5), ("vertex", 5)],
-    "cube": [(feature, 5) for feature in objects["cube"].getFeatures()],
-    "cylinder": [(feature, 5) for feature in objects["cylinder"].getFeatures()]
-  }
-
-  exp.learnObjects(
-    objects.provideObjectsToLearn(learnConfig, plot=True),
-    reset=True
-  )
-  if profile:
-    exp.printProfile()
-
-  inferConfig = {
-    "numSteps": 4,
-    "noiseLevel": noiseLevel,
-    "objectName": "cube",
-    "pairs": {
-      0: ["face", "face", "edge", "edge"],
-      1: ["edge", "face", "face", "edge"]
+    learnConfig = {
+        "sphere": [("surface", 10)],
+        # the two learning config below will be exactly the same
+        "box": [("face", 5), ("edge", 5), ("vertex", 5)],
+        "cube": [(feature, 5) for feature in objects["cube"].getFeatures()],
+        "cylinder": [(feature, 5) for feature in objects["cylinder"].getFeatures()],
     }
-  }
 
-  exp.infer(
-    objects.provideObjectToInfer(inferConfig, plot=True),
-    objectName="cube",
-    reset=True
-  )
-  if profile:
-    exp.printProfile()
+    exp.learnObjects(objects.provideObjectsToLearn(learnConfig, plot=True), reset=True)
+    if profile:
+        exp.printProfile()
 
-  exp.plotInferenceStats(
-    fields=["L2 Representation",
-            "Overlap L2 with object",
-            "L4 Representation"],
-  )
+    inferConfig = {
+        "numSteps": 4,
+        "noiseLevel": noiseLevel,
+        "objectName": "cube",
+        "pairs": {
+            0: ["face", "face", "edge", "edge"],
+            1: ["edge", "face", "face", "edge"],
+        },
+    }
 
+    exp.infer(
+        objects.provideObjectToInfer(inferConfig, plot=True),
+        objectName="cube",
+        reset=True,
+    )
+    if profile:
+        exp.printProfile()
+
+    exp.plotInferenceStats(
+        fields=["L2 Representation", "Overlap L2 with object", "L4 Representation"],
+    )
 
 
 if __name__ == "__main__":
-  runBasic()
+    runBasic()

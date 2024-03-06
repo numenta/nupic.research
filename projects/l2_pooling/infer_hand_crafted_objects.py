@@ -18,143 +18,154 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-from collections import defaultdict
-import itertools
-import random
 import os
+import random
+from collections import defaultdict
 
 import matplotlib.pyplot as plt
 
 from nupic.research.frameworks.columns.l2_l4_inference import L4L2Experiment
 from nupic.research.frameworks.columns.sensor_placement import greedySensorPositions
 
-
-
 FEATURES = ("A", "B")
 
 LOCATIONS = tuple(range(9))
 
 # Every object shares 3 feature-locations with every other object.
-OBJECTS = {"Object 1": ("A", "A", "A",
-                        "A", "A", "A",
-                        "A", "A", "A"),
-           "Object 2": ("A", "A", "A",
-                        "B", "B", "B",
-                        "B", "B", "B"),
-           "Object 3": ("B", "B", "B",
-                        "A", "A", "A",
-                        "B", "B", "B"),
-           "Object 4": ("B", "B", "B",
-                        "B", "B", "B",
-                        "A", "A", "A"),}
+OBJECTS = {
+    "Object 1": ("A", "A", "A", "A", "A", "A", "A", "A", "A"),
+    "Object 2": ("A", "A", "A", "B", "B", "B", "B", "B", "B"),
+    "Object 3": ("B", "B", "B", "A", "A", "A", "B", "B", "B"),
+    "Object 4": ("B", "B", "B", "B", "B", "B", "A", "A", "A"),
+}
 
 TIMESTEPS_PER_SENSATION = 3
 
+
 def experiment(numColumns, sampleSize):
-  locationSDRsByColumn = [dict((name,
-                                set(random.sample(range(1024), 40)))
-                               for name in LOCATIONS)
-                          for _ in range(numColumns)]
+    locationSDRsByColumn = [
+        dict((name, set(random.sample(range(1024), 40))) for name in LOCATIONS)
+        for _ in range(numColumns)
+    ]
 
-  featureSDRsByColumn = [dict((name,
-                               set(random.sample(range(1024), 40)))
-                              for name in FEATURES)
-                         for _ in range(numColumns)]
+    featureSDRsByColumn = [
+        dict((name, set(random.sample(range(1024), 40))) for name in FEATURES)
+        for _ in range(numColumns)
+    ]
 
-  exp = L4L2Experiment(
-    "Hello",
-    numCorticalColumns=numColumns,
-    L2Overrides={
-      "sampleSizeDistal": sampleSize,
-    },
-    seed=random.randint(2048, 4096)
-  )
+    exp = L4L2Experiment(
+        "Hello",
+        numCorticalColumns=numColumns,
+        L2Overrides={
+            "sampleSizeDistal": sampleSize,
+        },
+        seed=random.randint(2048, 4096),
+    )
 
-  exp.learnObjects(dict((objectName,
-                         [dict((column,
-                                (locationSDRsByColumn[column][location],
-                                 featureSDRsByColumn[column][features[location]]))
-                               for column in range(numColumns))
-                          for location in LOCATIONS])
-                        for objectName, features in OBJECTS.items()))
+    exp.learnObjects(
+        dict(
+            (
+                objectName,
+                [
+                    dict(
+                        (
+                            column,
+                            (
+                                locationSDRsByColumn[column][location],
+                                featureSDRsByColumn[column][features[location]],
+                            ),
+                        )
+                        for column in range(numColumns)
+                    )
+                    for location in LOCATIONS
+                ],
+            )
+            for objectName, features in OBJECTS.items()
+        )
+    )
 
-  objectName = "Object 1"
-  features = OBJECTS[objectName]
-  inferredL2 = exp.objectL2Representations[objectName]
+    objectName = "Object 1"
+    features = OBJECTS[objectName]
+    inferredL2 = exp.objectL2Representations[objectName]
 
-  touchCount = 0
+    touchCount = 0
 
-  for sensorPositions in greedySensorPositions(numColumns, len(LOCATIONS)):
-    sensation = dict(
-      (column,
-       (locationSDRsByColumn[column][sensorPositions[column]],
-        featureSDRsByColumn[column][features[sensorPositions[column]]]))
-      for column in range(numColumns))
-    exp.infer([sensation]*TIMESTEPS_PER_SENSATION,
-              reset=False, objectName=objectName)
+    for sensorPositions in greedySensorPositions(numColumns, len(LOCATIONS)):
+        sensation = dict(
+            (
+                column,
+                (
+                    locationSDRsByColumn[column][sensorPositions[column]],
+                    featureSDRsByColumn[column][features[sensorPositions[column]]],
+                ),
+            )
+            for column in range(numColumns)
+        )
+        exp.infer(
+            [sensation] * TIMESTEPS_PER_SENSATION, reset=False, objectName=objectName
+        )
 
-    touchCount += 1
+        touchCount += 1
 
-    if exp.getL2Representations() == inferredL2:
-      print("Inferred object after %d touches" % touchCount)
-      return touchCount
+        if exp.getL2Representations() == inferredL2:
+            print("Inferred object after %d touches" % touchCount)
+            return touchCount
 
-    if touchCount >= 60:
-      print("Never inferred object")
-      return None
+        if touchCount >= 60:
+            print("Never inferred object")
+            return None
 
 
 def go():
-  numColumnsOptions = list(range(1, len(LOCATIONS) + 1))
-  configs = (
-    ("Placeholder 13", 13),
-    ("Placeholder 20", 20),
-    ("Placeholder 30", 30),
-    ("Placeholder everything", -1),
-  )
+    numColumnsOptions = list(range(1, len(LOCATIONS) + 1))
+    configs = (
+        ("Placeholder 13", 13),
+        ("Placeholder 20", 20),
+        ("Placeholder 30", 30),
+        ("Placeholder everything", -1),
+    )
 
-  numTouchesLog = defaultdict(list)
+    numTouchesLog = defaultdict(list)
 
-  for config in configs:
-    _, sampleSize = config
-    print("sampleSize %d" % sampleSize)
+    for config in configs:
+        _, sampleSize = config
+        print("sampleSize %d" % sampleSize)
 
-    for numColumns in numColumnsOptions:
-      print("%d columns" % numColumns)
+        for numColumns in numColumnsOptions:
+            print("%d columns" % numColumns)
 
-      for _ in range(10):
-        numTouches = experiment(numColumns, sampleSize)
-        numTouchesLog[(numColumns, config)].append(numTouches)
+            for _ in range(10):
+                numTouches = experiment(numColumns, sampleSize)
+                numTouchesLog[(numColumns, config)].append(numTouches)
 
-  averages = dict((k,
-                   sum(numsTouches) / float(len(numsTouches)))
-                  for k, numsTouches in numTouchesLog.items())
+    averages = dict(
+        (k, sum(numsTouches) / float(len(numsTouches)))
+        for k, numsTouches in numTouchesLog.items()
+    )
 
-  plt.figure()
-  colorList = dict(list(zip(configs,
-                       ('r', 'k', 'g', 'b'))))
-  markerList = dict(list(zip(configs,
-                        ('o', '*', 'D', 'x'))))
+    plt.figure()
+    colorList = dict(list(zip(configs, ("r", "k", "g", "b"))))
+    markerList = dict(list(zip(configs, ("o", "*", "D", "x"))))
 
-  for config in configs:
-    plt.plot(numColumnsOptions,
-             [averages[(numColumns, config)]
-              for numColumns in numColumnsOptions],
-             color=colorList[config],
-             marker=markerList[config])
+    for config in configs:
+        plt.plot(
+            numColumnsOptions,
+            [averages[(numColumns, config)] for numColumns in numColumnsOptions],
+            color=colorList[config],
+            marker=markerList[config],
+        )
 
-  plt.legend([description for description, _ in configs],
-             loc="upper right")
-  plt.xlabel("Columns")
-  plt.xticks(numColumnsOptions)
-  plt.ylabel("Number of touches")
-  plt.yticks([0, 1, 2, 3, 4, 5])
-  plt.title("Touches until inference")
+    plt.legend([description for description, _ in configs], loc="upper right")
+    plt.xlabel("Columns")
+    plt.xticks(numColumnsOptions)
+    plt.ylabel("Number of touches")
+    plt.yticks([0, 1, 2, 3, 4, 5])
+    plt.title("Touches until inference")
 
-  plotPath = os.path.join("plots", "infer_hand_crafted_objects.pdf")
-  plt.savefig(plotPath)
-  plt.close()
+    plotPath = os.path.join("plots", "infer_hand_crafted_objects.pdf")
+    plt.savefig(plotPath)
+    plt.close()
 
 
 if __name__ == "__main__":
-  go()
+    go()

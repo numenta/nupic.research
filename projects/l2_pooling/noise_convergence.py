@@ -24,19 +24,22 @@ This file plots the convergence of L4-L2 as you increase the amount of noise.
 """
 
 import os
-import numpy
 import pickle
 from multiprocessing import cpu_count
-import matplotlib.pyplot as plt
+
 import matplotlib as mpl
-mpl.rcParams['pdf.fonttype'] = 42
+import matplotlib.pyplot as plt
+import numpy
 
 from nupic.research.frameworks.columns.multi_column_convergence_experiment import (
-  runExperiment, runExperimentPool
+    runExperiment,
+    runExperimentPool,
 )
 
+mpl.rcParams["pdf.fonttype"] = 42
 
-def plotConvergenceByObjectMultiColumn(results, objectRange, columnRange):
+
+def plotConvergenceByObjectMultiColumn(results, objectRange, columnRange, numTrials):
   """
   Plots the convergence graph: iterations vs number of objects.
   Each curve shows the convergence for a given number of columns.
@@ -65,53 +68,56 @@ def plotConvergenceByObjectMultiColumn(results, objectRange, columnRange):
 
   # Plot each curve
   legendList = []
-  colorList = ['r', 'b', 'g', 'm', 'c', 'k', 'y']
+  colorList = ["r", "b", "g", "m", "c", "k", "y"]
 
   for i in range(len(columnRange)):
     c = columnRange[i]
     print("columns={} objectRange={} convergence={}".format(
-      c, objectRange, convergence[c-1,objectRange]))
+      c, objectRange, convergence[c - 1, objectRange]))
     if c == 1:
-      legendList.append('1 column')
+      legendList.append("1 column")
     else:
-      legendList.append('{} columns'.format(c))
-    plt.plot(objectRange, convergence[c-1,objectRange],
+      legendList.append("{} columns".format(c))
+    plt.plot(objectRange, convergence[c - 1, objectRange],
              color=colorList[i])
 
   # format
-  plt.legend(legendList, loc="upper left", prop={'size':10})
+  plt.legend(legendList, loc="upper left", prop={"size": 10})
   plt.xlabel("Number of objects in training set")
-  plt.xticks(list(range(0,max(objectRange)+1,10)))
-  plt.yticks(list(range(0,int(convergence.max())+2)))
+  plt.xticks(list(range(0, max(objectRange) + 1, 10)))
+  plt.yticks(list(range(0, int(convergence.max()) + 2)))
   plt.ylabel("Average number of touches")
   plt.title("Object recognition with multiple columns (unique features = 5)")
 
-    # save
+  # save
   plt.savefig(plotPath)
   plt.close()
 
-def plotAccuracyByNoiseLevelAndColumnRange(results,noiseRange,columnRange):
+
+def plotAccuracyByNoiseLevelAndColumnRange(results, noiseRange, columnRange):
   plt.figure()
-  plotPath = os.path.join("plots", "classification_accuracy_by_noiselevelAndColumnNum.jpg")
+  plotPath = os.path.join(
+    "plots", "classification_accuracy_by_noiselevelAndColumnNum.jpg")
 
   # Plot each curve
   accuracyList = []
   legendList = []
-  colorList = ['r', 'b', 'g', 'm', 'c', 'k', 'y']
+  colorList = ["r", "b", "g", "m", "c", "k", "y"]
 
   for k in range(len(columnRange)):
     c = columnRange[k]
     for i in range(len(noiseRange)):
-      accuracyList.append(results[k*len(noiseRange)+i].get('classificationAccuracy'))
+      accuracyList.append(results[k * len(noiseRange) + i].get(
+        "classificationAccuracy"))
     if c == len(columnRange):
-      legendList.append('1 column')
+      legendList.append("1 column")
     else:
-      legendList.append('{} columns'.format(len(columnRange)-k))
+      legendList.append("{} columns".format(len(columnRange) - k))
     plt.plot(noiseRange, accuracyList, colorList[k])
     accuracyList = []
 
   # format
-  plt.legend(legendList, loc="upper left", prop={'size': 10})
+  plt.legend(legendList, loc="upper left", prop={"size": 10})
   plt.xlabel("Noise level added")
   plt.ylabel("classification accuracy")
   plt.title("Classification accuracy VS. noise level")
@@ -120,12 +126,12 @@ def plotAccuracyByNoiseLevelAndColumnRange(results,noiseRange,columnRange):
   plt.savefig(plotPath)
   plt.close()
 
+
 def plotAccuracyByActivationThreshold(results_by_thresholds, activation_thresholds):
   plt.figure()
   plotPath = os.path.join("plots", "classification_accuracy_by_activationThreshold.jpg")
 
   plt.plot(activation_thresholds, results_by_thresholds)
-
 
   # format
   plt.xlabel("activationThresholdDistal")
@@ -136,25 +142,27 @@ def plotAccuracyByActivationThreshold(results_by_thresholds, activation_threshol
   plt.savefig(plotPath)
   plt.close()
 
-if __name__ == "__main__":
 
+def main():
   # This is how you run a specific experiment in single process mode. Useful
   # for debugging, profiling, etc.
   if False:
     results = runExperiment(
-                  {
-                    "numObjects": 100,
-                    "numPoints": 10,
-                    "numLocations": 10,
-                    "numFeatures": 10,
-                    "numColumns": 1,
-                    "trialNum": 4,
-                    "featureNoise": 0.6,
-                    "plotInferenceStats": False,  # Outputs detailed graphs
-                    "settlingTime": 3,
-                    "includeRandomLocation": False,
-                    "l2Params": {"cellCount": 4096*4, "sdrSize": 40*2, "activationThresholdDistal": 14}
-                  }
+      {
+        "numObjects": 100,
+        "numPoints": 10,
+        "numLocations": 10,
+        "numFeatures": 10,
+        "numColumns": 1,
+        "trialNum": 4,
+        "featureNoise": 0.6,
+        "plotInferenceStats": False,  # Outputs detailed graphs
+        "settlingTime": 3,
+        "includeRandomLocation": False,
+        "l2Params": {"cellCount": 4096 * 4,
+                     "sdrSize": 40 * 2,
+                     "activationThresholdDistal": 14}
+      }
     )
 
   # This is for specifically testing how the distal activation threshold affect
@@ -164,30 +172,33 @@ if __name__ == "__main__":
     results_by_thresholds = []
     for i in range(len(activationThresholdDistalRange)):
         results = runExperiment(
-                  {
-                    "numObjects": 100,
-                    "numPoints": 10,
-                    "numLocations": 10,
-                    "numFeatures": 10,
-                    "numColumns": 1,
-                    "trialNum": 4,
-                    "featureNoise": 0.6,
-                    "plotInferenceStats": False,  # Outputs detailed graphs
-                    "settlingTime": 3,
-                    "includeRandomLocation": False,
-                    "l2Params": {"cellCount": 4096 * 4, "sdrSize": 40 * 2, "activationThresholdDistal": i+1}
-                  }
+          {
+            "numObjects": 100,
+            "numPoints": 10,
+            "numLocations": 10,
+            "numFeatures": 10,
+            "numColumns": 1,
+            "trialNum": 4,
+            "featureNoise": 0.6,
+            "plotInferenceStats": False,  # Outputs detailed graphs
+            "settlingTime": 3,
+            "includeRandomLocation": False,
+            "l2Params": {"cellCount": 4096 * 4,
+                         "sdrSize": 40 * 2,
+                         "activationThresholdDistal": i + 1}
+          }
         )
-        results_by_thresholds.append(results.get('classificationAccuracy'))
+        results_by_thresholds.append(results.get("classificationAccuracy"))
 
-    plotAccuracyByActivationThreshold(results_by_thresholds,activationThresholdDistalRange)
+    plotAccuracyByActivationThreshold(results_by_thresholds,
+                                      activationThresholdDistalRange)
 
   # Here we want to see how the number of objects affects convergence for
   # multiple columns.
   if False:
     # We run 10 trials for each column number and then analyze results
     numTrials = 1
-    columnRange = [1,2,3]
+    columnRange = [1, 2, 3]
     noiseRange = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
     featureRange = [10]
     objectRange = [100]
@@ -195,21 +206,25 @@ if __name__ == "__main__":
     # Comment this out if you are re-running analysis on already saved results.
     # Very useful for debugging the plots
     runExperimentPool(
-                      numObjects=objectRange,
-                      numLocations=[10],
-                      numFeatures=featureRange,
-                      numColumns=columnRange,
-                      numPoints=10,
-                      featureNoiseRange=noiseRange,
-                      numWorkers=cpu_count() - 1,
-                      #numWorkers=1,
-                      nTrials=numTrials,
-                      resultsName="object_convergence_noise_results.pkl")
+      numObjects=objectRange,
+      numLocations=[10],
+      numFeatures=featureRange,
+      numColumns=columnRange,
+      numPoints=10,
+      featureNoiseRange=noiseRange,
+      numWorkers=cpu_count() - 1,
+      nTrials=numTrials,
+      resultsName="object_convergence_noise_results.pkl")
 
     # Analyze results
-    with open("object_convergence_noise_results.pkl","rb") as f:
+    with open("object_convergence_noise_results.pkl", "rb") as f:
       results = pickle.load(f)
     # print results
 
-    plotAccuracyByNoiseLevelAndColumnRange(results, noiseRange, columnRange)
+    plotAccuracyByNoiseLevelAndColumnRange(results, noiseRange, columnRange,
+                                           numTrials)
     # plotConvergenceByObjectMultiColumn(results, objectRange, columnRange)
+
+
+if __name__ == "__main__":
+  main()

@@ -22,7 +22,6 @@
 import random
 
 
-
 def greedySensorPositions(numSensors, numLocations):
   """
   Returns an infinite sequence of sensor placements.

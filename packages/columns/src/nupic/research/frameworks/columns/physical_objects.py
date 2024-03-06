@@ -27,14 +27,14 @@ used.
 """
 
 import random
-from math import pi, cos, sin, sqrt
 from itertools import combinations
-import numpy as np
+from math import cos, pi, sin, sqrt
+
 import matplotlib.pyplot as plt
+import numpy as np
+import plyfile as ply
 
 from nupic.research.frameworks.columns.physical_object_base import PhysicalObject
-
-import plyfile as ply
 
 
 class Sphere(PhysicalObject):
@@ -78,7 +78,6 @@ class Sphere(PhysicalObject):
     else:
       self.epsilon = epsilon
 
-
   def getFeatureID(self, location):
     """
     Returns the feature index associated with the provided location.
@@ -90,22 +89,18 @@ class Sphere(PhysicalObject):
 
     return self.SPHERICAL_SURFACE
 
-
   def contains(self, location):
     """
     Checks that the provided point is on the sphere.
     """
     return self.almostEqual(
-      sum([coord ** 2 for coord in location]), self.radius ** 2
-    )
-
+      sum([coord ** 2 for coord in location]), self.radius ** 2)
 
   def sampleLocation(self):
     """
     Samples from the only available feature.
     """
     return self.sampleLocationFromFeature(self._FEATURES[0])
-
 
   def sampleLocationFromFeature(self, feature):
     """
@@ -122,19 +117,17 @@ class Sphere(PhysicalObject):
     else:
       raise NameError("No such feature in {}: {}".format(self, feature))
 
-
   def plot(self, numPoints=100):
     """
     Specific plotting method for cylinders.
     """
     fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+    ax = fig.add_subplot(111, projection="3d")
 
     # generate sphere
     phi, theta = np.meshgrid(
       np.linspace(0, pi, numPoints),
-      np.linspace(0, 2 * pi, numPoints)
-    )
+      np.linspace(0, 2 * pi, numPoints))
     x = self.radius * np.sin(phi) * np.cos(theta)
     y = self.radius * np.sin(phi) * np.sin(theta)
     z = self.radius * np.cos(phi)
@@ -148,14 +141,12 @@ class Sphere(PhysicalObject):
     plt.title("{}".format(self))
     return fig, ax
 
-
   def __repr__(self):
     """
     Custom representation.
     """
     template = self.__class__.__name__ + "(R={})"
     return template.format(self.radius)
-
 
 
 class Cylinder(PhysicalObject):
@@ -170,7 +161,6 @@ class Cylinder(PhysicalObject):
   """
 
   _FEATURES = ["topDisc", "bottomDisc", "topEdge", "bottomEdge", "side"]
-
 
   def __init__(self, height, radius, epsilon=None):
     """
@@ -202,7 +192,6 @@ class Cylinder(PhysicalObject):
     else:
       self.epsilon = epsilon
 
-
   def getFeatureID(self, location):
     """
     Returns the feature index associated with the provided location.
@@ -225,7 +214,6 @@ class Cylinder(PhysicalObject):
     else:
       return self.CYLINDER_SURFACE
 
-
   def contains(self, location):
     """
     Checks that the provided point is on the cylinder.
@@ -236,7 +224,6 @@ class Cylinder(PhysicalObject):
       return location[0] ** 2 + location[1] ** 2 < self.radius ** 2
     return False
 
-
   def sampleLocation(self):
     """
     Simple method to sample uniformly from a cylinder.
@@ -246,7 +233,6 @@ class Cylinder(PhysicalObject):
       return self._sampleLocationOnDisc()
     else:
       return self._sampleLocationOnSide()
-
 
   def sampleLocationFromFeature(self, feature):
     """
@@ -267,7 +253,6 @@ class Cylinder(PhysicalObject):
     else:
       raise NameError("No such feature in {}: {}".format(self, feature))
 
-
   def _sampleLocationOnDisc(self, top=None):
     """
     Helper method to sample from the top and bottom discs of a cylinder.
@@ -285,7 +270,6 @@ class Cylinder(PhysicalObject):
     x, y = sampledRadius * cos(sampledAngle), sampledRadius * sin(sampledAngle)
     return [x, y, z]
 
-
   def _sampleLocationOnEdge(self, top=None):
     """
     Helper method to sample from the top and bottom edges of a cylinder.
@@ -302,7 +286,6 @@ class Cylinder(PhysicalObject):
     x, y = self.radius * cos(sampledAngle), self.radius * sin(sampledAngle)
     return [x, y, z]
 
-
   def _sampleLocationOnSide(self):
     """
     Helper method to sample from the lateral surface of a cylinder.
@@ -312,13 +295,12 @@ class Cylinder(PhysicalObject):
     x, y = self.radius * cos(sampledAngle), self.radius * sin(sampledAngle)
     return [x, y, z]
 
-
   def plot(self, numPoints=100):
     """
     Specific plotting method for cylinders.
     """
     fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+    ax = fig.add_subplot(111, projection="3d")
 
     # generate cylinder
     x = np.linspace(- self.radius, self.radius, numPoints)
@@ -336,14 +318,12 @@ class Cylinder(PhysicalObject):
     plt.title("{}".format(self))
     return fig, ax
 
-
   def __repr__(self):
     """
     Custom representation.
     """
     template = self.__class__.__name__ + "(H={}, R={})"
     return template.format(self.height, self.radius)
-
 
 
 class Box(PhysicalObject):
@@ -357,7 +337,6 @@ class Box(PhysicalObject):
   """
 
   _FEATURES = ["face", "edge", "vertex"]
-
 
   def __init__(self, dimensions, dimension=3, epsilon=None):
     """
@@ -384,7 +363,6 @@ class Box(PhysicalObject):
     else:
       self.epsilon = epsilon
 
-
   def getFeatureID(self, location):
     """
     There are three possible features for a box:
@@ -397,7 +375,7 @@ class Box(PhysicalObject):
       return self.EMPTY_FEATURE  # random feature
 
     numFaces = sum(
-      [self.almostEqual(abs(coord), self.dimensions[i] / 2.) \
+      [self.almostEqual(abs(coord), self.dimensions[i] / 2.)
        for i, coord in enumerate(location)]
     )
 
@@ -408,7 +386,6 @@ class Box(PhysicalObject):
     if numFaces == 3:
       return self.POINTY
 
-
   def contains(self, location):
     """
     A location is on the box if one of the dimension is "satured").
@@ -418,13 +395,11 @@ class Box(PhysicalObject):
         return True
     return False
 
-
   def sampleLocation(self):
     """
     Random sampling fron any location corresponds to sampling form the faces.
     """
     return self._sampleFromFaces()
-
 
   def sampleLocationFromFeature(self, feature):
     """
@@ -443,7 +418,6 @@ class Box(PhysicalObject):
     else:
       raise NameError("No such feature in {}: {}".format(self, feature))
 
-
   def _sampleFromFaces(self):
     """
     We start by sampling a dimension to "max out", then sample the sign and
@@ -453,7 +427,6 @@ class Box(PhysicalObject):
     dim = random.choice(list(range(self.dimension)))
     coordinates[dim] = self.dimensions[dim] / 2. * random.choice([-1, 1])
     return coordinates
-
 
   def _sampleFromEdges(self):
     """
@@ -467,7 +440,6 @@ class Box(PhysicalObject):
     coordinates[dim1] = self.dimensions[dim1] / 2. * random.choice([-1, 1])
     coordinates[dim2] = self.dimensions[dim2] / 2. * random.choice([-1, 1])
     return coordinates
-
 
   def _sampleFromVertices(self):
     """
@@ -488,28 +460,28 @@ class Box(PhysicalObject):
     Only supports 3-dimensional objects.
     """
     fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+    ax = fig.add_subplot(111, projection="3d")
 
     # generate cylinder
-    x = np.linspace(- self.dimensions[0]/2., self.dimensions[0]/2., numPoints)
-    y = np.linspace(- self.dimensions[1]/2., self.dimensions[1]/2., numPoints)
-    z = np.linspace(- self.dimensions[2]/2., self.dimensions[2]/2., numPoints)
+    x = np.linspace(- self.dimensions[0] / 2., self.dimensions[0] / 2., numPoints)
+    y = np.linspace(- self.dimensions[1] / 2., self.dimensions[1] / 2., numPoints)
+    z = np.linspace(- self.dimensions[2] / 2., self.dimensions[2] / 2., numPoints)
 
     # plot
     Xc, Yc = np.meshgrid(x, y)
-    ax.plot_surface(Xc, Yc, -self.dimensions[2]/2,
+    ax.plot_surface(Xc, Yc, -self.dimensions[2] / 2,
                     alpha=0.2, rstride=20, cstride=10)
-    ax.plot_surface(Xc, Yc, self.dimensions[2]/2,
+    ax.plot_surface(Xc, Yc, self.dimensions[2] / 2,
                     alpha=0.2, rstride=20, cstride=10)
     Yc, Zc = np.meshgrid(y, z)
-    ax.plot_surface(-self.dimensions[0]/2, Yc, Zc,
+    ax.plot_surface(-self.dimensions[0] / 2, Yc, Zc,
                     alpha=0.2, rstride=20, cstride=10)
-    ax.plot_surface(self.dimensions[0]/2, Yc, Zc,
+    ax.plot_surface(self.dimensions[0] / 2, Yc, Zc,
                     alpha=0.2, rstride=20, cstride=10)
     Xc, Zc = np.meshgrid(x, z)
-    ax.plot_surface(Xc, -self.dimensions[1]/2, Zc,
+    ax.plot_surface(Xc, -self.dimensions[1] / 2, Zc,
                     alpha=0.2, rstride=20, cstride=10)
-    ax.plot_surface(Xc, self.dimensions[1]/2, Zc,
+    ax.plot_surface(Xc, self.dimensions[1] / 2, Zc,
                     alpha=0.2, rstride=20, cstride=10)
 
     ax.set_xlabel("X")
@@ -519,14 +491,12 @@ class Box(PhysicalObject):
     plt.title("{}".format(self))
     return fig, ax
 
-
   def __repr__(self):
     """
     Custom representation.
     """
     template = self.__class__.__name__ + "(dim=({}))"
     return template.format(", ".join([str(dim) for dim in self.dimensions]))
-
 
 
 class Cube(Box):
@@ -537,7 +507,6 @@ class Cube(Box):
   Example:
     cube = Cube(width=100, dimension=3, epsilon=2)
   """
-
 
   def __init__(self, width, dimension=3, epsilon=None):
     """
@@ -561,7 +530,6 @@ class Cube(Box):
                                dimension=dimension,
                                epsilon=epsilon)
 
-
   def __repr__(self):
     """
     Custom representation.
@@ -574,12 +542,12 @@ class PlyModel(PhysicalObject):
   """
   A 3D .ply format model loader as a physical object.
 
-  '.ply' format is simple polygon format. 
-  It can represent vertices, edges and faces (color, material) and 
+  '.ply' format is simple polygon format.
+  It can represent vertices, edges and faces (color, material) and
   custom attributes.
-  
+
   TODO:
-  Compute normals of adjacent face of random sample and decide 
+  Compute normals of adjacent face of random sample and decide
   if its a FLAT or CURVED surface
 
   Example:
@@ -589,7 +557,7 @@ class PlyModel(PhysicalObject):
 
   _FEATURES = ["face", "vertex", "edge", "surface"]
 
-  def __init__(self, file=None, normalTolerance = 0., epsilon=None):
+  def __init__(self, file=None, normalTolerance=0., epsilon=None):
     """
     The only key parameter to provide is location of file.
 
@@ -602,7 +570,7 @@ class PlyModel(PhysicalObject):
 
     @param    epsilon (float)
               Object resolution. Defaults to self.DEFAULT_EPSILON
-    
+
     @param    normalTolerance (float)
               Adjacent Faces Normal Tolerance. Defaults to zero - edges appear more.
 
@@ -610,9 +578,9 @@ class PlyModel(PhysicalObject):
     try:
       self.file = file
       self.model = ply.PlyData.read(self.file)
-      self.vertices = self.model['vertex']
-      self.faces = self.model['face']
-    except IOError as e:
+      self.vertices = self.model["vertex"]
+      self.faces = self.model["face"]
+    except IOError:
       print("Something went wrong!")
       print(("Please check if file exists at {}".format(file)))
       raise IOError
@@ -620,7 +588,7 @@ class PlyModel(PhysicalObject):
     self.mesh = None
     self.rng = random.Random()
     self.epsilon = self.DEFAULT_EPSILON if epsilon is None else epsilon
-    self.sampledPoints = {i:[] for i in self._FEATURES}
+    self.sampledPoints = {i: [] for i in self._FEATURES}
     self.nTol = normalTolerance
 
   def getFeatureID(self, location):
@@ -632,59 +600,60 @@ class PlyModel(PhysicalObject):
     truthyFeature = self.contains(location)
     if not truthyFeature:
       return self.EMPTY_FEATURE
-    elif truthyFeature=='face':
+    elif truthyFeature == "face":
       return self.FLAT
-    elif truthyFeature=='vertex':
+    elif truthyFeature == "vertex":
       return self.POINTY
-    elif truthyFeature=="edge":
+    elif truthyFeature == "edge":
       return self.EDGE
-    elif truthyFeature=="surface":
+    elif truthyFeature == "surface":
       return self.SURFACE
     else:
       return self.EMPTY_FEATURE
 
   def _containsOnFace(self, location, face):
     vertices = self.vertices[face]
-    vertices = np.array((vertices['x'], vertices['y'], vertices['z'])).T
+    vertices = np.array((vertices["x"], vertices["y"], vertices["z"])).T
     v0 = vertices[2] - vertices[0]
     v1 = vertices[1] - vertices[0]
     v2 = location - vertices[0]
     v3 = vertices[2] - location
-    N1 = np.cross(v0,v1)
-    N1 = N1/(np.dot(N1,N1))**.5
+    N1 = np.cross(v0, v1)
+    N1 = N1 / (np.dot(N1, N1)) ** .5
 
-    N2 = np.cross(v2,v3)
-    N2 = N2/(np.dot(N2,N2))**.5
-    if self.almostEqual(abs(np.dot(N1,N2)), 1.0):
+    N2 = np.cross(v2, v3)
+    N2 = N2 / (np.dot(N2, N2)) ** .5
+    if self.almostEqual(abs(np.dot(N1, N2)), 1.0):
       return True
     return False
-  
+
   def _containsOnEdge(self, location, edge):
-    edge = np.array((edge['x'], edge['y'], edge['z'])).T
+    edge = np.array((edge["x"], edge["y"], edge["z"])).T
     v = edge[1] - location
-    av = v/(np.dot(v,v))**.5
+    av = v / (np.dot(v, v)) ** .5
     d = edge[1] - edge[0]
-    ad = d/(np.dot(d,d))**.5
-    vd = np.dot(av,ad)
+    ad = d / (np.dot(d, d)) ** .5
+    vd = np.dot(av, ad)
     self.epsilon = 0.0001
     if self.almostEqual(vd, 1.0):
-          self.epsilon = self.DEFAULT_EPSILON
-          return True
+      self.epsilon = self.DEFAULT_EPSILON
+      return True
 
   def contains(self, location):
     """
     Checks that the provided point is on the model (object).
     """
     for vertex in self.vertices:
-      V = np.array((vertex['x'], vertex['y'], vertex['z'])).T
+      V = np.array((vertex["x"], vertex["y"], vertex["z"])).T
       if np.allclose(location, V, rtol=1.e-3):
         return "vertex"
     for face in self.faces:
-      edges = np.choose(np.array(list(combinations(list(range(3)),2))), self.vertices[face])
+      edges = np.choose(np.array(list(combinations(list(range(3)), 2))),
+                        self.vertices[face])
       for edge in edges:
         if self._containsOnEdge(location, edge):
           return "edge"
-      if self._containsOnFace(location,face):
+      if self._containsOnFace(location, face):
         return "face"
     return False
 
@@ -694,7 +663,6 @@ class PlyModel(PhysicalObject):
     """
     return self.sampleLocationFromFeature(random.choice(self._FEATURES))
 
-
   def sampleLocationFromFeature(self, feature):
     """
     Samples a location from the provided specific feature.
@@ -703,8 +671,8 @@ class PlyModel(PhysicalObject):
     forwarded to sample from face instead.
     """
     if feature == "surface":
-      return self.sampleLocationFromFeature('face') # Temporary workaround for surfaces
-    elif feature=="face":
+      return self.sampleLocationFromFeature("face")  # Temporary workaround for surfaces
+    elif feature == "face":
       indx = self.rng.choice(list(range(self.faces.count)))
       rndFace = self.faces[indx]
       return self._sampleLocationOnFace(rndFace)
@@ -712,7 +680,7 @@ class PlyModel(PhysicalObject):
     elif feature == "edge":
       indx = self.rng.choice(list(range(self.faces.count)))
       rndFace = self.faces[indx]
-      rndVertices = self.rng.sample(self.vertices[rndFace],2)
+      rndVertices = self.rng.sample(self.vertices[rndFace], 2)
       return self._sampleLocationOnEdge(rndVertices)
 
     elif feature == "vertex":
@@ -720,7 +688,7 @@ class PlyModel(PhysicalObject):
       return np.array(self.vertices[rndVertexIndx].tolist())
 
     elif feature == "surface":
-      return self.sampleLocationFromFeature("face")      # Temporary workaround for surfaces
+      return self.sampleLocationFromFeature("face")  # Temporary workaround for surfaces
     elif feature == "random":
       return self.sampleLocation()
     else:
@@ -729,24 +697,25 @@ class PlyModel(PhysicalObject):
   def _sampleLocationOnEdge(self, vertices):
     rnd = self.rng.random()
     vertices = np.array([i.tolist() for i in vertices])
-    return np.array([rnd, 1-rnd]).dot(vertices)
+    return np.array([rnd, 1 - rnd]).dot(vertices)
 
-  def _sampleLocationOnFace(self,face):
+  def _sampleLocationOnFace(self, face):
     vertices = self.vertices[face]
-    vertices = np.array((vertices['x'], vertices['y'], vertices['z'])).T
+    vertices = np.array((vertices["x"], vertices["y"], vertices["z"])).T
     r1 = self.rng.random()
     r2 = self.rng.random()
-    return (1 - sqrt(r1))*vertices[0] + sqrt(r1)*(1 - r2)*vertices[1] + sqrt(r1)*r2*vertices[2]
-  
+    return ((1 - sqrt(r1)) * vertices[0]
+            + sqrt(r1) * (1 - r2) * vertices[1] + sqrt(r1) * r2 * vertices[2])
+
   def plot(self, numPoints=100):
     fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    (x,y,z) = (self.vertices[t] for t in ('x', 'y', 'z'))
-    tri_idx = self.faces['vertex_indices']
+    ax = fig.add_subplot(111, projection="3d")
+    (x, y, z) = (self.vertices[t] for t in ("x", "y", "z"))
+    tri_idx = self.faces["vertex_indices"]
     idx_dtype = tri_idx[0].dtype
-    triangles = np.fromiter(tri_idx, [('data', idx_dtype, (3,))],
-                                      count=len(tri_idx))['data']
-    ax.plot_trisurf(x,y,z, triangles=triangles)
+    triangles = np.fromiter(tri_idx, [("data", idx_dtype, (3,))],
+                            count=len(tri_idx))["data"]
+    ax.plot_trisurf(x, y, z, triangles=triangles)
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
     ax.set_zlabel("Z")
@@ -757,17 +726,17 @@ class PlyModel(PhysicalObject):
   def visualize(self, numPoints=100):
     """
     Visualization utility for models.
-    Helps to debug the math and logic. 
+    Helps to debug the math and logic.
     Helps to monitor complex objects with difficult to define boundaries.
 
     Only supports 3-dimensional objects.
-    TODO: center the objects using scale, rotate and translate operations on mesh objects.
+    TODO: center the objects using scale, rotate and translate operations on
+    mesh objects.
     """
     try:
       import pyqtgraph as pg
       import pyqtgraph.multiprocess as mp
-      import pyqtgraph.opengl as gl
-    except ImportError as e:
+    except ImportError:
       print("PyQtGraph needs to be installed.")
       return (None, None, None, None, None)
 
@@ -776,19 +745,19 @@ class PlyModel(PhysicalObject):
       The pyqtgraph visualization utility window class
 
       Creates a remote process with viewbox frame for visualizations
-      Provided access to mesh and scatter for realtime update to view. 
+      Provided access to mesh and scatter for realtime update to view.
       """
-      def __init__(self): 
+      def __init__(self):
         self.proc = mp.QtProcess()
-        self.rpg = self.proc._import('pyqtgraph')
-        self.rgl = self.proc._import('pyqtgraph.opengl')
+        self.rpg = self.proc._import("pyqtgraph")
+        self.rgl = self.proc._import("pyqtgraph.opengl")
         self.rview = self.rgl.GLViewWidget()
-        self.rview.setBackgroundColor('k')
+        self.rview.setBackgroundColor("k")
         self.rview.setCameraPosition(distance=10)
         self.grid = self.rgl.GLGridItem()
         self.rview.addItem(self.grid)
-        self.rpg.setConfigOption('background', 'w')
-        self.rpg.setConfigOption('foreground', 'k')
+        self.rpg.setConfigOption("background", "w")
+        self.rpg.setConfigOption("foreground", "k")
 
       def snapshot(self, name=""):
         """
@@ -798,7 +767,6 @@ class PlyModel(PhysicalObject):
         """
         self.rview.grabFrameBuffer().save("{}.png".format(name))
 
-    
     # We might need this for future purposes Dont Delete
     # class MeshUpdate:
     #     def __init__(self, proc):
@@ -809,42 +777,44 @@ class PlyModel(PhysicalObject):
     #     @property
     #     def t(self):
     #         return self._t
-        
+
     #     def update(self,x):
     #         self.data_y.extend([x], _callSync='async')
     #         self.data_x.extend([self.t], _callSync='async',)
     #         self.curve.setData(y=self.data_y, _callSync='async')
-    
+
     pg.mkQApp()
     self.graphicsWindow = PlyVisWindow()
     self.graphicsWindow.rview.setWindowTitle(self.file)
     vertices = self.vertices.data
     vertices = np.array(vertices.tolist())
-    faces = np.array([self.faces[i]['vertex_indices'] for i in  range(self.faces.count)])
-    self.mesh = self.graphicsWindow.rgl.GLMeshItem(vertexes=vertices, faces=faces, 
-                    shader='normalColor', drawEdges=True, 
-                    drawFaces=True, computeNormals=False, 
-                    smooth=False)
+    faces = np.array([self.faces[i]["vertex_indices"]
+                      for i in range(self.faces.count)])
+    self.mesh = self.graphicsWindow.rgl.GLMeshItem(
+      vertexes=vertices, faces=faces, shader="normalColor", drawEdges=True,
+      drawFaces=True, computeNormals=False, smooth=False)
     self.graphicsWindow.rview.addItem(self.mesh)
     self.graphicsWindow.rview.show()
-    pos = np.empty((numPoints,3))
+    pos = np.empty((numPoints, 3))
     size = np.ones((numPoints,))
-    color = np.ones((numPoints,4))
-    self.scatter = self.graphicsWindow.rgl.GLScatterPlotItem(pos=pos, size=size, color=color, pxMode=True)
+    color = np.ones((numPoints, 4))
+    self.scatter = self.graphicsWindow.rgl.GLScatterPlotItem(
+      pos=pos, size=size, color=color, pxMode=True)
     self.graphicsWindow.rview.addItem(self.scatter)
     return self.scatter, self.mesh, pos, size, color
-
 
   def __repr__(self):
     """
     Custom representation.
     """
-    template = self.__class__.__name__ + "(Model obj: \n Vertices: \n {}\n Faces:\n{}\n)"
+    template = (self.__class__.__name__
+                + "(Model obj: \n Vertices: \n {}\n Faces:\n{}\n)")
     return template.format(self.vertices.data, self.faces.data)
-  
+
   def __str__(self):
     """
     Custom string
     """
-    template = self.__class__.__name__+ " {} "+ " Vertices: {} Faces: {}"
-    return template.format(self.file.split('/')[-1].split(".")[-2],self.vertices.count, self.faces.count)
+    template = self.__class__.__name__ + " {} " + " Vertices: {} Faces: {}"
+    return template.format(self.file.split("/")[-1].split(".")[-2],
+                           self.vertices.count, self.faces.count)

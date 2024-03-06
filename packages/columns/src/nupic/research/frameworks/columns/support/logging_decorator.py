@@ -22,7 +22,6 @@
 import pickle
 
 
-
 class LoggingDecorator(object):
   """
   Decorator class for logging calls to be used to debug and reconstruct
@@ -84,9 +83,7 @@ class LoggingDecorator(object):
 
       return fn(instance, *args, **kwargs)
 
-
     return _fn
-
 
   @staticmethod
   def save(callLog, logFilename):
@@ -99,7 +96,6 @@ class LoggingDecorator(object):
     """
     with open(logFilename, "wb") as outp:
       pickle.dump(callLog, outp)
-
 
   @staticmethod
   def load(logFilename):

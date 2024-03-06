@@ -25,16 +25,15 @@ Perform an experiment to see if L2 eventually recognizes an object.
 Test with various noise levels and with various column counts.
 """
 
-from collections import defaultdict
 import json
 import math
-import random
 import os
+import random
 import time
+from collections import defaultdict
 
 from nupic.research.frameworks.columns.l2_l4_inference import L4L2Experiment
 from nupic.research.frameworks.columns.sensor_placement import greedySensorPositions
-
 
 TIMESTEPS_PER_SENSATION = 3
 NUM_L4_COLUMNS = 2048
@@ -97,13 +96,11 @@ def createRandomObjects(numObjects, locationsPerObject, featurePoolSize):
   """
 
   allFeatures = list(range(featurePoolSize))
-  allLocations = list(range(locationsPerObject))
   objects = dict((name,
-                     [random.choice(allFeatures) for _ in range(locationsPerObject)])
-                    for name in range(numObjects))
+                  [random.choice(allFeatures) for _ in range(locationsPerObject)])
+                 for name in range(numObjects))
 
   return objects
-
 
 
 def doExperiment(numColumns, objects, l2Overrides, noiseLevels, numInitialTraversals,
@@ -136,8 +133,11 @@ def doExperiment(numColumns, objects, l2Overrides, noiseLevels, numInitialTraver
   Whether to use a noisy location
   """
 
-  featureSDR = lambda : set(random.sample(range(NUM_L4_COLUMNS), 40))
-  locationSDR = lambda : set(random.sample(range(1024), 40))
+  def featureSDR():
+    return set(random.sample(range(NUM_L4_COLUMNS), 40))
+
+  def locationSDR():
+    return set(random.sample(range(1024), 40))
 
   featureSDRsByColumn = [defaultdict(featureSDR) for _ in range(numColumns)]
   locationSDRsByColumn = [defaultdict(locationSDR) for _ in range(numColumns)]
@@ -198,7 +198,7 @@ def doExperiment(numColumns, objects, l2Overrides, noiseLevels, numInitialTraver
 
         sensation[0] = (locationSDR, featureSDR)
 
-        exp.infer([sensation]*TIMESTEPS_PER_SENSATION, reset=False,
+        exp.infer([sensation] * TIMESTEPS_PER_SENSATION, reset=False,
                   objectName=objectName)
 
         if touch >= numInitialTouches:
@@ -252,7 +252,7 @@ def logCellActivity_noisyFeature_varyNumColumns(name="cellActivity"):
     json.dump(d, fout)
 
   print("Wrote to", filename)
-  print("Visualize this file at: http://numenta.github.io/htmresearch/visualizations/grid-of-scatterplots/L2-columns-with-noise.html")
+  print("Visualize this file at: http://numenta.github.io/htmresearch/visualizations/grid-of-scatterplots/L2-columns-with-noise.html")  # noqa
 
 
 def logCellActivity_noisyLocation_varyNumColumns(name, objects):
@@ -272,8 +272,9 @@ def logCellActivity_noisyLocation_varyNumColumns(name, objects):
 
     for numColumns in columnCounts:
       print("numColumns", numColumns)
-      r = doExperiment(numColumns, objects, l2Overrides, noiseLevels, numInitialTraversals=6,
-                       noisyFeature=False, noisyLocation=True)
+      r = doExperiment(numColumns, objects, l2Overrides, noiseLevels,
+                       numInitialTraversals=6, noisyFeature=False,
+                       noisyLocation=True)
 
       for noiseLevel, counts in r.items():
         results[(numColumns, noiseLevel)].extend(counts)
@@ -293,8 +294,7 @@ def logCellActivity_noisyLocation_varyNumColumns(name, objects):
     json.dump(d, fout)
 
   print("Wrote to", filename)
-  print("Visualize this file at: http://numenta.github.io/htmresearch/visualizations/grid-of-scatterplots/L2-columns-with-noise.html")
-
+  print("Visualize this file at: http://numenta.github.io/htmresearch/visualizations/grid-of-scatterplots/L2-columns-with-noise.html")  # noqa
 
 
 if __name__ == "__main__":
@@ -309,7 +309,6 @@ if __name__ == "__main__":
   # improved, but the confidence of the inference isn't.
   print("Test: Noisy L4 minicolumn SDR")
   logCellActivity_noisyFeature_varyNumColumns(name="noisyFeatureSDR")
-
 
   # Add noise to L4's location input, observing the impact on L2. Add a constant
   # amount of noise to the location input of one cortical column, but leave the
@@ -329,49 +328,46 @@ if __name__ == "__main__":
   # Random objects with a small feature pool. Once noisy, a single column never
   # infers an object, since most objects contain the exact same 3 features.
 
-  print ("Test: Noisy L4 location SDR, "
-         "using random objects with a feature pool size of 3")
+  print("Test: Noisy L4 location SDR, "
+        "using random objects with a feature pool size of 3")
   logCellActivity_noisyLocation_varyNumColumns(
     "smallFeaturePool", createRandomObjects(numObjects=10,
                                             locationsPerObject=10,
                                             featurePoolSize=3))
 
-
   # A larger feature pool. Once noisy, a single column infers an object > 75% of
   # the time, since many objects are unique in their set of features.
 
-  print ("Test: Noisy L4 location SDR, "
-         "using random objects with a feature pool size of 10")
+  print("Test: Noisy L4 location SDR, "
+        "using random objects with a feature pool size of 10")
   logCellActivity_noisyLocation_varyNumColumns(
     "mediumFeaturePool", createRandomObjects(numObjects=10,
                                              locationsPerObject=10,
                                              featurePoolSize=10))
 
-
   # Hand-crafted objects that use only the same features. With a noisy location,
   # the object is never inferred with a single column. L2 always infers the
   # union of the 3 objects.
 
-  print ("Test: Noisy L4 location SDR, "
-         "using hand-crafted objects made of the same features")
+  print("Test: Noisy L4 location SDR, "
+        "using hand-crafted objects made of the same features")
   logCellActivity_noisyLocation_varyNumColumns(
     name="sameBagsOfFeatures",
     objects={
-    0: [0, 1, 2],
-    1: [0, 2, 1],
-    2: [2, 0, 1],
-  })
-
+      0: [0, 1, 2],
+      1: [0, 2, 1],
+      2: [2, 0, 1],
+    })
 
   # Hand-crafted objects that are each a unique combination of features. The
   # object is always inferred with a single column.
 
-  print ("Test: Noisy L4 location SDR, "
-         "using hand-crafted objects made of the unique sets of features")
+  print("Test: Noisy L4 location SDR, "
+        "using hand-crafted objects made of the unique sets of features")
   logCellActivity_noisyLocation_varyNumColumns(
     name="uniqueBagsOfFeatures",
     objects={
-    0: [0, 1, 2],
-    1: [1, 2, 3],
-    2: [2, 3, 0],
-  })
+      0: [0, 1, 2],
+      1: [1, 2, 3],
+      2: [2, 3, 0],
+    })

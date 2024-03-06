@@ -21,13 +21,7 @@
 
 from abc import ABCMeta, abstractmethod
 
-try:
-  from mpl_toolkits.mplot3d import Axes3D
-except ImportError:
-  print("Your Matplotlib version is not up to date. " \
-        "Don't use plotting functions")
 import matplotlib.pyplot as plt
-
 
 
 class PhysicalObject(object, metaclass=ABCMeta):
@@ -69,7 +63,6 @@ class PhysicalObject(object, metaclass=ABCMeta):
   # each physical objects has a list of features to sample from
   _FEATURES = []
 
-
   @abstractmethod
   def getFeatureID(self, location):
     """
@@ -86,7 +79,6 @@ class PhysicalObject(object, metaclass=ABCMeta):
     the object's surface (at epsilon's precision).
     """
 
-
   @abstractmethod
   def sampleLocation(self):
     """
@@ -100,7 +92,6 @@ class PhysicalObject(object, metaclass=ABCMeta):
     Samples a location from the provided specific feature.
     """
 
-
   def almostEqual(self, number, other):
     """
     Checks that the two provided number are equal with a precision of epsilon.
@@ -110,14 +101,12 @@ class PhysicalObject(object, metaclass=ABCMeta):
     """
     return abs(number - other) <= self.epsilon
 
-
   def getFeatures(self):
     """
     Returns the list of object feature spans, from which the user can sample
     locations.
     """
     return self._FEATURES
-
 
   def plot(self, numPoints=100):
     """
@@ -127,7 +116,7 @@ class PhysicalObject(object, metaclass=ABCMeta):
     samples numPoints points from the object and plots them in a 3d scatter.
     """
     fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+    ax = fig.add_subplot(111, projection="3d")
 
     for feature in self._FEATURES:
 
@@ -135,9 +124,9 @@ class PhysicalObject(object, metaclass=ABCMeta):
         x, y, z = tuple(self.sampleLocationFromFeature(feature))
         ax.scatter(x, y, z, marker=".")
 
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Z")
 
     plt.title("{}".format(self))
     return fig, ax

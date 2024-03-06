@@ -1,5 +1,5 @@
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2016 - 2017, Numenta, Inc.  Unless you have an agreement
+# Copyright (C) 2016, Numenta, Inc.  Unless you have an agreement
 # with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
@@ -26,12 +26,12 @@ Test with various noise levels and with various column counts and synapse
 sample sizes.
 """
 
-from collections import defaultdict
 import json
 import math
-import random
 import os
+import random
 import time
+from collections import defaultdict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -39,7 +39,7 @@ import numpy as np
 from nupic.research.frameworks.columns.column_pooler import ColumnPooler
 from nupic.research.frameworks.columns.sensor_placement import greedySensorPositions
 
-L4_CELL_COUNT = 8*1024
+L4_CELL_COUNT = 8 * 1024
 
 
 def createRandomObjectDescriptions(numObjects,
@@ -51,8 +51,8 @@ def createRandomObjectDescriptions(numObjects,
   """
   return dict(("Object %d" % i,
                list(zip(list(range(numLocationsPerObject)),
-                   [random.choice(featurePool)
-                    for _ in range(numLocationsPerObject)])))
+                        [random.choice(featurePool)
+                         for _ in range(numLocationsPerObject)])))
               for i in range(1, numObjects + 1))
 
 
@@ -128,12 +128,13 @@ def doExperiment(numColumns, l2Overrides, objectDescriptions, noiseMu,
   """
 
   # For each column, keep a mapping from feature-location names to their SDRs
-  layer4sdr = lambda : np.array(sorted(random.sample(range(L4_CELL_COUNT),
-                                                     40)), dtype="uint32")
+  def layer4sdr():
+    return np.array(sorted(random.sample(range(L4_CELL_COUNT),
+                                         40)), dtype="uint32")
   featureLocationSDRs = [defaultdict(layer4sdr) for _ in range(numColumns)]
 
   params = {"inputWidth": L4_CELL_COUNT,
-            "lateralInputWidths": [4096]*(numColumns-1),
+            "lateralInputWidths": [4096] * (numColumns - 1),
             "seed": random.randint(0, 1024)}
   params.update(l2Overrides)
 
@@ -142,7 +143,7 @@ def doExperiment(numColumns, l2Overrides, objectDescriptions, noiseMu,
 
   # Learn the objects
   objectL2Representations = {}
-  for objectName, featureLocations in  objectDescriptions.items():
+  for objectName, featureLocations in objectDescriptions.items():
     for featureLocationName in featureLocations:
       # Touch it enough times for the distal synapses to reach the
       # connected permanence, and then once more.
@@ -253,9 +254,9 @@ def plotSuccessRate_varyNumColumns(noiseSigma, noiseEverywhere):
 
   plt.figure()
   colors = dict(list(zip(columnCounts,
-                    ('r', 'k', 'g', 'b'))))
+                         ("r", "k", "g", "b"))))
   markers = dict(list(zip(columnCounts,
-                     ('o', '*', 'D', 'x'))))
+                          ("o", "*", "D", "x"))))
 
   for numColumns in columnCounts:
     y = []
@@ -324,9 +325,9 @@ def plotSuccessRate_varyDistalSampleSize(noiseSigma, noiseEverywhere):
 
   plt.figure()
   colorList = dict(list(zip(sampleSizes,
-                       ('r', 'k', 'g', 'b'))))
+                            ("r", "k", "g", "b"))))
   markerList = dict(list(zip(sampleSizes,
-                        ('o', '*', 'D', 'x'))))
+                             ("o", "*", "D", "x"))))
 
   for sampleSizeDistal in sampleSizes:
     y = []
@@ -395,9 +396,9 @@ def plotSuccessRate_varyProximalSampleSize(noiseSigma, noiseEverywhere):
 
   plt.figure()
   colorList = dict(list(zip(sampleSizes,
-                       ('r', 'k', 'g', 'b'))))
+                            ("r", "k", "g", "b"))))
   markerList = dict(list(zip(sampleSizes,
-                        ('o', '*', 'D', 'x'))))
+                             ("o", "*", "D", "x"))))
 
   for sampleSizeProximal in sampleSizes:
     y = []
@@ -469,8 +470,7 @@ def logCellActivity_varyNumColumns(noiseSigma, noiseEverywhere):
     json.dump(d, fout)
 
   print("Wrote to", filename)
-  print("Visualize this file at: http://numenta.github.io/htmresearch/visualizations/grid-of-scatterplots/L2-columns-with-noise.html")
-
+  print("Visualize this file at: http://numenta.github.io/htmresearch/visualizations/grid-of-scatterplots/L2-columns-with-noise.html")  # noqa
 
 
 if __name__ == "__main__":

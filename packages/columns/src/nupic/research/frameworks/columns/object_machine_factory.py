@@ -23,16 +23,10 @@
 Factory for creating object machines.
 """
 
-from nupic.research.frameworks.columns.simple_object_machine import (
-  SimpleObjectMachine
-)
-# from nupic.research.frameworks.columns.continuous_location_object_machine import (
-#   ContinuousLocationObjectMachine
-# )
 from nupic.research.frameworks.columns.sequence_object_machine import (
-  SequenceObjectMachine
+    SequenceObjectMachine,
 )
-
+from nupic.research.frameworks.columns.simple_object_machine import SimpleObjectMachine
 
 
 class ObjectMachineTypes(object):
@@ -56,7 +50,6 @@ class ObjectMachineTypes(object):
       attrValue = getattr(cls, attrName)
       if (isinstance(attrValue, type)):
         yield attrName
-
 
 
 def createObjectMachine(machineType, **kwargs):
