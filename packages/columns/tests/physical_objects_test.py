@@ -24,118 +24,115 @@ import unittest
 import matplotlib.pyplot as plt
 
 from nupic.research.frameworks.columns.physical_objects import (
-  Sphere, Cylinder, Box, Cube
+    Box,
+    Cube,
+    Cylinder,
+    Sphere,
 )
-
 
 
 @unittest.skip("needs work to get these running")
 class PhysicalObjectsTest(unittest.TestCase):
-  """Unit tests for physical objects."""
+    """Unit tests for physical objects."""
 
+    def testInitParams(self):
+        """Simple construction test."""
+        sphere = Sphere(radius=5, dimension=6)
+        cylinder = Cylinder(height=50, radius=100, epsilon=5)
+        box = Box(dimensions=[1, 2, 3, 4], dimension=4)
+        cube = Cube(width=10, dimension=2)
 
-  def testInitParams(self):
-    """Simple construction test."""
-    sphere = Sphere(radius=5, dimension=6)
-    cylinder = Cylinder(height=50, radius=100, epsilon=5)
-    box = Box(dimensions=[1, 2, 3, 4], dimension=4)
-    cube = Cube(width=10, dimension=2)
+        self.assertEqual(sphere.radius, 5)
+        self.assertEqual(sphere.dimension, 6)
+        self.assertEqual(sphere.epsilon, sphere.DEFAULT_EPSILON)
 
-    self.assertEqual(sphere.radius, 5)
-    self.assertEqual(sphere.dimension, 6)
-    self.assertEqual(sphere.epsilon, sphere.DEFAULT_EPSILON)
+        self.assertEqual(cylinder.radius, 100)
+        self.assertEqual(cylinder.height, 50)
+        self.assertEqual(cylinder.dimension, 3)
+        self.assertEqual(cylinder.epsilon, 5)
 
-    self.assertEqual(cylinder.radius, 100)
-    self.assertEqual(cylinder.height, 50)
-    self.assertEqual(cylinder.dimension, 3)
-    self.assertEqual(cylinder.epsilon, 5)
+        self.assertEqual(box.dimensions, [1, 2, 3, 4])
+        self.assertEqual(box.dimension, 4)
+        self.assertEqual(box.epsilon, box.DEFAULT_EPSILON)
 
-    self.assertEqual(box.dimensions, [1, 2, 3, 4])
-    self.assertEqual(box.dimension, 4)
-    self.assertEqual(box.epsilon, box.DEFAULT_EPSILON)
+        self.assertEqual(cube.dimensions, [10, 10])
+        self.assertEqual(cube.width, 10)
+        self.assertEqual(cube.dimension, 2)
+        self.assertEqual(sphere.epsilon, cube.DEFAULT_EPSILON)
 
-    self.assertEqual(cube.dimensions, [10, 10])
-    self.assertEqual(cube.width, 10)
-    self.assertEqual(cube.dimension, 2)
-    self.assertEqual(sphere.epsilon, cube.DEFAULT_EPSILON)
+    def testSampleContains(self):
+        """Samples points from the objects and test contains."""
+        sphere = Sphere(radius=20, dimension=6)
+        cylinder = Cylinder(height=50, radius=100, epsilon=2)
+        box = Box(dimensions=[10, 20, 30, 40], dimension=4)
+        cube = Cube(width=20, dimension=2)
 
+        for _ in range(50):
+            self.assertTrue(sphere.contains(sphere.sampleLocation()))
+            self.assertTrue(cylinder.contains(cylinder.sampleLocation()))
+            self.assertTrue(box.contains(box.sampleLocation()))
+            self.assertTrue(cube.contains(cube.sampleLocation()))
 
-  def testSampleContains(self):
-    """Samples points from the objects and test contains."""
-    sphere = Sphere(radius=20, dimension=6)
-    cylinder = Cylinder(height=50, radius=100, epsilon=2)
-    box = Box(dimensions=[10, 20, 30, 40], dimension=4)
-    cube = Cube(width=20, dimension=2)
+        # inside
+        self.assertFalse(sphere.contains([1] * sphere.dimension))
+        self.assertFalse(cube.contains([1] * cube.dimension))
+        self.assertFalse(cylinder.contains([1] * cylinder.dimension))
+        self.assertFalse(box.contains([1] * box.dimension))
 
-    for i in range(50):
-      self.assertTrue(sphere.contains(sphere.sampleLocation()))
-      self.assertTrue(cylinder.contains(cylinder.sampleLocation()))
-      self.assertTrue(box.contains(box.sampleLocation()))
-      self.assertTrue(cube.contains(cube.sampleLocation()))
+        # outside
+        self.assertFalse(sphere.contains([100] * sphere.dimension))
+        self.assertFalse(cube.contains([100] * cube.dimension))
+        self.assertFalse(cylinder.contains([100] * cylinder.dimension))
+        self.assertFalse(box.contains([100] * box.dimension))
 
-    # inside
-    self.assertFalse(sphere.contains([1] * sphere.dimension))
-    self.assertFalse(cube.contains([1] * cube.dimension))
-    self.assertFalse(cylinder.contains([1] * cylinder.dimension))
-    self.assertFalse(box.contains([1] * box.dimension))
+    def testPlotSampleLocations(self):
+        """Samples points from objects and plots them in a 3D scatter."""
+        objects = []
+        objects.append(Sphere(radius=20, dimension=3))
+        objects.append(Cylinder(height=50, radius=100, epsilon=2))
+        objects.append(Box(dimensions=[10, 20, 30], dimension=3))
+        objects.append(Cube(width=20, dimension=3))
+        numPoints = 500
 
-    # outside
-    self.assertFalse(sphere.contains([100] * sphere.dimension))
-    self.assertFalse(cube.contains([100] * cube.dimension))
-    self.assertFalse(cylinder.contains([100] * cylinder.dimension))
-    self.assertFalse(box.contains([100] * box.dimension))
+        for i in range(4):
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection="3d")
+            for _ in range(numPoints):
+                x, y, z = tuple(objects[i].sampleLocation())
+                ax.scatter(x, y, z)
 
+            ax.set_xlabel("X")
+            ax.set_ylabel("Y")
+            ax.set_zlabel("Z")
+            plt.title("Sampled points from {}".format(objects[i]))
+            plt.savefig("object{}.png".format(str(i)))
+            plt.close()
 
-  def testPlotSampleLocations(self):
-    """Samples points from objects and plots them in a 3D scatter."""
-    objects = []
-    objects.append(Sphere(radius=20, dimension=3))
-    objects.append(Cylinder(height=50, radius=100, epsilon=2))
-    objects.append(Box(dimensions=[10, 20, 30], dimension=3))
-    objects.append(Cube(width=20, dimension=3))
-    numPoints = 500
+    def testPlotSampleFeatures(self):
+        """Samples points from objects and plots them in a 3D scatter."""
+        objects = []
+        objects.append(Sphere(radius=20, dimension=3))
+        objects.append(Cylinder(height=50, radius=100, epsilon=2))
+        objects.append(Box(dimensions=[10, 20, 30], dimension=3))
+        objects.append(Cube(width=20, dimension=3))
+        numPoints = 500
 
-    for i in range(4):
-      fig = plt.figure()
-      ax = fig.add_subplot(111, projection='3d')
-      for _ in range(numPoints):
-        x, y, z = tuple(objects[i].sampleLocation())
-        ax.scatter(x, y, z)
+        for i in range(4):
 
-      ax.set_xlabel('X')
-      ax.set_ylabel('Y')
-      ax.set_zlabel('Z')
-      plt.title("Sampled points from {}".format(objects[i]))
-      plt.savefig("object{}.png".format(str(i)))
-      plt.close()
+            for feature in objects[i].features:
+                fig = plt.figure()
+                ax = fig.add_subplot(111, projection="3d")
+                for _ in range(numPoints):
+                    x, y, z = tuple(objects[i].sampleLocationFromFeature(feature))
+                    ax.scatter(x, y, z)
 
-
-  def testPlotSampleFeatures(self):
-    """Samples points from objects and plots them in a 3D scatter."""
-    objects = []
-    objects.append(Sphere(radius=20, dimension=3))
-    objects.append(Cylinder(height=50, radius=100, epsilon=2))
-    objects.append(Box(dimensions=[10, 20, 30], dimension=3))
-    objects.append(Cube(width=20, dimension=3))
-    numPoints = 500
-
-    for i in range(4):
-
-      for feature in objects[i].features:
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        for _ in range(numPoints):
-          x, y, z = tuple(objects[i].sampleLocationFromFeature(feature))
-          ax.scatter(x, y, z)
-
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
-        plt.title("Sampled points on {} from {}".format(feature, objects[i]))
-        plt.savefig("object_{}_{}.png".format(str(i), feature))
-        plt.close()
-
+                ax.set_xlabel("X")
+                ax.set_ylabel("Y")
+                ax.set_zlabel("Z")
+                plt.title("Sampled points on {} from {}".format(feature, objects[i]))
+                plt.savefig("object_{}_{}.png".format(str(i), feature))
+                plt.close()
 
 
 if __name__ == "__main__":
-  unittest.main()
+    unittest.main()

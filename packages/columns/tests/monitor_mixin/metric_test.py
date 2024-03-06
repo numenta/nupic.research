@@ -20,42 +20,40 @@
 # ----------------------------------------------------------------------
 
 import unittest
+
 from nupic.research.frameworks.columns.support.monitor_mixin.metric import Metric
-
-from nupic.research.frameworks.columns.support.monitor_mixin.trace import CountsTrace, BoolsTrace
-
+from nupic.research.frameworks.columns.support.monitor_mixin.trace import (
+    BoolsTrace,
+    CountsTrace,
+)
 
 
 class MetricTest(unittest.TestCase):
 
+    def setUp(self):
+        self.trace = CountsTrace(self, "# active cells")
+        self.trace.data = [1, 2, 3, 4, 5, 0]
 
-  def setUp(self):
-    self.trace = CountsTrace(self, "# active cells")
-    self.trace.data = [1, 2, 3, 4, 5, 0]
+    def testCreateFromTrace(self):
+        metric = Metric.createFromTrace(self.trace)
+        self.assertEqual(metric.title, self.trace.title)
+        self.assertEqual(metric.min, 0)
+        self.assertEqual(metric.max, 5)
+        self.assertEqual(metric.sum, 15)
+        self.assertEqual(metric.mean, 2.5)
+        self.assertEqual(metric.standardDeviation, 1.707825127659933)
 
-
-  def testCreateFromTrace(self):
-    metric = Metric.createFromTrace(self.trace)
-    self.assertEqual(metric.title, self.trace.title)
-    self.assertEqual(metric.min, 0)
-    self.assertEqual(metric.max, 5)
-    self.assertEqual(metric.sum, 15)
-    self.assertEqual(metric.mean, 2.5)
-    self.assertEqual(metric.standardDeviation, 1.707825127659933)
-
-
-  def testCreateFromTraceExcludeResets(self):
-    resetTrace = BoolsTrace(self, "resets")
-    resetTrace.data = [True, False, False, True, False, False]
-    metric = Metric.createFromTrace(self.trace, excludeResets=resetTrace)
-    self.assertEqual(metric.title, self.trace.title)
-    self.assertEqual(metric.min, 0)
-    self.assertEqual(metric.max, 5)
-    self.assertEqual(metric.sum, 10)
-    self.assertEqual(metric.mean, 2.5)
-    self.assertEqual(metric.standardDeviation, 1.8027756377319946)
+    def testCreateFromTraceExcludeResets(self):
+        resetTrace = BoolsTrace(self, "resets")
+        resetTrace.data = [True, False, False, True, False, False]
+        metric = Metric.createFromTrace(self.trace, excludeResets=resetTrace)
+        self.assertEqual(metric.title, self.trace.title)
+        self.assertEqual(metric.min, 0)
+        self.assertEqual(metric.max, 5)
+        self.assertEqual(metric.sum, 10)
+        self.assertEqual(metric.mean, 2.5)
+        self.assertEqual(metric.standardDeviation, 1.8027756377319946)
 
 
-
-if __name__ == '__main__':
-  unittest.main()
+if __name__ == "__main__":
+    unittest.main()

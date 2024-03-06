@@ -28,119 +28,117 @@ import numpy as np
 from nupic.bindings.math import Random
 
 
-
 class SequenceMachine(object):
-  """
-  Base sequence machine class.
-  """
-
-  def __init__(self,
-               patternMachine,
-               seed=42):
     """
-    @param patternMachine (PatternMachine) Pattern machine instance
+    Base sequence machine class.
     """
-    # Save member variables
-    self.patternMachine = patternMachine
 
-    # Initialize member variables
-    self._random = Random(seed)
+    def __init__(self, patternMachine, seed=42):
+        """
+        @param patternMachine (PatternMachine) Pattern machine instance
+        """
+        # Save member variables
+        self.patternMachine = patternMachine
 
+        # Initialize member variables
+        self._random = Random(seed)
 
-  def generateFromNumbers(self, numbers):
-    """
-    Generate a sequence from a list of numbers.
+    def generateFromNumbers(self, numbers):
+        """
+        Generate a sequence from a list of numbers.
 
-    Note: Any `None` in the list of numbers is considered a reset.
+        Note: Any `None` in the list of numbers is considered a reset.
 
-    @param numbers (list) List of numbers
+        @param numbers (list) List of numbers
 
-    @return (list) Generated sequence
-    """
-    sequence = []
+        @return (list) Generated sequence
+        """
+        sequence = []
 
-    for number in numbers:
-      if number == None:
-        sequence.append(number)
-      else:
-        pattern = self.patternMachine.get(number)
-        sequence.append(pattern)
+        for number in numbers:
+            if number is None:
+                sequence.append(number)
+            else:
+                pattern = self.patternMachine.get(number)
+                sequence.append(pattern)
 
-    return sequence
+        return sequence
 
+    def addSpatialNoise(self, sequence, amount):
+        """
+        Add spatial noise to each pattern in the sequence.
 
-  def addSpatialNoise(self, sequence, amount):
-    """
-    Add spatial noise to each pattern in the sequence.
+        @param sequence (list)  Sequence
+        @param amount   (float) Amount of spatial noise
 
-    @param sequence (list)  Sequence
-    @param amount   (float) Amount of spatial noise
+        @return (list) Sequence with spatial noise
+        """
+        newSequence = []
 
-    @return (list) Sequence with spatial noise
-    """
-    newSequence = []
+        for pattern in sequence:
+            if pattern is not None:
+                pattern = self.patternMachine.addNoise(pattern, amount)
+            newSequence.append(pattern)
 
-    for pattern in sequence:
-      if pattern is not None:
-        pattern = self.patternMachine.addNoise(pattern, amount)
-      newSequence.append(pattern)
+        return newSequence
 
-    return newSequence
+    def prettyPrintSequence(self, sequence, verbosity=1):
+        """
+        Pretty print a sequence.
 
+        @param sequence  (list) Sequence
+        @param verbosity (int)  Verbosity level
 
-  def prettyPrintSequence(self, sequence, verbosity=1):
-    """
-    Pretty print a sequence.
+        @return (string) Pretty-printed text
+        """
+        text = ""
 
-    @param sequence  (list) Sequence
-    @param verbosity (int)  Verbosity level
+        for i in range(len(sequence)):
+            pattern = sequence[i]
 
-    @return (string) Pretty-printed text
-    """
-    text = ""
+            if pattern is None:
+                text += "<reset>"
+                if i < len(sequence) - 1:
+                    text += "\n"
+            else:
+                text += self.patternMachine.prettyPrintPattern(
+                    pattern, verbosity=verbosity
+                )
 
-    for i in range(len(sequence)):
-      pattern = sequence[i]
+        return text
 
-      if pattern == None:
-        text += "<reset>"
-        if i < len(sequence) - 1:
-          text += "\n"
-      else:
-        text += self.patternMachine.prettyPrintPattern(pattern,
-                                                       verbosity=verbosity)
+    def generateNumbers(self, numSequences, sequenceLength, sharedRange=None):
+        """
+        @param numSequences   (int)   Number of sequences to return,
+                                      separated by None
+        @param sequenceLength (int)   Length of each sequence
+        @param sharedRange    (tuple) (start index, end index) indicating range of
+                                      shared subsequence in each sequence
+                                      (None if no shared subsequences)
+        @return (list) Numbers representing sequences
+        """
+        numbers = []
 
-    return text
+        if sharedRange:
+            sharedStart, sharedEnd = sharedRange
+            sharedLength = sharedEnd - sharedStart
+            sharedNumbers = list(
+                range(
+                    numSequences * sequenceLength,
+                    numSequences * sequenceLength + sharedLength,
+                )
+            )
 
+        for i in range(numSequences):
+            start = i * sequenceLength
+            newNumbers = np.array(list(range(start, start + sequenceLength)), np.uint32)
+            self._random.shuffle(newNumbers)
+            newNumbers = list(newNumbers)
 
-  def generateNumbers(self, numSequences, sequenceLength, sharedRange=None):
-    """
-    @param numSequences   (int)   Number of sequences to return,
-                                  separated by None
-    @param sequenceLength (int)   Length of each sequence
-    @param sharedRange    (tuple) (start index, end index) indicating range of
-                                  shared subsequence in each sequence
-                                  (None if no shared subsequences)
-    @return (list) Numbers representing sequences
-    """
-    numbers = []
+            if sharedRange is not None:
+                newNumbers[sharedStart:sharedEnd] = sharedNumbers
 
-    if sharedRange:
-      sharedStart, sharedEnd = sharedRange
-      sharedLength = sharedEnd - sharedStart
-      sharedNumbers = list(range(numSequences * sequenceLength,
-                            numSequences * sequenceLength + sharedLength))
+            numbers += newNumbers
+            numbers.append(None)
 
-    for i in range(numSequences):
-      start = i * sequenceLength
-      newNumbers = np.array(list(range(start, start + sequenceLength)), np.uint32)
-      self._random.shuffle(newNumbers)
-      newNumbers = list(newNumbers)
-
-      if sharedRange is not None:
-        newNumbers[sharedStart:sharedEnd] = sharedNumbers
-
-      numbers += newNumbers
-      numbers.append(None)
-
-    return numbers
+        return numbers

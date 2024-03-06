@@ -28,186 +28,175 @@ import numpy as np
 from nupic.bindings.math import Random
 
 
-
 class PatternMachine(object):
-  """
-  Base pattern machine class.
-  """
-
-  def __init__(self,
-               n,
-               w,
-               num=100,
-               seed=42):
     """
-    @param n   (int)      Number of available bits in pattern
-    @param w   (int/list) Number of on bits in pattern
-                          If list, each pattern will have a `w` randomly
-                          selected from the list.
-    @param num (int)      Number of available patterns
+    Base pattern machine class.
     """
-    # Save member variables
-    self._n = n
-    self._w = w
-    self._num = num
 
-    # Initialize member variables
-    self._random = Random(seed)
-    self._patterns = dict()
+    def __init__(self, n, w, num=100, seed=42):
+        """
+        @param n   (int)      Number of available bits in pattern
+        @param w   (int/list) Number of on bits in pattern
+                              If list, each pattern will have a `w` randomly
+                              selected from the list.
+        @param num (int)      Number of available patterns
+        """
+        # Save member variables
+        self._n = n
+        self._w = w
+        self._num = num
 
-    self._generate()
+        # Initialize member variables
+        self._random = Random(seed)
+        self._patterns = dict()
 
+        self._generate()
 
-  def get(self, number):
-    """
-    Return a pattern for a number.
+    def get(self, number):
+        """
+        Return a pattern for a number.
 
-    @param number (int) Number of pattern
+        @param number (int) Number of pattern
 
-    @return (set) Indices of on bits
-    """
-    if not number in self._patterns:
-      raise IndexError("Invalid number")
+        @return (set) Indices of on bits
+        """
+        if number not in self._patterns:
+            raise IndexError("Invalid number")
 
-    return self._patterns[number]
+        return self._patterns[number]
 
+    def addNoise(self, bits, amount):
+        """
+        Add noise to pattern.
 
-  def addNoise(self, bits, amount):
-    """
-    Add noise to pattern.
+        @param bits   (set)   Indices of on bits
+        @param amount (float) Probability of switching an on bit with a random bit
 
-    @param bits   (set)   Indices of on bits
-    @param amount (float) Probability of switching an on bit with a random bit
+        @return (set) Indices of on bits in noisy pattern
+        """
+        newBits = set()
 
-    @return (set) Indices of on bits in noisy pattern
-    """
-    newBits = set()
+        for bit in bits:
+            if self._random.getReal64() < amount:
+                newBits.add(self._random.getUInt32(self._n))
+            else:
+                newBits.add(bit)
 
-    for bit in bits:
-      if self._random.getReal64() < amount:
-        newBits.add(self._random.getUInt32(self._n))
-      else:
-        newBits.add(bit)
+        return newBits
 
-    return newBits
+    def numbersForBit(self, bit):
+        """
+        Return the set of pattern numbers that match a bit.
 
+        @param bit (int) Index of bit
 
-  def numbersForBit(self, bit):
-    """
-    Return the set of pattern numbers that match a bit.
+        @return (set) Indices of numbers
+        """
+        if bit >= self._n:
+            raise IndexError("Invalid bit")
 
-    @param bit (int) Index of bit
+        numbers = set()
 
-    @return (set) Indices of numbers
-    """
-    if bit >= self._n:
-      raise IndexError("Invalid bit")
+        for index, pattern in self._patterns.items():
+            if bit in pattern:
+                numbers.add(index)
 
-    numbers = set()
+        return numbers
 
-    for index, pattern in self._patterns.items():
-      if bit in pattern:
-        numbers.add(index)
+    def numberMapForBits(self, bits):
+        """
+        Return a map from number to matching on bits,
+        for all numbers that match a set of bits.
 
-    return numbers
+        @param bits (set) Indices of bits
 
+        @return (dict) Mapping from number => on bits.
+        """
+        numberMap = dict()
 
-  def numberMapForBits(self, bits):
-    """
-    Return a map from number to matching on bits,
-    for all numbers that match a set of bits.
+        for bit in bits:
+            numbers = self.numbersForBit(bit)
 
-    @param bits (set) Indices of bits
+            for number in numbers:
+                if number not in numberMap:
+                    numberMap[number] = set()
 
-    @return (dict) Mapping from number => on bits.
-    """
-    numberMap = dict()
+                numberMap[number].add(bit)
 
-    for bit in bits:
-      numbers = self.numbersForBit(bit)
+        return numberMap
 
-      for number in numbers:
-        if not number in numberMap:
-          numberMap[number] = set()
+    def prettyPrintPattern(self, bits, verbosity=1):
+        """
+        Pretty print a pattern.
 
-        numberMap[number].add(bit)
+        @param bits      (set) Indices of on bits
+        @param verbosity (int) Verbosity level
 
-    return numberMap
+        @return (string) Pretty-printed text
+        """
+        numberMap = self.numberMapForBits(bits)
+        text = ""
 
+        numberList = []
+        numberItems = sorted(
+            iter(numberMap.items()),
+            key=lambda number_bits: len(number_bits[1]),
+            reverse=True,
+        )
 
-  def prettyPrintPattern(self, bits, verbosity=1):
-    """
-    Pretty print a pattern.
+        for number, bits in numberItems:
 
-    @param bits      (set) Indices of on bits
-    @param verbosity (int) Verbosity level
+            if verbosity > 2:
+                strBits = [str(n) for n in bits]
+                numberText = "{0} (bits: {1})".format(number, ",".join(strBits))
+            elif verbosity > 1:
+                numberText = "{0} ({1} bits)".format(number, len(bits))
+            else:
+                numberText = str(number)
 
-    @return (string) Pretty-printed text
-    """
-    numberMap = self.numberMapForBits(bits)
-    text = ""
+            numberList.append(numberText)
 
-    numberList = []
-    numberItems = sorted(iter(numberMap.items()),
-                         key=lambda number_bits: len(number_bits[1]),
-                         reverse=True)
+        text += "[{0}]".format(", ".join(numberList))
 
-    for number, bits in numberItems:
+        return text
 
-      if verbosity > 2:
-        strBits = [str(n) for n in bits]
-        numberText = "{0} (bits: {1})".format(number, ",".join(strBits))
-      elif verbosity > 1:
-        numberText = "{0} ({1} bits)".format(number, len(bits))
-      else:
-        numberText = str(number)
+    def _generate(self):
+        """
+        Generates set of random patterns.
+        """
+        candidates = np.array(list(range(self._n)), np.uint32)
+        for i in range(self._num):
+            self._random.shuffle(candidates)
+            pattern = candidates[0 : self._getW()]
+            self._patterns[i] = set(pattern)
 
-      numberList.append(numberText)
+    def _getW(self):
+        """
+        Gets a value of `w` for use in generating a pattern.
+        """
+        w = self._w
 
-    text += "[{0}]".format(", ".join(numberList))
-
-    return text
-
-
-  def _generate(self):
-    """
-    Generates set of random patterns.
-    """
-    candidates = np.array(list(range(self._n)), np.uint32)
-    for i in range(self._num):
-      self._random.shuffle(candidates)
-      pattern = candidates[0:self._getW()]
-      self._patterns[i] = set(pattern)
-
-
-  def _getW(self):
-    """
-    Gets a value of `w` for use in generating a pattern.
-    """
-    w = self._w
-
-    if type(w) is list:
-      return w[self._random.getUInt32(len(w))]
-    else:
-      return w
-
+        if type(w) is list:
+            return w[self._random.getUInt32(len(w))]
+        else:
+            return w
 
 
 class ConsecutivePatternMachine(PatternMachine):
-  """
-  Pattern machine class that generates patterns with non-overlapping,
-  consecutive on bits.
-  """
-
-  def _generate(self):
     """
-    Generates set of consecutive patterns.
+    Pattern machine class that generates patterns with non-overlapping,
+    consecutive on bits.
     """
-    n = self._n
-    w = self._w
 
-    assert type(w) is int, "List for w not supported"
+    def _generate(self):
+        """
+        Generates set of consecutive patterns.
+        """
+        n = self._n
+        w = self._w
 
-    for i in range(n // w):
-      pattern = set(range(i * w, (i+1) * w))
-      self._patterns[i] = pattern
+        assert type(w) is int, "List for w not supported"
+
+        for i in range(n // w):
+            pattern = set(range(i * w, (i + 1) * w))
+            self._patterns[i] = pattern

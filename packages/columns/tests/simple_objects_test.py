@@ -21,61 +21,54 @@
 
 import unittest
 
-from nupic.research.frameworks.columns.object_machine_factory import (
-  createObjectMachine
-)
-
+from nupic.research.frameworks.columns.object_machine_factory import createObjectMachine
 
 
 class SimpleObjectsTest(unittest.TestCase):
-  """(Incomplete and really simple) unit tests for simple object machine."""
+    """(Incomplete and really simple) unit tests for simple object machine."""
 
+    def testCreateRandom(self):
+        """Simple construction test."""
+        objects = createObjectMachine(machineType="simple", seed=42)
+        objects.createRandomObjects(
+            numObjects=10, numPoints=10, numLocations=10, numFeatures=10
+        )
+        self.assertEqual(len(objects), 10)
 
-  def testCreateRandom(self):
-    """Simple construction test."""
-    objects= createObjectMachine(
-      machineType="simple",
-      seed=42
-    )
-    objects.createRandomObjects(numObjects=10,
-                                numPoints=10, numLocations=10, numFeatures=10)
-    self.assertEqual(len(objects), 10)
+        # Num locations must be >= num points
+        with self.assertRaises(AssertionError):
+            objects.createRandomObjects(
+                numObjects=10, numPoints=10, numLocations=9, numFeatures=10
+            )
 
-    # Num locations must be >= num points
-    with self.assertRaises(AssertionError):
-      objects.createRandomObjects(numObjects=10,
-                                  numPoints=10, numLocations=9, numFeatures=10)
+    def testGetDistinctPairs(self):
+        """Ensures we can compute unique pairs."""
+        pairObjects = createObjectMachine(
+            machineType="simple",
+            numInputBits=20,
+            sensorInputSize=150,
+            externalInputSize=2400,
+            numCorticalColumns=3,
+            numFeatures=5,
+            numLocations=10,
+            seed=42,
+        )
 
+        pairObjects.addObject([(1, 3)], 0)
+        pairObjects.addObject([(3, 1), (1, 3)], 1)
+        pairObjects.addObject([(2, 4)], 2)
 
-  def testGetDistinctPairs(self):
-    """Ensures we can compute unique pairs."""
-    pairObjects = createObjectMachine(
-      machineType="simple",
-      numInputBits=20,
-      sensorInputSize=150,
-      externalInputSize=2400,
-      numCorticalColumns=3,
-      numFeatures=5,
-      numLocations=10,
-      seed=42
-    )
+        distinctPairs = pairObjects.getDistinctPairs()
+        self.assertEqual(len(distinctPairs), 3)
 
-    pairObjects.addObject([(1, 3)], 0)
-    pairObjects.addObject([(3, 1), (1, 3)], 1)
-    pairObjects.addObject([(2, 4)], 2)
+        pairObjects.addObject([(2, 4), (1, 3)], 3)
+        distinctPairs = pairObjects.getDistinctPairs()
+        self.assertEqual(len(distinctPairs), 3)
 
-    distinctPairs = pairObjects.getDistinctPairs()
-    self.assertEqual(len(distinctPairs), 3)
-
-    pairObjects.addObject([(2, 4), (1, 3)], 3)
-    distinctPairs = pairObjects.getDistinctPairs()
-    self.assertEqual(len(distinctPairs), 3)
-
-    pairObjects.addObject([(2, 4), (1, 3), (1, 1)], 4)
-    distinctPairs = pairObjects.getDistinctPairs()
-    self.assertEqual(len(distinctPairs), 4)
-
+        pairObjects.addObject([(2, 4), (1, 3), (1, 1)], 4)
+        distinctPairs = pairObjects.getDistinctPairs()
+        self.assertEqual(len(distinctPairs), 4)
 
 
 if __name__ == "__main__":
-  unittest.main()
+    unittest.main()
