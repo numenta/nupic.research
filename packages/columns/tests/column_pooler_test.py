@@ -22,10 +22,10 @@
 import unittest
 import numpy as np
 
-from nupic.data.generators.pattern_machine import PatternMachine
+from nupic.research.frameworks.columns.data.generators.pattern_machine import PatternMachine
 
-from htmresearch.algorithms.column_pooler import ColumnPooler
-from htmresearch.support.column_pooler_mixin import ColumnPoolerMonitorMixin
+from nupic.research.frameworks.columns.column_pooler import ColumnPooler
+from nupic.research.frameworks.columns.support.column_pooler_mixin import ColumnPoolerMonitorMixin
 
 
 class MonitoredColumnPooler(ColumnPoolerMonitorMixin, ColumnPooler):

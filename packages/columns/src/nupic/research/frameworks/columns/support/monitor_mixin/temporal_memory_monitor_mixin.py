@@ -25,12 +25,12 @@ Temporal Memory mixin that enables detailed monitoring of history.
 
 import copy
 from collections import defaultdict
-from nupic.algorithms.monitor_mixin.metric import Metric
-from nupic.algorithms.monitor_mixin.monitor_mixin_base import MonitorMixinBase
+from nupic.research.frameworks.columns.support.monitor_mixin.metric import Metric
+from nupic.research.frameworks.columns.support.monitor_mixin.monitor_mixin_base import MonitorMixinBase
 from prettytable import PrettyTable
 
-from nupic.algorithms.monitor_mixin.trace import (IndicesTrace, CountsTrace,
-                                                  BoolsTrace, StringsTrace)
+from nupic.research.frameworks.columns.support.monitor_mixin.trace import (IndicesTrace, CountsTrace,
+BoolsTrace, StringsTrace)
 
 
 

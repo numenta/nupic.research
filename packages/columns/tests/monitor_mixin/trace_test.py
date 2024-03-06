@@ -21,7 +21,7 @@
 
 import unittest
 
-from nupic.algorithms.monitor_mixin.trace import IndicesTrace
+from nupic.research.frameworks.columns.support.monitor_mixin.trace import IndicesTrace
 
 
 

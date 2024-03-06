@@ -21,7 +21,7 @@
 
 import unittest
 
-from htmresearch.frameworks.layers.object_machine_factory import (
+from nupic.research.frameworks.columns.object_machine_factory import (
   createObjectMachine
 )
 

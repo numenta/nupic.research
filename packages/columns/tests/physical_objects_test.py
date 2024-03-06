@@ -23,7 +23,7 @@ import unittest
 
 import matplotlib.pyplot as plt
 
-from htmresearch.frameworks.layers.physical_objects import (
+from nupic.research.frameworks.columns.physical_objects import (
   Sphere, Cylinder, Box, Cube
 )
 

@@ -25,9 +25,6 @@ Trace classes used in monitor mixin framework.
 
 import abc
 
-import numpy
-
-
 
 class Trace(object, metaclass=abc.ABCMeta):
   """

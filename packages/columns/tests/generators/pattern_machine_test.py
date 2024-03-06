@@ -20,8 +20,8 @@
 # ----------------------------------------------------------------------
 import unittest
 
-from nupic.data.generators.pattern_machine import (PatternMachine,
-                                                   ConsecutivePatternMachine)
+from nupic.research.frameworks.columns.data.generators.pattern_machine import (
+  PatternMachine, ConsecutivePatternMachine)
 
 
 

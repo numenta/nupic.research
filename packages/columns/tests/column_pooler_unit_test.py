@@ -20,10 +20,9 @@
 # ----------------------------------------------------------------------
 
 import unittest
-import numpy
 
-from htmresearch.algorithms.column_pooler import ColumnPooler
-from htmresearch.support.column_pooler_mixin import ColumnPoolerMonitorMixin
+from nupic.research.frameworks.columns import ColumnPooler
+from nupic.research.frameworks.columns.support.column_pooler_mixin import ColumnPoolerMonitorMixin
 
 
 class MonitoredColumnPooler(ColumnPoolerMonitorMixin, ColumnPooler):

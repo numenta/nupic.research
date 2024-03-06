@@ -208,6 +208,6 @@ class ConsecutivePatternMachine(PatternMachine):
 
     assert type(w) is int, "List for w not supported"
 
-    for i in range(n / w):
+    for i in range(n // w):
       pattern = set(range(i * w, (i+1) * w))
       self._patterns[i] = pattern

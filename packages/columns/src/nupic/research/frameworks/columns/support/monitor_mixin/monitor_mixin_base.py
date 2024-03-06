@@ -80,7 +80,7 @@ import abc
 import numpy
 from prettytable import PrettyTable
 
-from nupic.algorithms.monitor_mixin.plot import Plot
+from nupic.research.frameworks.columns.support.monitor_mixin.plot import Plot
 
 
 

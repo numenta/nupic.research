@@ -22,13 +22,13 @@
 """Tests for l2_l4_inference module."""
 
 import copy
-from mock import patch
 import unittest
 import random
+from unittest.mock import patch
 
-from htmresearch.frameworks.layers import l2_l4_inference
+from nupic.research.frameworks.columns import l2_l4_inference
 
-from htmresearch.frameworks.layers.object_machine_factory import (
+from nupic.research.frameworks.columns.object_machine_factory import (
   createObjectMachine
 )
 
