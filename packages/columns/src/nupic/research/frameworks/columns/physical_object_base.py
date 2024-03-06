@@ -24,13 +24,13 @@ from abc import ABCMeta, abstractmethod
 try:
   from mpl_toolkits.mplot3d import Axes3D
 except ImportError:
-  print "Your Matplotlib version is not up to date. " \
-        "Don't use plotting functions"
+  print("Your Matplotlib version is not up to date. " \
+        "Don't use plotting functions")
 import matplotlib.pyplot as plt
 
 
 
-class PhysicalObject(object):
+class PhysicalObject(object, metaclass=ABCMeta):
   """
   Base class to create physical objects, for L4-L2 inference experiments.
 
@@ -52,8 +52,6 @@ class PhysicalObject(object):
   Note that because locations are integers, rather large object sizes should
   be used.
   """
-
-  __metaclass__ = ABCMeta
 
   # typical feature indices
   EMPTY_FEATURE = -1
@@ -133,7 +131,7 @@ class PhysicalObject(object):
 
     for feature in self._FEATURES:
 
-      for _ in xrange(numPoints):
+      for _ in range(numPoints):
         x, y, z = tuple(self.sampleLocationFromFeature(feature))
         ax.scatter(x, y, z, marker=".")
 

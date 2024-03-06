@@ -22,7 +22,7 @@
 import random
 import numpy
 
-from htmresearch.frameworks.layers.object_machine_base import ObjectMachineBase
+from nupic.research.frameworks.columns.object_machine_base import ObjectMachineBase
 
 
 
@@ -123,7 +123,7 @@ class SimpleObjectMachine(ObjectMachineBase):
 
     """
     if objectNames is None:
-      objectNames = self.objects.keys()
+      objectNames = list(self.objects.keys())
 
     objects = {}
     for name in objectNames:
@@ -177,14 +177,14 @@ class SimpleObjectMachine(ObjectMachineBase):
     # some checks
     if numSteps == 0:
       raise ValueError("No inference steps were provided")
-    for col in xrange(self.numColumns):
+    for col in range(self.numColumns):
       if len(inferenceConfig["pairs"][col]) != numSteps:
         raise ValueError("Incompatible numSteps and actual inference steps")
 
     sensationSteps = []
-    for step in xrange(numSteps):
+    for step in range(numSteps):
       pairs = [
-        inferenceConfig["pairs"][col][step] for col in xrange(self.numColumns)
+        inferenceConfig["pairs"][col][step] for col in range(self.numColumns)
       ]
       sdrPairs = self._getSDRPairs(
         pairs,
@@ -228,14 +228,14 @@ class SimpleObjectMachine(ObjectMachineBase):
       assert(numPoints <= numLocations), ("Number of points in object cannot be "
             "greater than number of locations")
 
-      locationArray = numpy.array(range(numLocations))
+      locationArray = numpy.array(list(range(numLocations)))
       numpy.random.seed(self.seed)
-      for _ in xrange(numObjects):
+      for _ in range(numObjects):
         # Permute the number of locations and select points from it
         locationArray = numpy.random.permutation(locationArray)
         self.addObject(
           [(locationArray[p],
-            numpy.random.randint(0, numFeatures)) for p in xrange(numPoints)],
+            numpy.random.randint(0, numFeatures)) for p in range(numPoints)],
         )
 
 
@@ -245,7 +245,7 @@ class SimpleObjectMachine(ObjectMachineBase):
     objects
     """
     distinctPairs = set()
-    for pairs in self.objects.itervalues():
+    for pairs in self.objects.values():
       distinctPairs = distinctPairs.union(set(pairs))
     return distinctPairs
 
@@ -277,7 +277,7 @@ class SimpleObjectMachine(ObjectMachineBase):
     """
     sensations = {}
     numpy.random.seed(self.seed)
-    for col in xrange(self.numColumns):
+    for col in range(self.numColumns):
       locationID, featureID = pairs[col]
 
       # generate random location if requested
@@ -360,9 +360,9 @@ class SimpleObjectMachine(ObjectMachineBase):
     bits = self.numInputBits
     random.seed(self.seed)
     self.locations = []
-    for _ in xrange(self.numColumns):
+    for _ in range(self.numColumns):
       self.locations.append(
-        [self._generatePattern(bits, size) for _ in xrange(self.numLocations)]
+        [self._generatePattern(bits, size) for _ in range(self.numLocations)]
       )
 
 
@@ -377,7 +377,7 @@ class SimpleObjectMachine(ObjectMachineBase):
     bits = self.numInputBits
     random.seed(self.seed)
     self.features = []
-    for _ in xrange(self.numColumns):
+    for _ in range(self.numColumns):
       self.features.append(
-        [self._generatePattern(bits, size) for _ in xrange(self.numFeatures)]
+        [self._generatePattern(bits, size) for _ in range(self.numFeatures)]
     )

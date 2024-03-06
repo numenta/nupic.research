@@ -26,7 +26,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from nupic.encoders.coordinate import CoordinateEncoder
-from htmresearch.frameworks.layers.object_machine_base import ObjectMachineBase
+from nupic.research.frameworks.columns.object_machine_base import ObjectMachineBase
 
 
 
@@ -134,7 +134,7 @@ class ContinuousLocationObjectMachine(ObjectMachineBase):
     """
     objects = {}
 
-    for objectName, locationList in learningConfig.iteritems():
+    for objectName, locationList in learningConfig.items():
 
       sensationList = []
       physicalObject = self.objects[objectName]
@@ -146,7 +146,7 @@ class ContinuousLocationObjectMachine(ObjectMachineBase):
         #  location name and number of points
         if len(element) == 2:
           featureName, numLocations = element
-          for _ in xrange(numLocations):
+          for _ in range(numLocations):
             location = physicalObject.sampleLocationFromFeature(featureName)
             sensationList.append(
               self._getSDRPairs(
@@ -227,7 +227,7 @@ class ContinuousLocationObjectMachine(ObjectMachineBase):
     # some checks
     if numSteps == 0:
       raise ValueError("No inference steps were provided")
-    for col in xrange(self.numColumns):
+    for col in range(self.numColumns):
       if len(inferenceConfig["pairs"][col]) != numSteps:
         raise ValueError("Incompatible numSteps and actual inference steps")
 
@@ -241,11 +241,11 @@ class ContinuousLocationObjectMachine(ObjectMachineBase):
       colors = plt.cm.rainbow(np.linspace(0, 1, numSteps))
 
     sensationSteps = []
-    for step in xrange(numSteps):
+    for step in range(numSteps):
       pairs = [
-        inferenceConfig["pairs"][col][step] for col in xrange(self.numColumns)
+        inferenceConfig["pairs"][col][step] for col in range(self.numColumns)
       ]
-      for i in xrange(len(pairs)):
+      for i in range(len(pairs)):
         if isinstance(pairs[i], str):
           location = physicalObject.sampleLocationFromFeature(pairs[i])
           pairs[i] = (
@@ -297,7 +297,7 @@ class ContinuousLocationObjectMachine(ObjectMachineBase):
     and the feature is just an index.
     """
     sensations = {}
-    for col in xrange(self.numColumns):
+    for col in range(self.numColumns):
       location, featureID = pairs[col]
       location = [int(coord) for coord in location]
 
@@ -361,7 +361,7 @@ class ContinuousLocationObjectMachine(ObjectMachineBase):
     """
     Generates a random SDR with specified number of bits and total size.
     """
-    cellsIndices = range(totalSize)
+    cellsIndices = list(range(totalSize))
     random.shuffle(cellsIndices)
     return set(cellsIndices[:numBits])
 
@@ -377,7 +377,7 @@ class ContinuousLocationObjectMachine(ObjectMachineBase):
     bits = self.numInputBits
 
     self.features = []
-    for _ in xrange(self.numColumns):
+    for _ in range(self.numColumns):
       self.features.append(
-        [self._generatePattern(bits, size) for _ in xrange(self.numFeatures)]
+        [self._generatePattern(bits, size) for _ in range(self.numFeatures)]
     )

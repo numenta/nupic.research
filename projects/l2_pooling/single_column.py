@@ -22,10 +22,10 @@
 This file creates simple experiments to test a single column L4-L2 network.
 """
 
-from htmresearch.frameworks.layers.object_machine_factory import (
+from nupic.research.frameworks.columns.object_machine_factory import (
   createObjectMachine
 )
-from htmresearch.frameworks.layers.l2_l4_inference import L4L2Experiment
+from nupic.research.frameworks.columns.l2_l4_inference import L4L2Experiment
 
 
 
@@ -43,7 +43,7 @@ def createThreeObjects():
 
 
 
-def runSharedFeatures(noiseLevel=None, profile=False):
+def runSharedFeatures(noiseLevel=None):
   """
   Runs a simple experiment where three objects share a number of location,
   feature pairs.
@@ -52,9 +52,6 @@ def runSharedFeatures(noiseLevel=None, profile=False):
   ----------------------------
   @param    noiseLevel (float)
             Noise level to add to the locations and features during inference
-
-  @param    profile (bool)
-            If True, the network will be profiled after learning and inference
 
   """
   exp = L4L2Experiment(
@@ -72,8 +69,6 @@ def runSharedFeatures(noiseLevel=None, profile=False):
     objects.addObject(object)
 
   exp.learnObjects(objects.provideObjectsToLearn())
-  if profile:
-    exp.printProfile()
 
   inferConfig = {
     "numSteps": 10,
@@ -84,8 +79,6 @@ def runSharedFeatures(noiseLevel=None, profile=False):
   }
 
   exp.infer(objects.provideObjectToInfer(inferConfig), objectName=0)
-  if profile:
-    exp.printProfile()
 
   exp.plotInferenceStats(
     fields=["L2 Representation",
@@ -95,7 +88,7 @@ def runSharedFeatures(noiseLevel=None, profile=False):
 
 
 
-def runUncertainLocations(missingLoc=None, profile=False):
+def runUncertainLocations(missingLoc=None):
   """
   Runs the same experiment as above, with missing locations at some timesteps
   during inference (if it was not successfully computed by the rest of the
@@ -105,9 +98,6 @@ def runUncertainLocations(missingLoc=None, profile=False):
            A dictionary mapping indices in the object to location index to
            replace with during inference (-1 means no location, a tuple means
            an union of locations).
-
-  @param   profile (bool)
-           If True, the network will be profiled after learning and inference
 
   """
   if missingLoc is None:
@@ -142,8 +132,6 @@ def runUncertainLocations(missingLoc=None, profile=False):
   }
 
   exp.infer(objects.provideObjectToInfer(inferConfig), objectName=0)
-  if profile:
-    exp.printProfile()
 
   exp.plotInferenceStats(
     fields=["L2 Representation",
@@ -176,7 +164,6 @@ def runStretchExperiment(numObjects=25):
   )
   objects.createRandomObjects(numObjects=numObjects, numPoints=10)
   exp.learnObjects(objects.provideObjectsToLearn())
-  exp.printProfile()
 
   inferConfig = {
     "numSteps": len(objects[0]),
@@ -186,7 +173,6 @@ def runStretchExperiment(numObjects=25):
   }
 
   exp.infer(objects.provideObjectToInfer(inferConfig), objectName=0)
-  exp.printProfile()
 
   exp.plotInferenceStats(
     fields=["L2 Representation",

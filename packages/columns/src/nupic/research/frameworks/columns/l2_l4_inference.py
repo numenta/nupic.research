@@ -83,14 +83,15 @@ import random
 import matplotlib.pyplot as plt
 import numpy as np
 from math import ceil
-from tabulate import tabulate
 
-from nupic.bindings.algorithms import SpatialPooler
+# from nupic.bindings.algorithms import SpatialPooler
 from nupic.bindings.math import SparseMatrix
 
-from htmresearch.algorithms.column_pooler import ColumnPooler
-from htmresearch.support.logging_decorator import LoggingDecorator
-from nupic.research.frameworks.columns import ApicalTiebreakPairMemory
+from nupic.research.frameworks.columns.support.logging_decorator import LoggingDecorator
+from nupic.research.frameworks.columns import (
+  ApicalTiebreakPairMemory,
+  ColumnPooler,
+)
 
 
 
@@ -272,21 +273,25 @@ class L4L2Experiment(object):
       self.config["columnPositions"] = columnPositions[:numCorticalColumns]
       self.config["longDistanceConnections"] = longDistanceConnections
 
-    # L4
-    self.L4Params = self.getDefaultL4Params(inputSize, externalInputSize,
-                                            numExternalInputBits)
-    if L4Overrides is not None:
-      self.L4Params.update(L4Overrides)
-    self.L4Columns = [ApicalTiebreakPairMemory(**self.L4Params)
-                      for _ in range(numCorticalColumns)]
-
-
     # L2
     self.L2Params = self.getDefaultL2Params(numCorticalColumns, inputSize,
                                             numInputBits)
     if L2Overrides is not None:
       self.L2Params.update(L2Overrides)
     self.L2Columns = [ColumnPooler(**self.L2Params)
+                      for _ in range(numCorticalColumns)]
+
+    # L4
+    feedbackInputSize = (self.L2Params["cellCount"]
+                         if self.enableFeedback
+                         else 0)
+    self.L4Params = self.getDefaultL4Params(inputSize,
+                                            feedbackInputSize,
+                                            externalInputSize,
+                                            numExternalInputBits)
+    if L4Overrides is not None:
+      self.L4Params.update(L4Overrides)
+    self.L4Columns = [ApicalTiebreakPairMemory(**self.L4Params)
                       for _ in range(numCorticalColumns)]
 
     # will be populated during training
@@ -418,10 +423,6 @@ class L4L2Experiment(object):
         for _ in range(self.numLearningPoints):
           self.doTimestep(sensations, learn=True)
 
-      # actually learn the objects
-      if iterations > 0:
-        self.network.run(iterations)
-
       # update L2 representations
       self._saveL2Representation(objectName)
 
@@ -473,17 +474,10 @@ class L4L2Experiment(object):
              Name of the objects (must match the names given during learning).
 
     """
-    self._unsetLearningMode()
     statistics = collections.defaultdict(list)
 
     for sensations in sensationList:
-
-      # feed all columns with sensations
-      for col in range(self.numColumns):
-        location, feature = sensations[col]
-        self.sensorInputs[col].addDataToQueue(list(feature), 0, 0)
-        self.externalInputs[col].addDataToQueue(list(location), 0, 0)
-      self.network.run(1)
+      self.doTimestep(sensations, learn=False)
       self._updateInferenceStats(statistics, objectName)
 
     if reset:
@@ -731,7 +725,7 @@ class L4L2Experiment(object):
                         dtype="uint32")
 
     for i, representations in enumerate(self.objectL2RepresentationsMatrices):
-      activeCells = self.L2Columns[i]._pooler.getActiveCells()
+      activeCells = self.L2Columns[i].getActiveCells()
       overlaps[i, :] = representations.rightVecSumAtNZSparse(activeCells)
 
     return overlaps
@@ -797,7 +791,7 @@ class L4L2Experiment(object):
     """
     L2Representation = self.getL2Representations()
     objectRepresentation = self.objectL2Representations[objectName]
-    sdrSize = self.config["L2Params"]["sdrSize"]
+    sdrSize = self.L2Params["sdrSize"]
     if minOverlap is None:
       minOverlap = sdrSize / 2
     if maxL2Size is None:
@@ -814,7 +808,7 @@ class L4L2Experiment(object):
     return numCorrectClassifications == self.numColumns
 
 
-  def getDefaultL4Params(self, inputSize, externalInputSize, numInputBits):
+  def getDefaultL4Params(self, inputSize, feedbackInputSize, externalInputSize, numInputBits):
     """
     Returns a good default set of parameters to use in the L4 region.
     """
@@ -833,9 +827,7 @@ class L4L2Experiment(object):
     return {
       "columnCount": inputSize,
       "basalInputSize": externalInputSize,
-      "apicalInputSize": (4096  # Keep synced with L2 "cellCount"
-                          if self.enableFeedback
-                          else 0),
+      "apicalInputSize": feedbackInputSize,
       "cellsPerColumn": 16, # Keep synced with L2 "inputWidth"
       "initialPermanence": 0.51,
       "connectedPermanence": 0.6,
@@ -883,7 +875,6 @@ class L4L2Experiment(object):
       "sampleSizeDistal": 20,
       "connectedPermanenceDistal": 0.5,
       "seed": self.seed,
-      "learningMode": True,
     }
 
 

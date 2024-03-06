@@ -37,8 +37,8 @@ from multiprocessing import Pool
 import matplotlib.pyplot as plt
 plt.ion()
 
-from htmresearch.frameworks.layers.l2_l4_inference import L4L2Experiment
-from htmresearch.frameworks.layers.object_machine_factory import (
+from nupic.research.frameworks.columns.l2_l4_inference import L4L2Experiment
+from nupic.research.frameworks.columns.object_machine_factory import (
   createObjectMachine
 )
 
@@ -50,8 +50,6 @@ def getL4Params():
   return {
     "columnCount": 2048,
     "cellsPerColumn": 8,
-    "learn": True,
-    "learnOnOneCell": False,
     "initialPermanence": 0.51,
     "connectedPermanence": 0.6,
     "permanenceIncrement": 0.1,
@@ -60,7 +58,6 @@ def getL4Params():
     "basalPredictedSegmentDecrement": 0.002,
     "activationThreshold": 13,
     "sampleSize": 20,
-    "implementation": "ApicalTiebreakCPP",
     "seed": 41
   }
 
@@ -87,7 +84,6 @@ def getL2Params():
     "sampleSizeDistal": 20,
     "connectedPermanenceDistal": 0.5,
     "seed": 41,
-    "learningMode": True,
   }
 
 
@@ -100,8 +96,6 @@ def runExperiment(args):
 
   @param noiseLevel  (float) Noise level to add to the locations and features
                              during inference. Default: None
-  @param profile     (bool)  If True, the network will be profiled after
-                             learning and inference. Default: False
   @param numObjects  (int)   The number of objects we will train.
                              Default: 10
   @param numPoints   (int)   The number of points on each object.
@@ -122,7 +116,6 @@ def runExperiment(args):
   numLocations = args.get("numLocations", 10)
   numFeatures = args.get("numFeatures", 10)
   numColumns = args.get("numColumns", 2)
-  profile = args.get("profile", False)
   noiseLevel = args.get("noiseLevel", None)  # TODO: implement this?
   numPoints = args.get("numPoints", 10)
   trialNum = args.get("trialNum", 42)
@@ -162,14 +155,6 @@ def runExperiment(args):
   )
 
   exp.learnObjects(objects.provideObjectsToLearn())
-  L2TimeLearn = 0
-  L2TimeInfer = 0
-
-  if profile:
-    # exp.printProfile(reset=True)
-    L2TimeLearn = getProfileInfo(exp)
-    args.update({"L2TimeLearn": L2TimeLearn})
-  exp.resetProfile()
 
   # For inference, we will check and plot convergence for each object. For each
   # object, we create a sequence of random sensations for each column.  We will
@@ -198,22 +183,14 @@ def runExperiment(args):
     }
 
     exp.infer(objects.provideObjectToInfer(inferConfig), objectName=objectId)
-    if profile:
-      L2TimeInfer += getProfileInfo(exp)
-      exp.resetProfile()
-      # exp.printProfile(reset=True)
-
-  if profile:
-    L2TimeInfer /= len(objects)
-    args.update({"L2TimeInfer": L2TimeInfer})
 
   convergencePoint, _ = exp.averageConvergencePoint("L2 Representation", 40, 40)
   print("objectSeed {} # distal syn {} # proximal syn {}, " \
-        "# convergence point={:4.2f} train time {:4.3f} infer time {:4.3f}".format(
+        "# convergence point={:4.2f}".format(
     objectSeed,
     l2Params["sampleSizeDistal"],
     l2Params["sampleSizeProximal"],
-    convergencePoint, L2TimeLearn, L2TimeInfer))
+    convergencePoint))
 
   # Return our convergence point as well as all the parameters and objects
   args.update({"objects": objects.getObjects()})
@@ -224,60 +201,18 @@ def runExperiment(args):
   numProximalConnections = []
   for l2Columns in exp.L2Columns:
     numLateralConnections.append(
-      l2Columns._pooler.numberOfDistalSynapses())
+      l2Columns.numberOfDistalSynapses())
     numProximalConnections.append(
-      np.sum(l2Columns._pooler.numberOfProximalSynapses()))
+      np.sum(l2Columns.numberOfProximalSynapses()))
 
   result = {
     'trial': objectSeed,
-    'L2TimeLearn': args['L2TimeLearn'],
-    'L2TimeInfer': args['L2TimeInfer'],
     'sampleSizeProximal': l2Params["sampleSizeProximal"],
     'sampleSizeDistal': l2Params["sampleSizeDistal"],
     'numLateralConnections': np.mean(np.array(numLateralConnections)),
     'numProximalConnections': np.mean(np.array(numProximalConnections)),
     'convergencePoint': args['convergencePoint']}
   return result
-
-
-def getProfileInfo(exp):
-  """
-  Prints profiling information.
-
-  Parameters:
-  ----------------------------
-  @param   reset (bool)
-           If set to True, the profiling will be reset.
-
-  """
-
-  totalTime = 0.000001
-  for region in list(exp.network.regions.values()):
-    timer = region.getComputeTimer()
-    totalTime += timer.getElapsed()
-
-  # Sort the region names
-  regionNames = list(exp.network.regions.keys())
-  regionNames.sort()
-
-  count = 1
-  profileInfo = []
-  L2Time = 0.0
-  L4Time = 0.0
-  for regionName in regionNames:
-    region = exp.network.regions[regionName]
-    timer = region.getComputeTimer()
-    count = max(timer.getStartCount(), count)
-    profileInfo.append([region.name,
-                        timer.getStartCount(),
-                        timer.getElapsed(),
-                        100.0 * timer.getElapsed() / totalTime,
-                        timer.getElapsed() / max(timer.getStartCount(), 1)])
-    if "L2Column" in regionName:
-      L2Time += timer.getElapsed()
-    elif "L4Column" in regionName:
-      L4Time += timer.getElapsed()
-  return L2Time
 
 
 def experimentVaryingSynapseSampling(expParams,
@@ -311,13 +246,18 @@ def experimentVaryingSynapseSampling(expParams,
             "trialNum": rpt,
             "l4Params": l4Params,
             "l2Params": l2Params,
-            "profile": True,
             "objectSeed": rpt,
           }
         )
 
-  pool = Pool(processes=expParams['numWorkers'])
-  result = pool.map(runExperiment, args)
+  use_pool = False
+  if use_pool:
+    pool = Pool(processes=expParams['numWorkers'])
+    result = pool.map(runExperiment, args)
+  else:
+    result = []
+    for arg in args:
+      result.append(runExperiment(arg))
 
   #
   #       if df is None:
@@ -385,8 +325,6 @@ def plotDistalSynSamplingResult():
 
     df = convertResultsToDataFrames(results)
 
-    l2LearnTimeList = []
-    l2InferTimeList = []
     convergencePointList =[]
     numLateralConnectionsList = []
 
@@ -397,8 +335,6 @@ def plotDistalSynSamplingResult():
         df['sampleSizeDistal'] == sampleSizeDistal,
         df['sampleSizeProximal'] == sampleSizeProximalList[0]))[0]
 
-      l2LearnTimeList.append(np.mean(df['L2TimeLearn'].iloc[idx]))
-      l2InferTimeList.append(np.mean(df['L2TimeInfer'].iloc[idx]))
       convergencePointList.append(np.mean(df['convergencePoint'].iloc[idx]))
       numLateralConnectionsList.append(np.mean(df['numLateralConnections'].iloc[idx]))
 
@@ -412,13 +348,13 @@ def plotDistalSynSamplingResult():
     ax[0, 1].set_ylabel('# lateral connections / column')
     ax[0, 1].set_xlabel('Distal sample size')
 
-    ax[1, 0].plot(sampleSizeDistalList, l2LearnTimeList, '-o')
-    ax[1, 0].set_ylabel('L2 training time (s)')
-    ax[1, 0].set_xlabel('Distal sample size')
+    # ax[1, 0].plot(sampleSizeDistalList, l2LearnTimeList, '-o')
+    # ax[1, 0].set_ylabel('L2 training time (s)')
+    # ax[1, 0].set_xlabel('Distal sample size')
 
-    ax[1, 1].plot(sampleSizeDistalList, l2InferTimeList, '-o')
-    ax[1, 1].set_ylabel('L2 infer time (s)')
-    ax[1, 1].set_xlabel('Distal sample size')
+    # ax[1, 1].plot(sampleSizeDistalList, l2InferTimeList, '-o')
+    # ax[1, 1].set_ylabel('L2 infer time (s)')
+    # ax[1, 1].set_xlabel('Distal sample size')
 
     legends.append('{}-column'.format(numColumns))
   plt.tight_layout()
@@ -439,8 +375,6 @@ def plotProximalSynSamplingResult():
 
     df = convertResultsToDataFrames(results)
 
-    l2LearnTimeList = []
-    l2InferTimeList = []
     convergencePointList =[]
     numLateralConnectionsList = []
     numProximalConnectionsList = []
@@ -452,8 +386,6 @@ def plotProximalSynSamplingResult():
         df['sampleSizeDistal'] == sampleSizeDistalList[0],
         df['sampleSizeProximal'] == sampleSizeProximal))[0]
 
-      l2LearnTimeList.append(np.mean(df['L2TimeLearn'].iloc[idx]))
-      l2InferTimeList.append(np.mean(df['L2TimeInfer'].iloc[idx]))
       convergencePointList.append(np.mean(df['convergencePoint'].iloc[idx]))
       numProximalConnectionsList.append(np.mean(df['numProximalConnections'].iloc[idx]))
 
@@ -466,13 +398,13 @@ def plotProximalSynSamplingResult():
     ax[0, 1].set_ylabel('# proximal connections / column')
     ax[0, 1].set_xlabel('Proximal sample size')
 
-    ax[1, 0].plot(sampleSizeProximalList, l2LearnTimeList, '-o')
-    ax[1, 0].set_ylabel('L2 training time (s)')
-    ax[1, 0].set_xlabel('Proximal sample size')
+    # ax[1, 0].plot(sampleSizeProximalList, l2LearnTimeList, '-o')
+    # ax[1, 0].set_ylabel('L2 training time (s)')
+    # ax[1, 0].set_xlabel('Proximal sample size')
 
-    ax[1, 1].plot(sampleSizeProximalList, l2InferTimeList, '-o')
-    ax[1, 1].set_ylabel('L2 infer time (s)')
-    ax[1, 1].set_xlabel('Proximal sample size')
+    # ax[1, 1].plot(sampleSizeProximalList, l2InferTimeList, '-o')
+    # ax[1, 1].set_ylabel('L2 infer time (s)')
+    # ax[1, 1].set_xlabel('Proximal sample size')
 
     legends.append('{}-column'.format(numColumns))
   plt.tight_layout()

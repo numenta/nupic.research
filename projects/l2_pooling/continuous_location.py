@@ -24,11 +24,11 @@ This file creates simple experiment to test an L4-L2 network on physical
 objects.
 """
 
-from htmresearch.frameworks.layers.l2_l4_inference import L4L2Experiment
-from htmresearch.frameworks.layers.object_machine_factory import (
+from nupic.research.frameworks.columns.l2_l4_inference import L4L2Experiment
+from nupic.research.frameworks.columns.object_machine_factory import (
   createObjectMachine
 )
-from htmresearch.frameworks.layers.physical_objects import *
+from nupic.research.frameworks.columns.physical_objects import *
 
 
 

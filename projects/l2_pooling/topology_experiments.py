@@ -32,7 +32,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 mpl.rcParams['pdf.fonttype'] = 42
 
-from htmresearch.frameworks.layers.multi_column_convergence_experiment import (
+from nupic.research.frameworks.columns.multi_column_convergence_experiment import (
   runExperiment
 )
 

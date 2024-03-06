@@ -32,10 +32,8 @@ import random
 import os
 import time
 
-import numpy as np
-
-from htmresearch.frameworks.layers.l2_l4_inference import L4L2Experiment
-from htmresearch.frameworks.layers.sensor_placement import greedySensorPositions
+from nupic.research.frameworks.columns.l2_l4_inference import L4L2Experiment
+from nupic.research.frameworks.columns.sensor_placement import greedySensorPositions
 
 
 TIMESTEPS_PER_SENSATION = 3
@@ -65,7 +63,7 @@ def noisy(pattern, noiseLevel, totalNumCells):
 
   noised = set(pattern)
 
-  noised.difference_update(random.sample(noised, n))
+  noised.difference_update(random.sample(list(noised), n))
 
   for _ in range(n):
     while True:
@@ -245,7 +243,9 @@ def logCellActivity_noisyFeature_varyNumColumns(name="cellActivity"):
               "noiseLevel": noiseLevel,
               "results": cellCounts})
 
-  filename = os.path.join("plots",
+  plotDir = "plots"
+  os.makedirs(plotDir, exist_ok=True)
+  filename = os.path.join(plotDir,
                           "%s_%s.json"
                           % (name, time.strftime("%Y%m%d-%H%M%S")))
   with open(filename, "w") as fout:
@@ -284,7 +284,9 @@ def logCellActivity_noisyLocation_varyNumColumns(name, objects):
               "noiseLevel": noiseLevel,
               "results": cellCounts})
 
-  filename = os.path.join("plots",
+  plotDir = "plots"
+  os.makedirs(plotDir, exist_ok=True)
+  filename = os.path.join(plotDir,
                           "%s_%s.json"
                           % (name, time.strftime("%Y%m%d-%H%M%S")))
   with open(filename, "w") as fout:

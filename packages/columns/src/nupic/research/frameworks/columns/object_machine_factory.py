@@ -23,13 +23,13 @@
 Factory for creating object machines.
 """
 
-from htmresearch.frameworks.layers.simple_object_machine import (
+from nupic.research.frameworks.columns.simple_object_machine import (
   SimpleObjectMachine
 )
-from htmresearch.frameworks.layers.continuous_location_object_machine import (
-  ContinuousLocationObjectMachine
-)
-from htmresearch.frameworks.layers.sequence_object_machine import (
+# from nupic.research.frameworks.columns.continuous_location_object_machine import (
+#   ContinuousLocationObjectMachine
+# )
+from nupic.research.frameworks.columns.sequence_object_machine import (
   SequenceObjectMachine
 )
 
@@ -41,7 +41,7 @@ class ObjectMachineTypes(object):
   """
 
   simple = SimpleObjectMachine
-  continuous = ContinuousLocationObjectMachine
+  # continuous = ContinuousLocationObjectMachine
   sequence = SequenceObjectMachine
 
   @classmethod

@@ -27,6 +27,7 @@ from .apical_tiebreak_temporal_memory import (
     ApicalTiebreakSequenceMemory,
     ApicalTiebreakPairMemory,
 )
+from .column_pooler import ColumnPooler
 from .temporal_memory_wrappers import (
     ApicalTiebreakPairMemoryWrapper
 )

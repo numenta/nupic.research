@@ -644,7 +644,7 @@ def _sampleRange(rng, start, end, step, k):
   """
   Equivalent to:
 
-  random.sample(xrange(start, end, step), k)
+  random.sample(range(start, end, step), k)
 
   except it uses our random number generator.
 
@@ -674,7 +674,7 @@ def _countWhereGreaterEqualInRows(sparseMatrix, rows, threshold):
   Like countWhereGreaterOrEqual, but for an arbitrary selection of rows, and
   without any column filtering.
   """
-  return sum(sparseMatrix.countWhereGreaterOrEqual(row, row+1,
-                                                   0, sparseMatrix.nCols(),
-                                                   threshold)
+  return sum(sparseMatrix.countWhereGreaterEqual(row, row+1,
+                                                 0, sparseMatrix.nCols(),
+                                                 threshold)
              for row in rows)

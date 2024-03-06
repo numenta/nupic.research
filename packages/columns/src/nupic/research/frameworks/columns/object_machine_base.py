@@ -25,7 +25,7 @@ import random
 import numpy
 
 
-class ObjectMachineBase(object):
+class ObjectMachineBase(object, metaclass=ABCMeta):
   """
   An object machine is a helper class that allows the user to quickly create
   objects and sensations for inference experiments. It is designed to send
@@ -36,8 +36,6 @@ class ObjectMachineBase(object):
   This is the base class. It has a few generic methods and specifies
   required methods for any child class.
   """
-
-  __metaclass__ = ABCMeta
 
 
   def __init__(self,
@@ -173,8 +171,8 @@ class ObjectMachineBase(object):
     sumCommonPairs = 0
     numObjects = 0
     commonPairHistogram = numpy.zeros(len(objects[0]), dtype=numpy.int32)
-    for o1, s1 in objects.iteritems():
-      for o2, s2 in objects.iteritems():
+    for o1, s1 in objects.items():
+      for o2, s2 in objects.items():
         if o1 != o2:
           # Count number of common locations id's and common feature id's
           commonLocations = 0
@@ -209,7 +207,7 @@ class ObjectMachineBase(object):
     Checks that objects have the correct format before being sent to the
     experiment.
     """
-    for objectName, sensationList in objects.iteritems():
+    for objectName, sensationList in objects.items():
       if objectName not in self.objects:
         raise ValueError(
           "Invalid object name \"{}\" sent to experiment".format(objectName)
@@ -220,7 +218,7 @@ class ObjectMachineBase(object):
           raise ValueError(
             "Invalid number of cortical column sensations sent to experiment"
           )
-        for pair in sensations.values():
+        for pair in list(sensations.values()):
           if not isinstance(pair, tuple) or len(pair) != 2 or \
                   not isinstance(pair[0], set) or \
                   not isinstance(pair[1], set):
@@ -237,7 +235,7 @@ class ObjectMachineBase(object):
         raise ValueError(
           "Invalid number of cortical column sensations sent to experiment"
         )
-      for pair in sensations.values():
+      for pair in list(sensations.values()):
         if not isinstance(pair, tuple) or len(pair) != 2 or \
                 not isinstance(pair[0], set) or \
                 not isinstance(pair[1], set):
@@ -249,7 +247,7 @@ class ObjectMachineBase(object):
     """
     Generates a random SDR with specified number of bits and total size.
     """
-    indices = random.sample(xrange(totalSize), numBits)
+    indices = random.sample(range(totalSize), numBits)
     return set(indices)
 
 

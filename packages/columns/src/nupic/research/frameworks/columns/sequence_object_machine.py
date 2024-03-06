@@ -22,7 +22,7 @@
 import random
 import numpy
 
-from htmresearch.frameworks.layers.object_machine_base import ObjectMachineBase
+from nupic.research.frameworks.columns.object_machine_base import ObjectMachineBase
 
 
 class SequenceObjectMachine(ObjectMachineBase):
@@ -100,7 +100,7 @@ class SequenceObjectMachine(ObjectMachineBase):
 
     """
     if objectNames is None:
-      objectNames = self.objects.keys()
+      objectNames = list(self.objects.keys())
 
     objects = {}
     for name in objectNames:
@@ -149,14 +149,14 @@ class SequenceObjectMachine(ObjectMachineBase):
     # some checks
     if numSteps == 0:
       raise ValueError("No inference steps were provided")
-    for col in xrange(self.numColumns):
+    for col in range(self.numColumns):
       if len(inferenceConfig["pairs"][col]) != numSteps:
         raise ValueError("Incompatible numSteps and actual inference steps")
 
     sensationSteps = []
-    for step in xrange(numSteps):
+    for step in range(numSteps):
       pairs = [
-        inferenceConfig["pairs"][col][step] for col in xrange(self.numColumns)
+        inferenceConfig["pairs"][col][step] for col in range(self.numColumns)
       ]
       sdrPairs = self._getSDRPairs(
         pairs,
@@ -189,10 +189,10 @@ class SequenceObjectMachine(ObjectMachineBase):
     Creates a set of random sequences, each with sequenceLength elements,
     and adds them to the machine.
     """
-    for _ in xrange(numSequences):
+    for _ in range(numSequences):
       self.addObject(
         [numpy.random.randint(0, self.numFeatures)
-                                            for _ in xrange(sequenceLength)]
+                                            for _ in range(sequenceLength)]
       )
 
 
@@ -203,7 +203,7 @@ class SequenceObjectMachine(ObjectMachineBase):
     adding noise if necessary.
     """
     sensations = {}
-    for col in xrange(self.numColumns):
+    for col in range(self.numColumns):
       locationID, featureID = pairs[col]
 
       # generate random location if requested
@@ -276,9 +276,9 @@ class SequenceObjectMachine(ObjectMachineBase):
     bits = self.numInputBits
 
     self.features = []
-    for _ in xrange(self.numColumns):
+    for _ in range(self.numColumns):
       self.features.append(
-        [self._generatePattern(bits, size) for _ in xrange(self.numFeatures)]
+        [self._generatePattern(bits, size) for _ in range(self.numFeatures)]
     )
 
 
@@ -293,7 +293,7 @@ class SequenceObjectMachine(ObjectMachineBase):
     bits = self.numInputBits
 
     self.locations = []
-    for _ in xrange(self.numColumns):
+    for _ in range(self.numColumns):
       self.locations.append(
-        [self._generatePattern(bits, size) for _ in xrange(self.numLocations)]
+        [self._generatePattern(bits, size) for _ in range(self.numLocations)]
       )

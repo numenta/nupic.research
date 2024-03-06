@@ -23,8 +23,8 @@ This file is used to debug specific Thing experiments.
 """
 
 import pprint
-from htmresearch.support.logging_decorator import LoggingDecorator
-from htmresearch.frameworks.layers.l2_l4_inference import (
+from nupic.research.frameworks.columns.support.logging_decorator import LoggingDecorator
+from nupic.research.frameworks.columns.l2_l4_inference import (
   L4L2Experiment, rerunExperimentFromLogfile)
 
 thingObjects = {

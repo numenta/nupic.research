@@ -36,8 +36,8 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 
-from htmresearch.algorithms.column_pooler import ColumnPooler
-from htmresearch.frameworks.layers.sensor_placement import greedySensorPositions
+from nupic.research.frameworks.columns.column_pooler import ColumnPooler
+from nupic.research.frameworks.columns.sensor_placement import greedySensorPositions
 
 L4_CELL_COUNT = 8*1024
 
@@ -79,7 +79,7 @@ def noisy(pattern, noiseLevel, totalNumCells):
 
   noised = set(pattern)
 
-  noised.difference_update(random.sample(noised, n))
+  noised.difference_update(random.sample(list(noised), n))
 
   for _ in range(n):
     while True:
@@ -279,7 +279,9 @@ def plotSuccessRate_varyNumColumns(noiseSigma, noiseEverywhere):
   plt.yticks([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
   plt.title("Inference with normally distributed noise (stdev=%.2f)" % noiseSigma)
 
-  plotPath = os.path.join("plots",
+  plotDir = "plots"
+  os.makedirs(plotDir, exist_ok=True)
+  plotPath = os.path.join(plotDir,
                           "successRate_varyColumnCount_sigma%.2f_%s.pdf"
                           % (noiseSigma, time.strftime("%Y%m%d-%H%M%S")))
   plt.savefig(plotPath, bbox_extra_artists=(lgnd,), bbox_inches="tight")
@@ -348,7 +350,9 @@ def plotSuccessRate_varyDistalSampleSize(noiseSigma, noiseEverywhere):
   plt.yticks([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
   plt.title("Inference with normally distributed noise (stdev=0.1)")
 
-  plotPath = os.path.join("plots",
+  plotDir = "plots"
+  os.makedirs(plotDir, exist_ok=True)
+  plotPath = os.path.join(plotDir,
                           "successRate_varyDistalSampleSize_sigma%.2f_%s.pdf"
                           % (noiseSigma, time.strftime("%Y%m%d-%H%M%S")))
   plt.savefig(plotPath, bbox_extra_artists=(lgnd,), bbox_inches="tight")
@@ -417,7 +421,9 @@ def plotSuccessRate_varyProximalSampleSize(noiseSigma, noiseEverywhere):
   plt.yticks([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
   plt.title("Inference with normally distributed noise (stdev=0.1)")
 
-  plotPath = os.path.join("plots",
+  plotDir = "plots"
+  os.makedirs(plotDir, exist_ok=True)
+  plotPath = os.path.join(plotDir,
                           "successRate_varyProximalSampleSize_sigma%.2f_%s.pdf"
                           % (noiseSigma, time.strftime("%Y%m%d-%H%M%S")))
   plt.savefig(plotPath, bbox_extra_artists=(lgnd,), bbox_inches="tight")
@@ -454,7 +460,9 @@ def logCellActivity_varyNumColumns(noiseSigma, noiseEverywhere):
               "noiseLevel": noiseLevel,
               "results": cellCounts})
 
-  filename = os.path.join("plots",
+  plotDir = "plots"
+  os.makedirs(plotDir, exist_ok=True)
+  filename = os.path.join(plotDir,
                           "varyColumns_sigma%.2f_%s.json"
                           % (noiseSigma, time.strftime("%Y%m%d-%H%M%S")))
   with open(filename, "w") as fout:

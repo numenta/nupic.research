@@ -30,8 +30,8 @@ import random
 import time
 import numpy
 
-from htmresearch.frameworks.layers.l2_l4_inference import L4L2Experiment
-from htmresearch.frameworks.layers.object_machine_factory import (
+from nupic.research.frameworks.columns.l2_l4_inference import L4L2Experiment
+from nupic.research.frameworks.columns.object_machine_factory import (
   createObjectMachine
 )
 
@@ -57,11 +57,6 @@ def runExperiment(args):
                              from.  Default: 10
   @param numColumns  (int)   The total number of cortical columns in network.
                              Default: 2
-  @param networkType (string)The type of network to use.  Options are:
-                             "MultipleL4L2Columns",
-                             "MultipleL4L2ColumnsWithTopology" and
-                             "MultipleL4L2ColumnsWithRandomTopology".
-                             Default: "MultipleL4L2Columns"
   @param longDistanceConnections (float) The probability that a column will
                              connect to a distant column.  Only relevant when
                              using the random topology network type.
@@ -84,7 +79,6 @@ def runExperiment(args):
   numLocations = args.get("numLocations", 10)
   numFeatures = args.get("numFeatures", 10)
   numColumns = args.get("numColumns", 2)
-  networkType = args.get("networkType", "MultipleL4L2Columns")
   longDistanceConnections = args.get("longDistanceConnections", 0)
   locationNoise = args.get("locationNoise", 0.0)
   featureNoise = args.get("featureNoise", 0.0)
@@ -135,7 +129,6 @@ def runExperiment(args):
     numCorticalColumns=numColumns,
     L2Overrides=l2Params,
     L4Overrides=l4Params,
-    networkType = networkType,
     longDistanceConnections=longDistanceConnections,
     inputSize=150,
     externalInputSize=2400,
@@ -221,8 +214,8 @@ def runExperiment(args):
   classificationAccuracy = float(numCorrectClassifications) / numObjects
   classificationPerSensation = classificationPerSensation / numObjects
 
-  print("# objects {} # features {} # locations {} # columns {} trial # {} network type {}".format(
-    numObjects, numFeatures, numLocations, numColumns, trialNum, networkType))
+  print("# objects {} # features {} # locations {} # columns {} trial # {}".format(
+    numObjects, numFeatures, numLocations, numColumns, trialNum))
   print("Average convergence point=",convergencePoint)
   print("Classification accuracy=",classificationAccuracy)
   print()

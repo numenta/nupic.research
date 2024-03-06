@@ -40,10 +40,10 @@ import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
 
-from htmresearch.frameworks.layers.object_machine_factory import (
+from nupic.research.frameworks.columns.object_machine_factory import (
   createObjectMachine
 )
-from htmresearch.frameworks.layers.l2_l4_inference import L4L2Experiment
+from nupic.research.frameworks.columns.l2_l4_inference import L4L2Experiment
 
 import matplotlib as mpl
 
@@ -88,8 +88,6 @@ def getL4Params():
   return {
     "columnCount": 150,
     "cellsPerColumn": 16,
-    "learn": True,
-    "learnOnOneCell": False,
     "initialPermanence": 0.51,
     "connectedPermanence": 0.6,
     "permanenceIncrement": 0.1,
@@ -98,7 +96,6 @@ def getL4Params():
     "basalPredictedSegmentDecrement": 0.0,
     "activationThreshold": 13,
     "sampleSize": 25,
-    "implementation": "ApicalTiebreakCPP",
   }
 
 
@@ -123,7 +120,6 @@ def getL2Params():
     "activationThresholdDistal": 18,
     "sampleSizeDistal": 20,
     "connectedPermanenceDistal": 0.5,
-    "learningMode": True,
   }
 
 
@@ -217,7 +213,6 @@ def testNetworkWithOneObject(objects, exp, testObject, numTestPoints):
 
   testPairs = [objects[testObject][i] for i in testPts]
 
-  exp._unsetLearningMode()
   exp.sendReset()
 
   overlap = np.zeros((numTestPoints, numObjects))
@@ -226,14 +221,10 @@ def testNetworkWithOneObject(objects, exp, testObject, numTestPoints):
 
   for step, pair in enumerate(testPairs):
     (locationIdx, featureIdx) = pair
-    for colIdx in range(exp.numColumns):
-      feature = objects.features[colIdx][featureIdx]
-      location = objects.locations[colIdx][locationIdx]
-
-      exp.sensorInputs[colIdx].addDataToQueue(list(feature), 0, 0)
-      exp.externalInputs[colIdx].addDataToQueue(list(location), 0, 0)
-
-    exp.network.run(1)
+    sensations = {colIdx: (objects.locations[colIdx][locationIdx],
+                           objects.features[colIdx][featureIdx])
+                  for colIdx in range(exp.numColumns)}
+    exp.doTimestep(sensations, learn=False)
 
     for colIdx in range(exp.numColumns):
       numL2ActiveCells[step] += float(len(exp.getL2Representations()[colIdx]))
@@ -280,7 +271,7 @@ def testOnSingleRandomSDR(objects, exp, numRepeats=100, repeatID=0):
   confusion = overlapTrueObj.copy()
   outcome = overlapTrueObj.copy()
 
-  columnPooler = exp.L2Columns[0]._pooler
+  columnPooler = exp.L2Columns[0]
   numConnectedProximal = columnPooler.numberOfConnectedProximalSynapses()
   numConnectedDistal = columnPooler.numberOfConnectedDistalSynapses()
 
@@ -440,7 +431,6 @@ def runCapacityTest(numObjects,
                     l2Params,
                     l4Params,
                     objectParams,
-                    networkType = "MultipleL4L2Columns",
                     repeat=0):
   """
   Generate [numObjects] objects with [numPointsPerObject] points per object
@@ -480,7 +470,6 @@ def runCapacityTest(numObjects,
                        L2Overrides=l2Params,
                        L4Overrides=l4Params,
                        inputSize=l4ColumnCount,
-                       networkType = networkType,
                        externalInputSize=externalInputSize,
                        numLearningPoints=3,
                        numCorticalColumns=numCorticalColumns,
@@ -573,7 +562,6 @@ def runCapacityTestVaryingObjectNum(numPointsPerObject=10,
                                     l2Params=None,
                                     l4Params=None,
                                     objectParams=None,
-                                    networkType="MultipleL4L2Columns",
                                     numRpts=1):
   """
   Run experiment with fixed number of pts per object, varying number of objects
@@ -595,7 +583,6 @@ def runCapacityTestVaryingObjectNum(numPointsPerObject=10,
                      l2Params,
                      l4Params,
                      objectParams,
-                     networkType,
                      rpt))
   result = None
   for testResult in pool.map(invokeRunCapacityTest, params):
@@ -625,7 +612,6 @@ def runCapacityTestWrapperNonParallel(numPointsPerObject=10,
                                       l2Params=None,
                                       l4Params=None,
                                       objectParams=None,
-                                      networkType="MultipleL4L2Columns",
                                       rpt=0):
   """
   Run experiment with fixed number of pts per object, varying number of objects
@@ -640,7 +626,6 @@ def runCapacityTestWrapperNonParallel(numPointsPerObject=10,
                                l2Params,
                                l4Params,
                                objectParams,
-                               networkType,
                                rpt)
 
 
@@ -873,7 +858,6 @@ def runExperiment3(numCorticalColumns=DEFAULT_NUM_CORTICAL_COLUMNS,
                                     l2Params,
                                     l4Params,
                                     objectParams,
-                                    "MultipleL4L2Columns",
                                     numRpts)
 
   # plot result
@@ -981,7 +965,6 @@ def runExperiment4(resultDirName=DEFAULT_RESULT_DIR_NAME,
                                     l2Params,
                                     l4Params,
                                     objectParams,
-                                    "MultipleL4L2Columns",
                                     numRpts)
 
   # plot result
@@ -1088,7 +1071,6 @@ def runExperiment5(resultDirName=DEFAULT_RESULT_DIR_NAME,
                                     l2Params,
                                     l4Params,
                                     objectParams,
-                                    "MultipleL4L2Columns",
                                     numRpts)
 
   # plot result
@@ -1199,7 +1181,6 @@ def runExperiment6(resultDirName=DEFAULT_RESULT_DIR_NAME,
                                     l2Params,
                                     l4Params,
                                     objectParams,
-                                    "MultipleL4L2Columns",
                                     numRpts)
 
   # plot result
@@ -1303,7 +1284,6 @@ def runExperiment7(numCorticalColumns=DEFAULT_NUM_CORTICAL_COLUMNS,
                                     l2Params,
                                     l4Params,
                                     objectParams,
-                                    "MultipleL4L2Columns",
                                     numRpts)
 
   # plot result
@@ -1411,7 +1391,6 @@ def runExperiment8(numCorticalColumns=DEFAULT_NUM_CORTICAL_COLUMNS,
                                     l2Params,
                                     l4Params,
                                     objectParams,
-                                    "MultipleL4L2Columns",
                                     numRpts)
 
   # plot result
@@ -1476,22 +1455,22 @@ def runExperiment9(resultDirName=DEFAULT_RESULT_DIR_NAME,
   expParams = []
   expParams.append(
     {'l4Column': 150, 'externalInputSize': 2400, 'w': 20, 'sample': 6,
-     'thresh': 3, 'l2Column': 4, 'networkType': "MultipleL4L2Columns"})
+     'thresh': 3, 'l2Column': 4})
   expParams.append(
     {'l4Column': 150, 'externalInputSize': 2400, 'w': 20, 'sample': 6,
-     'thresh': 3, 'l2Column': 9, 'networkType': "MultipleL4L2Columns"})
+     'thresh': 3, 'l2Column': 9})
   expParams.append(
     {'l4Column': 150, 'externalInputSize': 2400, 'w': 20, 'sample': 6,
-     'thresh': 3, 'l2Column': 16, 'networkType': "MultipleL4L2Columns"})
-  expParams.append(
-    {'l4Column': 150, 'externalInputSize': 2400, 'w': 20, 'sample': 6,
-     'thresh': 3, 'l2Column': 4, 'networkType': "MultipleL4L2ColumnsWithTopology"})
-  expParams.append(
-    {'l4Column': 150, 'externalInputSize': 2400, 'w': 20, 'sample': 6,
-     'thresh': 3, 'l2Column': 9, 'networkType': "MultipleL4L2ColumnsWithTopology"})
-  expParams.append(
-    {'l4Column': 150, 'externalInputSize': 2400, 'w': 20, 'sample': 6,
-     'thresh': 3, 'l2Column': 16, 'networkType': "MultipleL4L2ColumnsWithTopology"})
+     'thresh': 3, 'l2Column': 16})
+  # expParams.append(
+  #   {'l4Column': 150, 'externalInputSize': 2400, 'w': 20, 'sample': 6,
+  #    'thresh': 3, 'l2Column': 4, 'networkType': "MultipleL4L2ColumnsWithTopology"})
+  # expParams.append(
+  #   {'l4Column': 150, 'externalInputSize': 2400, 'w': 20, 'sample': 6,
+  #    'thresh': 3, 'l2Column': 9, 'networkType': "MultipleL4L2ColumnsWithTopology"})
+  # expParams.append(
+  #   {'l4Column': 150, 'externalInputSize': 2400, 'w': 20, 'sample': 6,
+  #    'thresh': 3, 'l2Column': 16, 'networkType': "MultipleL4L2ColumnsWithTopology"})
 
   run_params = []
   for object_num in reversed(objectNumRange):
@@ -1503,7 +1482,6 @@ def runExperiment9(resultDirName=DEFAULT_RESULT_DIR_NAME,
         l4Params["columnCount"] = expParam['l4Column']
         numInputBits = expParam['w']
         numCorticalColumns = expParam['l2Column']
-        networkType = expParam['networkType']
 
         l4Params["activationThreshold"] = int(numInputBits * .6)
         l4Params["minThreshold"] = int(numInputBits * .6)
@@ -1520,7 +1498,7 @@ def runExperiment9(resultDirName=DEFAULT_RESULT_DIR_NAME,
 
         expName = "multiple_column_capacity_varying_object_num_synapses_{}_thresh_{}_l4column_{}_l2column_{}_{}".format(
             expParam['sample'], expParam['thresh'], expParam["l4Column"],
-            expParam['l2Column'], expParam["networkType"])
+            expParam['l2Column'])
 
         try:
           os.remove(_prepareResultsDir("{}.csv".format(expName),
@@ -1536,7 +1514,6 @@ def runExperiment9(resultDirName=DEFAULT_RESULT_DIR_NAME,
                            l2Params,
                            l4Params,
                            objectParams,
-                           networkType,
                            rpt))
 
   pool = multiprocessing.Pool(cpuCount or multiprocessing.cpu_count(), maxtasksperchild=1)
@@ -1555,9 +1532,9 @@ def runExperiment9(resultDirName=DEFAULT_RESULT_DIR_NAME,
 
   legendEntries = []
   for expParam in expParams:
-    expName = "multiple_column_capacity_varying_object_num_synapses_{}_thresh_{}_l4column_{}_l2column_{}_{}".format(
+    expName = "multiple_column_capacity_varying_object_num_synapses_{}_thresh_{}_l4column_{}_l2column_{}".format(
         expParam['sample'], expParam['thresh'], expParam["l4Column"],
-        expParam['l2Column'], expParam["networkType"])
+        expParam['l2Column'])
 
     resultFileName = _prepareResultsDir("{}.csv".format(expName),
                                         resultDirName=resultDirName
@@ -1567,7 +1544,8 @@ def runExperiment9(resultDirName=DEFAULT_RESULT_DIR_NAME,
 
     plotResults(result, ax, "numObjects", None, colors[ploti])
     ploti += 1
-    if "Topology" in expParam["networkType"]:
+    if False:
+    # if "Topology" in expParam["networkType"]:
       legendEntries.append("L4 mcs {} #cc {} w/ topology".format(
         expParam['l4Column'], expParam['l2Column']))
     else:
@@ -1655,7 +1633,6 @@ def runExperiment10(numCorticalColumns=DEFAULT_NUM_CORTICAL_COLUMNS,
                                     l2Params,
                                     l4Params,
                                     objectParams,
-                                    "MultipleL4L2Columns",
                                     numRpts)
 
   # plot result
@@ -1785,27 +1762,26 @@ if __name__ == "__main__":
 
   opts = parser.parse_args()
 
-  # runExperiments(resultDirName=opts.resultDirName,
-  #                plotDirName=opts.plotDirName,
-  #                cpuCount=opts.cpuCount)
+  runExperiments(resultDirName=opts.resultDirName,
+                 plotDirName=opts.plotDirName,
+                 cpuCount=opts.cpuCount)
 
 
 
-  numObjects = 50
-  numPointsPerObject=10
-  numCorticalColumns=1
-  l4Params = getL4Params()
-  l2Params = getL2Params()
-  objectParams = {'numInputBits': 20,
-                  'externalInputSize': 2400,
-                  'numFeatures': DEFAULT_NUM_FEATURES,
-                  'numLocations': DEFAULT_NUM_LOCATIONS,
-                  'uniquePairs': True}
-  runCapacityTest(numObjects,
-                      numPointsPerObject,
-                      numCorticalColumns,
-                      l2Params,
-                      l4Params,
-                      objectParams,
-                      networkType = "MultipleL4L2Columns",
-                      repeat=0)
+  # numObjects = 50
+  # numPointsPerObject=10
+  # numCorticalColumns=1
+  # l4Params = getL4Params()
+  # l2Params = getL2Params()
+  # objectParams = {'numInputBits': 20,
+  #                 'externalInputSize': 2400,
+  #                 'numFeatures': DEFAULT_NUM_FEATURES,
+  #                 'numLocations': DEFAULT_NUM_LOCATIONS,
+  #                 'uniquePairs': True}
+  # runCapacityTest(numObjects,
+  #                     numPointsPerObject,
+  #                     numCorticalColumns,
+  #                     l2Params,
+  #                     l4Params,
+  #                     objectParams,
+  #                     repeat=0)
