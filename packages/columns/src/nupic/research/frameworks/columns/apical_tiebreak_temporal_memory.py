@@ -587,8 +587,8 @@ class ApicalTiebreakTemporalMemory(object):
 
         inhibitedMask = np.in1d(partlyDepolarizedCells // self.cellsPerColumn,
                                 fullyDepolarizedCells // self.cellsPerColumn)
-        predictedCells = np.append(fullyDepolarizedCells,
-                                   partlyDepolarizedCells[~inhibitedMask])
+        predictedCells = np.union1d(fullyDepolarizedCells,
+                                    partlyDepolarizedCells[~inhibitedMask])
 
         if not self.useApicalTiebreak:
             predictedCells = cellsForBasalSegments
