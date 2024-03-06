@@ -219,7 +219,7 @@ class ColumnPoolerMonitorMixin(MonitorMixinBase):
     """
 
     cellTrace = copy.deepcopy(self._mmTraces[activityType].data)
-    for i in xrange(len(cellTrace)):
+    for i in range(len(cellTrace)):
       cellTrace[i] = self.getCellIndices(cellTrace[i])
 
     return self.mmGetCellTracePlot(cellTrace, self.numberOfCells(),

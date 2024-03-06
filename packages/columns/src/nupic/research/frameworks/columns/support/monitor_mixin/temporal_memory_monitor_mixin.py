@@ -152,9 +152,9 @@ class TemporalMemoryMonitorMixin(MonitorMixinBase):
     numCellsPerColumn = []
 
     for predictedActiveCells in (
-        self._mmData["predictedActiveCellsForSequence"].values()):
+        list(self._mmData["predictedActiveCellsForSequence"].values())):
       cellsForColumn = self.mapCellsToColumns(predictedActiveCells)
-      numCellsPerColumn += [len(x) for x in cellsForColumn.values()]
+      numCellsPerColumn += [len(x) for x in list(cellsForColumn.values())]
 
     return Metric(self,
                   "# predicted => active cells per column for each sequence",
@@ -174,13 +174,13 @@ class TemporalMemoryMonitorMixin(MonitorMixinBase):
     numSequencesForCell = defaultdict(lambda: 0)
 
     for predictedActiveCells in (
-          self._mmData["predictedActiveCellsForSequence"].values()):
+          list(self._mmData["predictedActiveCellsForSequence"].values())):
       for cell in predictedActiveCells:
         numSequencesForCell[cell] += 1
 
     return Metric(self,
                   "# sequences each predicted => active cells appears in",
-                  numSequencesForCell.values())
+                  list(numSequencesForCell.values()))
 
 
   def mmPrettyPrintConnections(self):
@@ -197,7 +197,7 @@ class TemporalMemoryMonitorMixin(MonitorMixinBase):
              "(#) [(source cell=permanence ...),       ...]\n")
     text += "------------------------------------\n"
 
-    columns = range(self.numberOfColumns())
+    columns = list(range(self.numberOfColumns()))
 
     for column in columns:
       cells = self.cellsForColumn(column)
@@ -220,8 +220,8 @@ class TemporalMemoryMonitorMixin(MonitorMixinBase):
 
         text += ("Column {0:3} / Cell {1:3}:\t({2}) {3}\n".format(
           column, cell,
-          len(segmentDict.values()),
-          "[{0}]".format(",       ".join(segmentDict.values()))))
+          len(list(segmentDict.values())),
+          "[{0}]".format(",       ".join(list(segmentDict.values())))))
 
       if column < len(columns) - 1:  # not last
         text += "\n"
@@ -243,9 +243,9 @@ class TemporalMemoryMonitorMixin(MonitorMixinBase):
     table = PrettyTable(["Pattern", "Column", "predicted=>active cells"])
 
     for sequenceLabel, predictedActiveCells in (
-          self._mmData["predictedActiveCellsForSequence"].iteritems()):
+          iter(self._mmData["predictedActiveCellsForSequence"].items())):
       cellsForColumn = self.mapCellsToColumns(predictedActiveCells)
-      for column, cells in cellsForColumn.iteritems():
+      for column, cells in cellsForColumn.items():
         table.add_row([sequenceLabel, column, list(cells)])
 
     return table.get_string(sortby=sortby).encode("utf-8")
@@ -418,7 +418,7 @@ class TemporalMemoryMonitorMixin(MonitorMixinBase):
       self._mmComputeTransitionTraces()
 
     cellTrace = copy.deepcopy(self._mmTraces[activityType].data)
-    for i in xrange(len(cellTrace)):
+    for i in range(len(cellTrace)):
       cellTrace[i] = self.getCellIndices(cellTrace[i])
 
     return self.mmGetCellTracePlot(cellTrace, self.numberOfCells(),

@@ -29,12 +29,11 @@ import numpy
 
 
 
-class Trace(object):
+class Trace(object, metaclass=abc.ABCMeta):
   """
   A record of the past data the algorithm has seen, with an entry for each
   iteration.
   """
-  __metaclass__ = abc.ABCMeta
 
 
   def __init__(self, monitor, title):

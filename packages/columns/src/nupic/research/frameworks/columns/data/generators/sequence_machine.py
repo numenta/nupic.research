@@ -99,7 +99,7 @@ class SequenceMachine(object):
     """
     text = ""
 
-    for i in xrange(len(sequence)):
+    for i in range(len(sequence)):
       pattern = sequence[i]
 
       if pattern == None:
@@ -128,12 +128,12 @@ class SequenceMachine(object):
     if sharedRange:
       sharedStart, sharedEnd = sharedRange
       sharedLength = sharedEnd - sharedStart
-      sharedNumbers = range(numSequences * sequenceLength,
-                            numSequences * sequenceLength + sharedLength)
+      sharedNumbers = list(range(numSequences * sequenceLength,
+                            numSequences * sequenceLength + sharedLength))
 
-    for i in xrange(numSequences):
+    for i in range(numSequences):
       start = i * sequenceLength
-      newNumbers = np.array(range(start, start + sequenceLength), np.uint32)
+      newNumbers = np.array(list(range(start, start + sequenceLength)), np.uint32)
       self._random.shuffle(newNumbers)
       newNumbers = list(newNumbers)
 
