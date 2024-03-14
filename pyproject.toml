@@ -44,4 +44,4 @@ known_third_party = ['elasticsearch', 'dotenv', 'torch', 'tensorflow', 'tabulate
                      'tqdm', 'wandb', 'transformers', 'tokenizers', 'datasets',
                      'deepspeed', 'scipy', 'scikit-learn', 'seaborn', 'librosa',
                      'pytorch_lightning', 'pretrainedmodels', 'ax', 'ptitprince',
-                     'sigopt', 'wandb', 'gym', 'prettytable', 'plyfile']
+                     'sigopt', 'wandb', 'gym', 'prettytable', 'plotly', 'plyfile']
