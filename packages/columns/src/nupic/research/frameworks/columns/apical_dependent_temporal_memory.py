@@ -22,8 +22,8 @@
 """An implementation of ApicalDependentTemporalMemory"""
 
 import numpy as np
-from nupic.bindings.math import Random, SparseMatrixConnections
 
+from nupic.bindings.math import Random, SparseMatrixConnections
 from nupic.research.frameworks.columns import numpy_helpers as np2
 
 

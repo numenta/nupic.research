@@ -25,6 +25,7 @@ experimentation and tests.
 """
 
 import numpy as np
+
 from nupic.bindings.math import Random
 
 

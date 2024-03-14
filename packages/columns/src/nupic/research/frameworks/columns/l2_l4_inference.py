@@ -84,9 +84,9 @@ from math import ceil
 
 import matplotlib.pyplot as plt
 import numpy as np
+
 from nupic.bindings.algorithms import SpatialPooler
 from nupic.bindings.math import SparseMatrix
-
 from nupic.research.frameworks.columns import ApicalTiebreakPairMemory, ColumnPooler
 from nupic.research.frameworks.columns.support.logging_decorator import LoggingDecorator
 

@@ -20,6 +20,7 @@
 # ----------------------------------------------------------------------
 
 import numpy
+
 from nupic.bindings.math import Random, SparseMatrix
 
 
