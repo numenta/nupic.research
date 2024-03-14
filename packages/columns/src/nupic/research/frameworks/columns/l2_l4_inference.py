@@ -87,7 +87,7 @@ import numpy as np
 
 from nupic.bindings.algorithms import SpatialPooler
 from nupic.bindings.math import SparseMatrix
-from nupic.research.frameworks.columns import ApicalTiebreakPairMemory, ColumnPooler
+from nupic.research.frameworks.columns import ColumnPooler
 from nupic.research.frameworks.columns.support.logging_decorator import LoggingDecorator
 
 
@@ -133,6 +133,7 @@ class L4L2Experiment(object):
                maxConnectionDistance=1,
                columnPositions=None,
                L4Overrides=None,
+               L4Impl="cpp",
                numLearningPoints=3,
                seed=42,
                logCalls=False,
@@ -176,6 +177,9 @@ class L4L2Experiment(object):
 
     @param   L4Overrides (dict)
              Parameters to override in the L4 region
+
+    @param   L4Impl (string)
+             "py" or "cpp" for Python or C++ implementation of L4
 
     @param   numLearningPoints (int)
              Number of times each pair should be seen to be learnt
@@ -276,6 +280,7 @@ class L4L2Experiment(object):
                       for _ in range(numCorticalColumns)]
 
     # L4
+    self.L4Impl = L4Impl
     feedbackInputSize = (self.L2Params["cellCount"]
                          if self.enableFeedback
                          else 0)
@@ -285,6 +290,12 @@ class L4L2Experiment(object):
                                             numExternalInputBits)
     if L4Overrides is not None:
       self.L4Params.update(L4Overrides)
+    if L4Impl == "cpp":
+      from nupic.bindings.algorithms import ApicalTiebreakPairMemory
+    elif L4Impl == "py":
+      from nupic.research.frameworks.columns import ApicalTiebreakPairMemory
+    else:
+      raise ValueError("Invalid L4Impl value: {}".format(L4Impl))
     self.L4Columns = [ApicalTiebreakPairMemory(**self.L4Params)
                       for _ in range(numCorticalColumns)]
 
@@ -801,7 +812,7 @@ class L4L2Experiment(object):
       activationThreshold = int(numInputBits * .6)
       minThreshold = activationThreshold
 
-    return {
+    params = {
       "columnCount": inputSize,
       "basalInputSize": externalInputSize,
       "apicalInputSize": feedbackInputSize,
@@ -814,10 +825,14 @@ class L4L2Experiment(object):
       "basalPredictedSegmentDecrement": 0.0,
       "apicalPredictedSegmentDecrement": 0.0,
       "activationThreshold": activationThreshold,
-      "reducedBasalThreshold": int(activationThreshold * 0.6),
       "sampleSize": sampleSize,
       "seed": self.seed
     }
+
+    if self.L4Impl == "py":
+      params["reducedBasalThreshold"] = int(activationThreshold * 0.6),
+
+    return params
 
   def getDefaultL2Params(self, numCorticalColumns, inputSize, numInputBits):
     """
@@ -929,9 +944,10 @@ class L4L2Experiment(object):
         L2Representation[i]
         # random.sample(L2Representation[i], min(len(L2Representation[i]), 500))
       )
-      statistics["L4 Apical Segments C" + str(i)].append(
-        len(self.L4Columns[i].getActiveApicalSegments())
-      )
+      if self.L4Impl == "py":
+        statistics["L4 Apical Segments C" + str(i)].append(
+          len(self.L4Columns[i].getActiveApicalSegments())
+        )
 
       # add true overlap and classification result if objectName was learned
       if objectName in self.objectL2Representations:
