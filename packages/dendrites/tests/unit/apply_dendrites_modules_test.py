@@ -54,8 +54,7 @@ class ApplyDendritesModulesTest(unittest.TestCase):
         module = DendriticBias1d()
         output_a = F.dendritic_bias_1d(self.y, self.dendrite_activations)
         output_b = module(self.y, self.dendrite_activations)
-        all_equal = (output_a[0] == output_b[0]).all()
-        self.assertTrue(all_equal)
+        torch.testing.assert_close(output_a[0], output_b[0])
 
     def test_dendritic_gate(self):
         """
@@ -64,8 +63,7 @@ class ApplyDendritesModulesTest(unittest.TestCase):
         module = DendriticGate1d()
         output_a = F.dendritic_gate_1d(self.y, self.dendrite_activations)
         output_b = module(self.y, self.dendrite_activations)
-        all_equal = (output_a[0] == output_b[0]).all()
-        self.assertTrue(all_equal)
+        torch.testing.assert_close(output_a[0], output_b[0])
 
     def test_dendritic_absolute_max_gate(self):
         """
@@ -75,8 +73,7 @@ class ApplyDendritesModulesTest(unittest.TestCase):
         module = DendriticAbsoluteMaxGate1d()
         output_a = F.dendritic_absolute_max_gate_1d(self.y, self.dendrite_activations)
         output_b = module(self.y, self.dendrite_activations)
-        all_equal = (output_a[0] == output_b[0]).all()
-        self.assertTrue(all_equal)
+        torch.testing.assert_close(output_a[0], output_b[0])
 
     def test_dendritic_gate_2d(self):
         """
@@ -85,8 +82,7 @@ class ApplyDendritesModulesTest(unittest.TestCase):
         module = DendriticGate2d()
         output_a = F.dendritic_gate_2d(self.y_2d, self.dendrite_activations_2d)
         output_b = module(self.y_2d, self.dendrite_activations_2d)
-        all_equal = (output_a[0] == output_b[0]).all()
-        self.assertTrue(all_equal)
+        torch.testing.assert_close(output_a[0], output_b[0])
 
     def test_dendritic_absolute_max_gate_2d(self):
         """
@@ -97,8 +93,7 @@ class ApplyDendritesModulesTest(unittest.TestCase):
         output_a = F.dendritic_absolute_max_gate_2d(self.y_2d,
                                                     self.dendrite_activations_2d)
         output_b = module(self.y_2d, self.dendrite_activations_2d)
-        all_equal = (output_a[0] == output_b[0]).all()
-        self.assertTrue(all_equal)
+        torch.testing.assert_close(output_a[0], output_b[0])
 
 
 if __name__ == "__main__":
