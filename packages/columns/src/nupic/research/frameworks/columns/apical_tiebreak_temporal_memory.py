@@ -587,6 +587,9 @@ class ApicalTiebreakTemporalMemory(object):
 
         inhibitedMask = np.in1d(partlyDepolarizedCells // self.cellsPerColumn,
                                 fullyDepolarizedCells // self.cellsPerColumn)
+        # Strictly speaking, this could just be a np.append. The current code
+        # does not depend on these being sorted. But downstream users of the TM
+        # may expect sorted cells.
         predictedCells = np.union1d(fullyDepolarizedCells,
                                     partlyDepolarizedCells[~inhibitedMask])
 
