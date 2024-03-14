@@ -180,6 +180,7 @@ class SequenceMemoryTestBase(object, metaclass=ABCMeta):
                     set(self.get_predicted_cells()), set(self.get_active_cells())
                 )
 
+    @pytest.mark.slow
     def testB3(self):
         """N=300, M=1, P=1. (See how high we can go with N)"""
 
