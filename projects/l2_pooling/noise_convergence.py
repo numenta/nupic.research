@@ -25,6 +25,7 @@ This file plots the convergence of L4-L2 as you increase the amount of noise.
 
 import os
 import pickle
+from itertools import groupby
 from multiprocessing import cpu_count
 
 import matplotlib as mpl
@@ -141,6 +142,152 @@ def plotAccuracyByActivationThreshold(results_by_thresholds, activation_threshol
   # save
   plt.savefig(plotPath)
   plt.close()
+
+
+def plotFeatureLocationNoise(feature_results, location_results):
+  plt.figure()
+
+  feature_results = zip(*feature_results)
+  plt.plot(*feature_results, label="Feature Noise")
+
+  location_results = zip(*location_results)
+  plt.plot(*location_results, label="Location Noise")
+
+  plt.xlabel("Amount of noise")
+  plt.ylabel("Accuracy")
+  plt.legend(loc="lower left")
+
+  # save
+  plotPath = os.path.join("plots", "feature_location_noise.pdf")
+  plt.savefig(plotPath)
+  plt.close()
+
+
+def runFeatureLocationNoiseExperiment():
+  """
+  Evaluated robustness of a single column network to noise. After the network
+  learned a set of objects, we added varying amounts of random noise to the
+  sensory and location inputs. The noise affected the active bits in the
+  input without changing its overall sparsity (see Materials and Methods).
+  Recognition accuracy after 30 touches is plotted as a function of noise
+  """
+  noise = numpy.arange(0, 0.8, .1)
+  objects = [50]
+  locations = [10]
+  features = [10]
+  columns = [1]
+  points = 10
+  settlingTime = 3
+  numTrials = 10
+
+  feature_noise_results = runExperimentPool(
+    numObjects=objects,
+    numLocations=locations,
+    numFeatures=features,
+    numColumns=columns,
+    featureNoiseRange=noise,
+    numWorkers=cpu_count() - 1,
+    numPoints=points,
+    nTrials=numTrials,
+    enableFeedback=[False],
+    settlingTime=settlingTime,
+    resultsName="feature_noise_results.pkl")
+
+  # with open("feature_noise_results.pkl", "rb") as f:
+  #   feature_noise_results = pickle.load(f)
+
+  # Group Feature results by noise
+  def feature_noise_key(x):
+    return x["featureNoise"]
+  sorted_results = sorted(feature_noise_results, key=feature_noise_key)
+  feature_noise_results = [(k, numpy.mean(next(v)["classificationAccuracy"]))
+                           for k, v in groupby(sorted_results,
+                                               key=feature_noise_key)]
+
+  location_noise_results = runExperimentPool(
+    numObjects=objects,
+    numLocations=locations,
+    numFeatures=features,
+    numColumns=columns,
+    locationNoiseRange=noise,
+    numWorkers=cpu_count() - 1,
+    numPoints=points,
+    settlingTime=settlingTime,
+    nTrials=numTrials,
+    enableFeedback=[False],
+    resultsName="location_noise_results.pkl")
+
+  # with open("location_noise_results.pkl", "rb") as f:
+  #   location_noise_results = pickle.load(f)
+
+  # Group Location results by noise
+  def location_noise_key(x):
+    return x["locationNoise"]
+  sorted_results = sorted(location_noise_results, key=location_noise_key)
+  location_noise_results = [(k, numpy.mean(next(v)["classificationAccuracy"]))
+                            for k, v in groupby(sorted_results,
+                                                key=location_noise_key)]
+
+  plotFeatureLocationNoise(feature_results=feature_noise_results,
+                           location_results=location_noise_results)
+
+
+def plotSensationsNoise(results):
+  plt.figure()
+
+  colorList = ["blue", "green", "purple", "brown", "fuchsia", "grey"]
+  for i, line in enumerate(results):
+    plt.plot(line[1], label="Noise level {}".format(line[0]), c=colorList[i])
+
+  plt.xlabel("Number of Sensations")
+  plt.ylabel("Accuracy")
+  plt.legend(loc="center right")
+
+  # save
+  plotPath = os.path.join("plots", "sensation_noise.pdf")
+  plt.savefig(plotPath)
+  plt.close()
+
+
+def runSensationsNoiseExperiment():
+  """
+  Calculcate Recognition accuracy as a function of the number of sensations.
+  Colored lines correspond to noise levels in the location input
+  """
+  noise = [0.0, 0.2, 0.4, 0.5, 0.6, 0.7]
+  objects = [100]
+  locations = [5000]
+  features = [5000]
+  columns = [1]
+  points = 10
+  settlingTime = 3
+  numTrials = 10
+
+  results = runExperimentPool(
+    numObjects=objects,
+    numLocations=locations,
+    numFeatures=features,
+    numColumns=columns,
+    locationNoiseRange=noise,
+    numWorkers=cpu_count() - 1,
+    numPoints=points,
+    settlingTime=settlingTime,
+    nTrials=numTrials,
+    enableFeedback=[False],
+    resultsName="sensation_noise_results.pkl")
+
+  # with open("sensation_noise_results.pkl", "rb") as f:
+  #   results = pickle.load(f)
+
+  # Group results by noise
+  def noise_key(x):
+    return x["locationNoise"]
+  sorted_results = sorted(results, key=noise_key)
+  grouped_results = [(k, numpy.mean([row["classificationPerSensation"]
+                                     for row in v], axis=0))
+                     for k, v in groupby(sorted_results, key=noise_key)]
+
+  plotSensationsNoise(grouped_results)
 
 
 def main():

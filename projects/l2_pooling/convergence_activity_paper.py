@@ -33,12 +33,14 @@ import plotly.graph_objs as go
 from nupic.research.frameworks.columns.l2_l4_inference import L4L2Experiment
 from nupic.research.frameworks.columns.object_machine_factory import createObjectMachine
 
-plotlyUser = os.environ["PLOTLY_USERNAME"]  # noqa
-plotlyAPIKey = os.environ["PLOTLY_API_KEY"]  # noqa
-plotly.plotly.sign_in(plotlyUser, plotlyAPIKey)
+# Plotly requires a valid user to be able to save High Res images
+plotlyUser = os.environ.get("PLOTLY_USERNAME")  # noqa
+plotlyAPIKey = os.environ.get("PLOTLY_API_KEY")  # noqa
+if plotlyAPIKey is not None:
+    plotly.plotly.sign_in(plotlyUser, plotlyAPIKey)
 
 
-def plotActivity(l2ActiveCellsMultiColumn):
+def plotActivity(l2ActiveCellsMultiColumn, highlightTouch):
     maxTouches = 15
     numTouches = min(maxTouches, len(l2ActiveCellsMultiColumn))
     numColumns = len(l2ActiveCellsMultiColumn[0])
@@ -48,7 +50,6 @@ def plotActivity(l2ActiveCellsMultiColumn):
         shared_yaxes=True,
         subplot_titles=("Column 1", "Column 2", "Column 3")[0:numColumns],
     )
-    # pprint.pprint(fig)
 
     data = go.Scatter(x=[], y=[])
 
@@ -68,42 +69,28 @@ def plotActivity(l2ActiveCellsMultiColumn):
                             "y0": cell,
                             "y1": cell + 1,
                             "line": {
-                                # "color": "rgba(128, 0, 128, 1)",
+                                # 'color': 'rgba(128, 0, 128, 1)',
                                 "width": 2,
                             },
-                            # "fillcolor": "rgba(128, 0, 128, 0.7)",
+                            # 'fillcolor': 'rgba(128, 0, 128, 0.7)',
                         },
                     )
-
-    # Add red rectangle
-    if numColumns == 1:
-        shapes.append(
-            {
-                "type": "rect",
-                "x0": 6,
-                "x1": 6.6,
-                "y0": -95,
-                "y1": 4100,
-                "line": {
-                    "color": "rgba(255, 0, 0, 0.5)",
-                    "width": 3,
-                },
-            },
-        )
-    else:
-        shapes.append(
-            {
-                "type": "rect",
-                "x0": 3,
-                "x1": 3.6,
-                "y0": -95,
-                "y1": 4100,
-                "line": {
-                    "color": "rgba(255, 0, 0, 0.5)",
-                    "width": 3,
-                },
-            },
-        )
+                if t == highlightTouch:
+                    # Add red rectangle
+                    shapes.append(
+                        {
+                            "type": "rect",
+                            "xref": "x" + str((c + 1)),
+                            "x0": t,
+                            "x1": t + 0.6,
+                            "y0": -95,
+                            "y1": 4100,
+                            "line": {
+                                "color": "rgba(255, 0, 0, 0.5)",
+                                "width": 3,
+                            },
+                        },
+                    )
 
     # Legend for x-axis and appropriate title
     fig["layout"]["annotations"].append(
@@ -171,7 +158,10 @@ def plotActivity(l2ActiveCellsMultiColumn):
     plotly.offline.plot(fig, filename=basename + ".html", auto_open=True)
 
     # Can't save image files in offline mode
-    plotly.plotly.image.save_as(fig, filename=basename + ".pdf", scale=4)
+
+
+#   if plotlyAPIKey is not None:
+#     plotly.plotly.image.save_as(fig, filename=basename + '.pdf', scale=4)
 
 
 def plotL2ObjectRepresentations(exp1):
@@ -188,10 +178,10 @@ def plotL2ObjectRepresentations(exp1):
                     "y0": cell,
                     "y1": cell + 2,
                     "line": {
-                        # "color": "rgba(128, 0, 128, 1)",
+                        # 'color': 'rgba(128, 0, 128, 1)',
                         "width": 2,
                     },
-                    # "fillcolor": "rgba(128, 0, 128, 0.7)",
+                    # 'fillcolor': 'rgba(128, 0, 128, 0.7)',
                 },
             )
 
@@ -261,12 +251,19 @@ def plotL2ObjectRepresentations(exp1):
     print("url=", plotPath)
 
     # Can't save image files in offline mode
-    plotly.plotly.image.save_as(
-        fig, filename="plots/target_object_representations.pdf", scale=4
-    )
+
+
+#   if plotlyAPIKey is not None:
+#     plotly.plotly.image.save_as(fig,
+#                                 filename='plots/target_object_representations.pdf',
+#                                 scale=4)
 
 
 def runExperiment():
+    """
+    We will run two experiments side by side, with either single column
+    or 3 columns
+    """
     numColumns = 3
     numFeatures = 3
     numPoints = 10
@@ -359,14 +356,27 @@ def runExperiment():
         L2ActiveCellNVsTimeSingleColumn.append(len(exp1.getL2Representations()[0]))
 
     # Used to figure out where to put the red rectangle!
-    print(numFeatures)
-    for i, _sdrs in enumerate(l2ActiveCellsSingleColumn):
-        print(
-            i, len(l2ActiveCellsSingleColumn[i][0]), len(l2ActiveCellsMultiColumn[i][0])
-        )
+    sdrSize = exp1.L2Params["sdrSize"]
+    singleColumnHighlight = next(
+        (
+            idx
+            for idx, value in enumerate(l2ActiveCellsSingleColumn)
+            if len(value[0]) == sdrSize
+        ),
+        None,
+    )
+    sdrSize = exp3.L2Params["sdrSize"]
+    multiColumnHighlight = next(
+        (
+            idx
+            for idx, value in enumerate(l2ActiveCellsMultiColumn)
+            if len(value[0]) == sdrSize
+        ),
+        None,
+    )
 
-    plotActivity(l2ActiveCellsMultiColumn)
-    plotActivity(l2ActiveCellsSingleColumn)
+    plotActivity(l2ActiveCellsMultiColumn, multiColumnHighlight)
+    plotActivity(l2ActiveCellsSingleColumn, singleColumnHighlight)
     plotL2ObjectRepresentations(exp1)
 
 

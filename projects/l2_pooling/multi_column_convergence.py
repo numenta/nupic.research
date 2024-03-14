@@ -193,6 +193,70 @@ def plotConvergenceByObjectMultiColumn(results, objectRange, columnRange, numTri
   plt.close()
 
 
+def runSingleColumnExperiment():
+  """
+  Mean number of sensations needed to unambiguously recognize an object with a
+  single column network as the set of learned objects increases. We train models
+  on varying numbers of objects, from 1 to 100 and plot the average number of
+  sensations required to unambiguously recognize a single object.
+  """
+  # We run 10 trials for each column number and then analyze results
+  numTrials = 10
+  columnRange = [1]
+  featureRange = [5, 10, 20, 30]
+  objectRange = [2, 10, 20, 30, 40, 50, 60, 80, 100]
+
+  # Comment this out if you are re-running analysis on already saved results.
+  # Very useful for debugging the plots
+  runExperimentPool(
+    numObjects=objectRange,
+    numLocations=[10],
+    numFeatures=featureRange,
+    numColumns=columnRange,
+    numPoints=10,
+    nTrials=numTrials,
+    numWorkers=cpu_count() - 1,
+    resultsName="object_convergence_results.pkl")
+
+  # Analyze results
+  with open("object_convergence_results.pkl", "rb") as f:
+    results = pickle.load(f)
+
+  plotConvergenceByObject(results, objectRange, featureRange, numTrials)
+
+
+def runMultiColumnExperiment():
+  """
+  Mean number of observations needed to unambiguously recognize an object with
+  multi-column networks as the set of columns increases. We train each network
+  with 100 objects and plot the average number of sensations required to
+  unambiguously recognize an object.
+  """
+  # We run 10 trials for each column number and then analyze results
+  numTrials = 10
+  columnRange = [1, 2, 3, 4, 5, 6, 7, 8]
+  featureRange = [5, 10, 20, 30]
+  objectRange = [100]
+
+  # Comment this out if you are re-running analysis on already saved results.
+  # Very useful for debugging the plots
+  runExperimentPool(
+    numObjects=objectRange,
+    numLocations=[10],
+    numFeatures=featureRange,
+    numColumns=columnRange,
+    numPoints=10,
+    numWorkers=cpu_count() - 1,
+    nTrials=numTrials,
+    resultsName="object_convergence_multi_column_results.pkl")
+
+  # Analyze results
+  with open("object_convergence_multi_column_results.pkl", "rb") as f:
+    results = pickle.load(f)
+
+  plotConvergenceByColumn(results, columnRange, featureRange, numTrials)
+
+
 def main():
 
   # This is how you run a specific experiment in single process mode. Useful
