@@ -35,8 +35,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from nupic.engine import Network
 
-from htmresearch.frameworks.location.location_network_creation import createMultipleL246aLocationColumn
-from htmresearch.frameworks.location.object_generation import generateObjects
+from nupic.research.frameworks.location.location_network_creation import createMultipleL246aLocationColumn
+from nupic.research.frameworks.location.object_generation import generateObjects
 from htmresearch.support.expsuite import PyExperimentSuite
 from htmresearch.support.register_regions import registerAllResearchRegions
 

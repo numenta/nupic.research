@@ -33,7 +33,7 @@ import matplotlib.cm
 import numpy as np
 import PIL.Image
 
-from htmresearch.algorithms.location_modules import (
+from nupic.research.frameworks.location.location_modules import (
   ThresholdedGaussian2DLocationModule)
 
 CWD = os.path.dirname(os.path.realpath(__file__))
@@ -104,9 +104,9 @@ def insertPointExcitations(parent, bumps, rhombusBase, rhombusHeight,
      columnInRhombus.flatten())] = coloredSquare
 
   png = PIL.Image.fromarray(((bitmap) * 255).astype("uint8"), mode="RGBA")
-  pngBuffer = io.StringIO()
+  pngBuffer = io.BytesIO()
   png.save(pngBuffer, format="PNG")
-  pngStr = base64.b64encode(pngBuffer.getvalue())
+  pngStr = base64.b64encode(pngBuffer.getvalue()).decode("utf-8")
 
   image = ET.SubElement(parent, "image")
   image.set("xlink:href", "data:image/png;base64,{}".format(pngStr))
@@ -161,7 +161,7 @@ def rhombusChart(inFilename, outFilename, objectNumber, moduleNumbers, numSteps,
                              rhombusBase, rhombusHeight, bumpSigma)
 
   filename = os.path.join(CHART_DIR, outFilename)
-  with open(filename, "w") as f:
+  with open(filename, "wb") as f:
     print("Saving", filename)
     ET.ElementTree(svg).write(f, encoding="utf-8", xml_declaration=True)
 

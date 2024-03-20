@@ -39,7 +39,7 @@ import numpy as np
 np.random.seed(865486387)
 random.seed(357627)
 
-from htmresearch.frameworks.location.path_integration_union_narrowing import (
+from nupic.research.frameworks.location.path_integration_union_narrowing import (
   PIUNCorticalColumn, PIUNExperiment)
 from two_layer_tracing import PIUNVisualizer as trace
 

@@ -38,11 +38,11 @@ import io
 
 import numpy as np
 
-from htmresearch.frameworks.location.path_integration_union_narrowing import (
+from nupic.research.frameworks.location.path_integration_union_narrowing import (
   PIUNCorticalColumn, PIUNExperiment)
-from htmresearch.frameworks.location.two_layer_tracing import (
+from nupic.research.frameworks.location.two_layer_tracing import (
   PIUNVisualizer as trace)
-from htmresearch.frameworks.location.object_generation import generateObjects
+from nupic.research.frameworks.location.object_generation import generateObjects
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 

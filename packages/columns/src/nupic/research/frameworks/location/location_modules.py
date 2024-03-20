@@ -27,9 +27,10 @@ import copy
 
 import numpy as np
 
-from htmresearch.support import numpy_helpers as np2
-from htmresearch.algorithms.multiconnections import Multiconnections
 from nupic.bindings.math import SparseMatrixConnections, Random
+from nupic.research.frameworks.columns import numpy_helpers as np2
+from nupic.research.frameworks.columns.multiconnections import Multiconnections
+
 
 
 class ThresholdedGaussian2DLocationModule(object):

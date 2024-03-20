@@ -31,9 +31,8 @@ from collections import defaultdict
 
 import numpy as np
 
-from htmresearch.algorithms.apical_tiebreak_temporal_memory import (
-  ApicalTiebreakPairMemory)
-from htmresearch.algorithms.location_modules import (
+from nupic.research.frameworks.columns import ApicalTiebreakPairMemory
+from nupic.research.frameworks.location.location_modules import (
   Superficial2DLocationModule, ThresholdedGaussian2DLocationModule)
 
 

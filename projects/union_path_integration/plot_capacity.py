@@ -21,12 +21,10 @@
 
 """Plot capacity chart."""
 
-import collections
 import json
 import os
 
 import matplotlib.pyplot as plt
-import numpy as np
 
 CWD = os.path.dirname(os.path.realpath(__file__))
 CHART_DIR = os.path.join(CWD, "charts")

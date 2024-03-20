@@ -24,15 +24,13 @@
 import argparse
 from collections import defaultdict
 import json
-import math
 import os
-import itertools
 
 import matplotlib.pyplot as plt
 import matplotlib.lines
 import numpy as np
 
-from htmresearch.frameworks.location import ambiguity_index
+from nupic.research.frameworks.location import ambiguity_index
 
 CWD = os.path.dirname(os.path.realpath(__file__))
 CHART_DIR = os.path.join(CWD, "charts")

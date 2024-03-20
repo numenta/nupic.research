@@ -29,11 +29,11 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
 
-from htmresearch.algorithms.apical_tiebreak_temporal_memory import (
+from nupic.research.frameworks.columns import (
     ApicalTiebreakPairMemory,
 )
-from htmresearch.algorithms.location_modules import Superficial2DLocationModule
-from htmresearch.frameworks.location.path_integration_union_narrowing import (
+from nupic.research.frameworks.location.location_modules import Superficial2DLocationModule
+from nupic.research.frameworks.location.path_integration_union_narrowing import (
     PIUNCorticalColumn,
     PIUNExperiment,
 )

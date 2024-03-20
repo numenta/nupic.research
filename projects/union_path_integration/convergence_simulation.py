@@ -36,10 +36,10 @@ import json
 
 import numpy as np
 
-from htmresearch.frameworks.location.object_generation import generateObjects
-from htmresearch.frameworks.location.path_integration_union_narrowing import (
+from nupic.research.frameworks.location.object_generation import generateObjects
+from nupic.research.frameworks.location.path_integration_union_narrowing import (
   PIUNCorticalColumn, PIUNExperiment, PIUNExperimentMonitor)
-from htmresearch.frameworks.location.two_layer_tracing import (
+from nupic.research.frameworks.location.two_layer_tracing import (
   PIUNVisualizer as trace, PIUNLogger as rawTrace)
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -228,8 +228,12 @@ def doExperiment(locationModuleWidth,
       rawTraceHandle.__exit__()
       rawTraceFileOut.close()
 
-  for step, num in sorted(convergence.items()):
+  for step, num in sorted((k, v)
+                          for k, v in convergence.items()
+                          if k is not None):
     print("{}: {}".format(step, num))
+  if None in convergence:
+    print("Failed to infer: {}".format(convergence[None]))
 
   result = {
     "convergence": convergence,
@@ -304,17 +308,20 @@ def runExperiments(experiments, resultName, numWorkers=-1, appendResults=False):
   # Save results for later use
   results = [(arg,res) for arg, res in zip(experiments, result)]
 
+  resultFilename = os.path.join(SCRIPT_DIR, resultName)
+  os.makedirs(os.path.dirname(resultFilename), exist_ok=True)
+
   if appendResults:
     try:
-      with open(os.path.join(SCRIPT_DIR, resultName), "r") as f:
+      with open(resultFilename, "r") as f:
         existingResults = json.load(f)
         results = existingResults + results
     except IOError:
       pass
 
-  with open(os.path.join(SCRIPT_DIR, resultName),"wb") as f:
+  with open(resultFilename, "w") as f:
     print("Writing results to {}".format(resultName))
-    json.dump(results,f)
+    json.dump(results, f)
 
   return results
 

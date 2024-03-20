@@ -33,7 +33,7 @@ import io
 
 import numpy as np
 
-from htmresearch.frameworks.location.path_integration_union_narrowing import (
+from nupic.research.frameworks.location.path_integration_union_narrowing import (
   PIUNExperimentMonitor)
 
 

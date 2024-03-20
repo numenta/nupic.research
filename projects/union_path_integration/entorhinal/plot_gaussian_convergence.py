@@ -25,7 +25,7 @@ from collections import defaultdict
 import json
 import os
 
-from htmresearch.frameworks.location import ambiguity_index
+from nupic.research.frameworks.location import ambiguity_index
 
 import matplotlib.lines
 import matplotlib.pyplot as plt
