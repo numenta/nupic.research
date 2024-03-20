@@ -26,7 +26,6 @@ Run the apical tiebreak sequence tests on the ExtendedTemporalMemory.
 import unittest
 
 from nupic.bindings.algorithms import ApicalTiebreakSequenceMemory
-
 from nupic.research.frameworks.columns.shared_tests import (
     ApicalTiebreakSequencesTestBase,
 )

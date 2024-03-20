@@ -23,7 +23,9 @@ exclude = .git, .eggs, __pycache__, build, dist, __init__.py, .domino, .ipynb, .
 ignore = D1, D200, D205, D4, N812, T001, E203, W503, E800, T100, T101, T003, C4, BLK100, F541
 ; Contains legacy code
 per-file-ignores =
-  packages/columns/*: N801, N802, N803, N806, N815
+  packages/columns/*: N801, N802, N803, N806, N815, E111, E114, E121
+  projects/l2_pooling/*: N801, N802, N803, N806, N815, E111, E114, E121
+  projects/l2_pooling/thing_debug.py: N801, N802, N803, N806, N815, E111, E114, E121, E231, E501
   tests/unit/frameworks/htm/*: N801, N802, N803, N806, N815
   src/nupic/research/frameworks/htm/temporal_memory/examples/*: N801, N802, N803, N806, N815
 copyright-check = True
