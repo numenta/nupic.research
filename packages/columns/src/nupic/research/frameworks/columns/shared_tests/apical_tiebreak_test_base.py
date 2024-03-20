@@ -170,6 +170,51 @@ class ApicalTiebreakTestBase(object, metaclass=ABCMeta):
 
         self.assertEqual(activeCells1 | activeCells2, set(self.getActiveCells()))
 
+    def testSomeApicalSupportedSomeNot(self):
+        """
+        Construct an artificial situation to handle the case where different minicolumns
+        have different levels of dendritic support.
+
+        We choose two minicolumn patterns: A and B, with no overlapping columns.
+
+        Learn A for (basalInput1, apicalInput1)
+        Learn B for (basalInput2, apicalInput2)
+
+        Now provide apicalInput1, basalInput1, basalInput2, and activate both A and B.
+
+        Verify that both A and B are predicted, that all the cells are activePredicted,
+        and that all cells returned by the Temporal Memory are sorted.
+        """
+
+        self.init()
+
+        activeColumnsA = self.randomColumnPattern()
+        remainingColumns = set(range(self.columnCount)) - activeColumnsA
+        activeColumnsB = set(random.sample(list(remainingColumns), self.w))
+        basalInput1 = self.randomBasalPattern()
+        basalInput2 = self.randomBasalPattern()
+        apicalInput1 = self.randomApicalPattern()
+        apicalInput2 = self.randomApicalPattern()
+
+        for i in range(3):
+            self.compute(activeColumnsA, basalInput1, apicalInput1, learn=True)
+            if i == 2:
+                patternA = list(self.getActiveCells())
+            self.compute(activeColumnsB, basalInput2, apicalInput2, learn=True)
+            if i == 2:
+                patternB = list(self.getActiveCells())
+
+        self.compute(activeColumnsA | activeColumnsB, basalInput1 | basalInput2,
+                     apicalInput1, learn=False)
+
+        activeCells = list(self.getActiveCells())
+        predictedCells = list(self.getPredictedCells())
+
+        self.assertEqual(set(activeCells), set(predictedCells))
+        self.assertEqual(set(activeCells), set(patternA) | set(patternB))
+        self.assertEqual(sorted(activeCells), list(activeCells))
+        self.assertEqual(sorted(predictedCells), list(predictedCells))
+
     # ==============================
     # Helper functions
     # ==============================
