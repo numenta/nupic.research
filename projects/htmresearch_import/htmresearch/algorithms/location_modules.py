@@ -909,7 +909,7 @@ class BodyToSpecificObjectModule2D(object):
     }
     self.connectionsByColumn = [
       Multiconnections(self.cellCount, cellCountBySource)
-      for _ in xrange(len(sensorToSpecificObjectByColumn))]
+      for _ in range(len(sensorToSpecificObjectByColumn))]
 
     # Create a list of location-location-offset triples as 3 numpy arrays.
     # In the math that follows, make sure that the results correspond to this
@@ -978,7 +978,7 @@ class BodyToSpecificObjectModule2D(object):
 
 
   def activateRandomLocation(self):
-    self.activeCells = np.array([random.choice(xrange(self.cellCount))],
+    self.activeCells = np.array([random.choice(range(self.cellCount))],
                                 dtype="int")
 
 

@@ -70,7 +70,7 @@ def varyResolution_varyNumModules(inFilenames, outFilename,
     for numModules, marker, markerSize in zip(moduleCounts, markers, markerSizes):
       resultsByNumObjects = allResults[(numModules, resolution)]
       expResults = [(numObjects, sum(results) / len(results))
-                    for numObjects, results in resultsByNumObjects.iteritems()
+                    for numObjects, results in resultsByNumObjects.items()
                     if resolution not in maxNumObjectsByResolution
                     or numObjects <= maxNumObjectsByResolution[resolution]]
 
@@ -118,7 +118,7 @@ def varyResolution_varyNumModules(inFilenames, outFilename,
   plt.tight_layout()
 
   filePath = os.path.join(CHART_DIR, outFilename)
-  print "Saving", filePath
+  print("Saving", filePath)
   plt.savefig(filePath)
 
 
@@ -154,7 +154,7 @@ def varyModuleSize_varyResolution(inFilenames, outFilename,
     for resolution, marker, markerSize in zip(resolutions, markers, markerSizes):
       resultsByNumObjects = allResults[(scalingFactor, resolution)]
       expResults = [(numObjects, sum(results) / len(results))
-                     for numObjects, results in resultsByNumObjects.iteritems()
+                     for numObjects, results in resultsByNumObjects.items()
                     if (scalingFactor, resolution) not in maxNumObjectsByParams
                     or numObjects <= maxNumObjectsByParams[(scalingFactor, resolution)]]
 
@@ -195,7 +195,7 @@ def varyModuleSize_varyResolution(inFilenames, outFilename,
                            "$ \\frac{\\sigma_{rat}}{\\sigma} * 4 $ "])
 
   ax1.set_xlim(ax1.get_xlim()[0], 400)
-  print ax1.get_xlim()
+  print(ax1.get_xlim())
 
   ax1.set_xlabel("# learned objects")
   ax1.set_ylabel("Recognition accuracy after many sensations")
@@ -213,7 +213,7 @@ def varyModuleSize_varyResolution(inFilenames, outFilename,
   plt.tight_layout()
 
   filePath = os.path.join(CHART_DIR, outFilename)
-  print "Saving", filePath
+  print("Saving", filePath)
   plt.savefig(filePath)
 
 
@@ -256,7 +256,7 @@ def varyModuleSize_varyNumModules(inFilenames, outFilename,
     for numModules, marker, markerSize in zip(moduleCounts, markers, markerSizes):
       resultsByNumObjects = allResults[(scalingFactor, numModules)]
       expResults = [(numObjects, sum(results) / len(results))
-                     for numObjects, results in resultsByNumObjects.iteritems()
+                     for numObjects, results in resultsByNumObjects.items()
                     if (scalingFactor, numModules) not in maxNumObjectsByParams
                     or numObjects <= maxNumObjectsByParams[(scalingFactor, numModules)]]
 
@@ -307,7 +307,7 @@ def varyModuleSize_varyNumModules(inFilenames, outFilename,
   plt.tight_layout()
 
   filePath = os.path.join(CHART_DIR, outFilename)
-  print "Saving", filePath
+  print("Saving", filePath)
   plt.savefig(filePath)
 
 

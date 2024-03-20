@@ -54,7 +54,7 @@ def varyResolution_varyNumModules(inFilenames, outFilename,
       resolution = exp[0]["inverseReadoutResolution"]
 
       results = []
-      for numSensationsStr, numOccurrences in exp[1]["convergence"].items():
+      for numSensationsStr, numOccurrences in list(exp[1]["convergence"].items()):
         if numSensationsStr == "null":
           results += [np.inf] * numOccurrences
         else:
@@ -74,7 +74,7 @@ def varyResolution_varyNumModules(inFilenames, outFilename,
       resultsByNumObjects = allResults[(numModules, resolution)]
 
       expResults = sorted((numObjects, np.median(results))
-                          for numObjects, results in resultsByNumObjects.iteritems())
+                          for numObjects, results in resultsByNumObjects.items())
 
       # Results up to the final non-infinite median.
       lineResults = [(numObjects, median)
@@ -92,7 +92,7 @@ def varyResolution_varyNumModules(inFilenames, outFilename,
 
       ax1.plot([numObjects for numObjects, median in lineResults],
                [median for numObjects, median in lineResults],
-               "{}-".format(marker), markevery=xrange(numCircleMarkers),
+               "{}-".format(marker), markevery=range(numCircleMarkers),
                color=color, linewidth=1, markersize=markerSize)
       if len(lineResults) < len(expResults):
         endNumObjects, endMedian = lineEndResults[-1]
@@ -135,7 +135,7 @@ def varyResolution_varyNumModules(inFilenames, outFilename,
   plt.tight_layout()
 
   filePath = os.path.join(CHART_DIR, outFilename)
-  print "Saving", filePath
+  print("Saving", filePath)
   plt.savefig(filePath)
 
 
@@ -157,7 +157,7 @@ def varyModuleSize_varyResolution(inFilenames, outFilename,
       resolution = exp[0]["inverseReadoutResolution"]
 
       results = []
-      for numSensationsStr, numOccurrences in exp[1]["convergence"].items():
+      for numSensationsStr, numOccurrences in list(exp[1]["convergence"].items()):
         if numSensationsStr == "null":
           results += [np.inf] * numOccurrences
         else:
@@ -177,7 +177,7 @@ def varyModuleSize_varyResolution(inFilenames, outFilename,
       resultsByNumObjects = allResults[(enlargeModuleFactor, resolution)]
 
       expResults = sorted((numObjects, np.median(results))
-                          for numObjects, results in resultsByNumObjects.iteritems())
+                          for numObjects, results in resultsByNumObjects.items())
 
       # Results up to the final non-infinite median.
       lineResults = [(numObjects, median)
@@ -195,7 +195,7 @@ def varyModuleSize_varyResolution(inFilenames, outFilename,
 
       ax1.plot([numObjects for numObjects, median in lineResults],
                [median for numObjects, median in lineResults],
-               "{}-".format(marker), markevery=xrange(numCircleMarkers),
+               "{}-".format(marker), markevery=range(numCircleMarkers),
                color=color, linewidth=1, markersize=markerSize)
       if len(lineResults) < len(expResults):
         endNumObjects, endMedian = lineEndResults[-1]
@@ -246,7 +246,7 @@ def varyModuleSize_varyResolution(inFilenames, outFilename,
   plt.tight_layout()
 
   filePath = os.path.join(CHART_DIR, outFilename)
-  print "Saving", filePath
+  print("Saving", filePath)
   plt.savefig(filePath)
 
 
@@ -268,7 +268,7 @@ def varyModuleSize_varyNumModules(inFilenames, outFilename,
       numModules = exp[0]["numModules"]
 
       results = []
-      for numSensationsStr, numOccurrences in exp[1]["convergence"].items():
+      for numSensationsStr, numOccurrences in list(exp[1]["convergence"].items()):
         if numSensationsStr == "null":
           results += [np.inf] * numOccurrences
         else:
@@ -293,7 +293,7 @@ def varyModuleSize_varyNumModules(inFilenames, outFilename,
       resultsByNumObjects = allResults[(enlargeModuleFactor, numModules)]
 
       expResults = sorted((numObjects, np.median(results))
-                          for numObjects, results in resultsByNumObjects.iteritems())
+                          for numObjects, results in resultsByNumObjects.items())
 
       # Results up to the final non-infinite median.
       lineResults = [(numObjects, median)
@@ -311,7 +311,7 @@ def varyModuleSize_varyNumModules(inFilenames, outFilename,
 
       ax1.plot([numObjects for numObjects, median in lineResults],
                [median for numObjects, median in lineResults],
-               "{}-".format(marker), markevery=xrange(numCircleMarkers),
+               "{}-".format(marker), markevery=range(numCircleMarkers),
                color=color, linewidth=1, markersize=markerSize)
       if len(lineResults) < len(expResults):
         endNumObjects, endMedian = lineEndResults[-1]
@@ -358,7 +358,7 @@ def varyModuleSize_varyNumModules(inFilenames, outFilename,
   plt.tight_layout()
 
   filePath = os.path.join(CHART_DIR, outFilename)
-  print "Saving", filePath
+  print("Saving", filePath)
   plt.savefig(filePath)
 
 

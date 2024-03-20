@@ -371,7 +371,7 @@ class PIUNExperiment(object):
 
     # Generate a set of feature SDRs.
     self.features = dict(
-      (k, np.array(sorted(random.sample(xrange(self.column.L4.numberOfColumns()),
+      (k, np.array(sorted(random.sample(range(self.column.L4.numberOfColumns()),
                                         self.numActiveMinicolumns)), dtype="uint32"))
       for k in featureNames)
 
@@ -400,7 +400,7 @@ class PIUNExperiment(object):
     self.column.reset()
     self.locationOnObject = None
 
-    for monitor in self.monitors.values():
+    for monitor in list(self.monitors.values()):
       monitor.afterReset()
 
 
@@ -437,7 +437,7 @@ class PIUNExperiment(object):
       numIters = noisyTrainingTime
     else:
       numIters = 1
-    for i in xrange(numIters):
+    for i in range(numIters):
       for iFeature, feature in enumerate(objectDescription["features"]):
         self._move(feature, randomLocation=randomLocation, useNoise=useNoise)
         featureSDR = self.features[feature["name"]]
@@ -486,7 +486,7 @@ class PIUNExperiment(object):
     """
     self.reset()
 
-    for monitor in self.monitors.values():
+    for monitor in list(self.monitors.values()):
       monitor.beforeInferObject(objectDescription)
 
     currentStep = 0
@@ -495,10 +495,10 @@ class PIUNExperiment(object):
     inferredStep = None
     prevTouchSequence = None
 
-    for _ in xrange(self.maxTraversals):
+    for _ in range(self.maxTraversals):
       # Choose touch sequence.
       while True:
-        touchSequence = range(len(objectDescription["features"]))
+        touchSequence = list(range(len(objectDescription["features"])))
         random.shuffle(touchSequence)
 
         # Make sure the first touch will cause a movement.
@@ -547,7 +547,7 @@ class PIUNExperiment(object):
       if finished:
         break
 
-    for monitor in self.monitors.values():
+    for monitor in list(self.monitors.values()):
       monitor.afterInferObject(objectDescription, inferredStep)
 
     return inferredStep
@@ -583,14 +583,14 @@ class PIUNExperiment(object):
       else:
         params = self.column.movementCompute(displacement, 0, 0)
 
-      for monitor in self.monitors.values():
+      for monitor in list(self.monitors.values()):
         monitor.afterLocationShift(**params)
     else:
-      for monitor in self.monitors.values():
+      for monitor in list(self.monitors.values()):
         monitor.afterLocationInitialize()
 
     self.locationOnObject = locationOnObject
-    for monitor in self.monitors.values():
+    for monitor in list(self.monitors.values()):
       monitor.afterLocationChanged(locationOnObject)
 
 
@@ -600,7 +600,7 @@ class PIUNExperiment(object):
     until the network settles.
     """
 
-    for monitor in self.monitors.values():
+    for monitor in list(self.monitors.values()):
       monitor.beforeSense(featureSDR)
 
     iteration = 0
@@ -618,7 +618,7 @@ class PIUNExperiment(object):
 
         prevCellActivity = cellActivity
 
-      for monitor in self.monitors.values():
+      for monitor in list(self.monitors.values()):
         if iteration > 0:
           monitor.beforeSensoryRepetition()
         monitor.afterInputCompute(**inputParams)
@@ -659,12 +659,10 @@ class PIUNExperiment(object):
 
 
 
-class PIUNExperimentMonitor(object):
+class PIUNExperimentMonitor(object, metaclass=abc.ABCMeta):
   """
   Abstract base class for a PIUNExperiment monitor.
   """
-
-  __metaclass__ = abc.ABCMeta
 
   def beforeSense(self, featureSDR): pass
   def beforeSensoryRepetition(self): pass

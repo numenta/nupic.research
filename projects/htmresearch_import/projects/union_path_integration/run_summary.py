@@ -21,7 +21,7 @@
 
 import argparse
 
-import convergence_simulation
+from . import convergence_simulation
 
 
 def experiment(bumpType, numModules=10, locationModuleWidth=10, numObjects=42):
@@ -53,22 +53,22 @@ def getExperiments(bumpType):
   return (
     [experiment(bumpType, locationModuleWidth=6, numObjects=numObjects,
                 numModules=numModules)
-     for numObjects in [3] + range(20, (221 if bumpType == "square" else 161),
-                                   20)
+     for numObjects in [3] + list(range(20, (221 if bumpType == "square" else 161),
+                                   20))
      for numModules in [5, 10, 15]]
 
     +
     [experiment(bumpType, locationModuleWidth=10, numObjects=numObjects,
                 numModules=numModules)
-     for numObjects in [3] + range(20, (381 if bumpType == "square" else 281),
-                                   20)
+     for numObjects in [3] + list(range(20, (381 if bumpType == "square" else 281),
+                                   20))
      for numModules in [5, 10, 15]]
 
     +
     [experiment(bumpType, locationModuleWidth=14, numObjects=numObjects,
                 numModules=numModules)
-     for numObjects in [3] + range(20, (681 if bumpType == "square" else 421),
-                                   20)
+     for numObjects in [3] + list(range(20, (681 if bumpType == "square" else 421),
+                                   20))
      for numModules in [5, 10, 15]]
   )
 

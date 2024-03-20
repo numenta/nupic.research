@@ -30,7 +30,7 @@ import numpy as np
 
 def generateObjects(numObjects, numFeatures):
   objects = {}
-  for i in xrange(numObjects):
+  for i in range(numObjects):
     obj = np.random.randint(numFeatures, size=10, dtype=np.int32)
     objects[i] = obj
   return objects
@@ -40,15 +40,15 @@ def runTrial(objects):
   results = collections.defaultdict(int)
 
   objectSets = []
-  for targetID, targetObj in objects.iteritems():
+  for targetID, targetObj in objects.items():
     objectSets.append((targetID, frozenset(targetObj)))
 
 
-  for targetID, targetObj in objects.iteritems():
+  for targetID, targetObj in objects.items():
     np.random.shuffle(targetObj)
 
     candidates = objectSets
-    for i in xrange(len(targetObj)):
+    for i in range(len(targetObj)):
       step = i + 1
       feats = frozenset(targetObj[:step])
       newCandidates = []
@@ -69,7 +69,7 @@ def runSim(numObjects, numFeatures, numTrials):
   # List of trials, each a map from recognition time to number of occurrences
   results = []
 
-  for _ in xrange(numTrials):
+  for _ in range(numTrials):
     objects = generateObjects(numObjects, numFeatures)
     results.append(runTrial(objects))
 

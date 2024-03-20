@@ -60,12 +60,12 @@ def generateFeatures(numFeatures):
   alphanumeric strings. Otherwise, output will be ["F1", "F2", ...]
   """
   # Capital letters, lowercase letters, numbers
-  candidates = ([chr(i+65) for i in xrange(26)] +
-                [chr(i+97) for i in xrange(26)] +
-                [chr(i+48) for i in xrange(10)])
+  candidates = ([chr(i+65) for i in range(26)] +
+                [chr(i+97) for i in range(26)] +
+                [chr(i+48) for i in range(10)])
 
   if numFeatures > len(candidates):
-    candidates = ["F{}".format(i) for i in xrange(numFeatures)]
+    candidates = ["F{}".format(i) for i in range(numFeatures)]
     return candidates
 
   return candidates[:numFeatures]
@@ -76,15 +76,15 @@ def generateObjects(numObjects, featuresPerObject, objectWidth, featurePool):
   featureScale = 20
 
   locations = []
-  for x in xrange(objectWidth):
-    for y in xrange(objectWidth):
+  for x in range(objectWidth):
+    for y in range(objectWidth):
       locations.append((x, y))
 
   objects = []
-  for o in xrange(numObjects):
+  for o in range(numObjects):
     np.random.shuffle(locations)
     features = []
-    for i in xrange(featuresPerObject):
+    for i in range(featuresPerObject):
       x, y = locations[i]
       featureName = random.choice(featurePool)
       features.append({"top": y*featureScale, "left": x*featureScale,
@@ -135,7 +135,7 @@ def doExperiment(cellDimensions,
   if anchoringMethod == "discrete":
     cellCoordinateOffsets = (.5,)
 
-  for i in xrange(numModules):
+  for i in range(numModules):
     orientation = float(i) * perModRange
 
     locationConfigs.append({
@@ -169,7 +169,7 @@ def doExperiment(cellDimensions,
 
   for objectDescription in objects:
     exp.learnObject(objectDescription, randomLocation=randomLocation, useNoise = False)
-    print 'Learned object {}'.format(objectDescription["name"])
+    print('Learned object {}'.format(objectDescription["name"]))
 
   filename = "traces/{}-points-{}-cells-{}-objects-{}-feats-{}-random.html".format(
     len(cellCoordinateOffsets)**2, np.prod(cellDimensions), numObjects, numFeatures, randomLocation)
@@ -178,25 +178,25 @@ def doExperiment(cellDimensions,
   if useTrace:
     with io.open(filename, "w", encoding="utf8") as fileOut:
       with trace(fileOut, exp, includeSynapses=False):
-        print "Logging to", filename
+        print("Logging to", filename)
         for objectDescription in objects:
           steps = exp.inferObjectWithRandomMovements(objectDescription, randomLocation=randomLocation)
           convergence[steps] += 1
           if steps is None:
-            print 'Failed to infer object "{}"'.format(objectDescription["name"])
+            print('Failed to infer object "{}"'.format(objectDescription["name"]))
           else:
-            print 'Inferred object {} after {} steps'.format(objectDescription["name"], steps)
+            print('Inferred object {} after {} steps'.format(objectDescription["name"], steps))
   else:
     for objectDescription in objects:
       steps = exp.inferObjectWithRandomMovements(objectDescription, randomLocation=randomLocation)
       convergence[steps] += 1
       if steps is None:
-        print 'Failed to infer object "{}"'.format(objectDescription["name"])
+        print('Failed to infer object "{}"'.format(objectDescription["name"]))
       else:
-        print 'Inferred object {} after {} steps'.format(objectDescription["name"], steps)
+        print('Inferred object {} after {} steps'.format(objectDescription["name"], steps))
 
-  for step, num in sorted(convergence.iteritems()):
-    print "{}: {}".format(step, num)
+  for step, num in sorted(convergence.items()):
+    print("{}: {}".format(step, num))
 
   return(convergence)
 
@@ -214,7 +214,7 @@ def runMultiprocessNoiseExperiment(resultName=None, numWorkers = 0, **kwargs):
     resultName = str(kwargs) + ".json"
 
   experiments = [{}]
-  for key, values in kwargs.items():
+  for key, values in list(kwargs.items()):
     if type(values) is list:
       newExperiments = []
       for experiment in experiments:
@@ -234,8 +234,8 @@ def runMultiprocessNoiseExperiment(resultName=None, numWorkers = 0, **kwargs):
     while not rs.ready():
       remaining = rs._number_left
       pctDone = 100.0 - (100.0*remaining) / len(experiments)
-      print "    => {} experiments remaining, percent complete={}".format(\
-        remaining, pctDone)
+      print("    => {} experiments remaining, percent complete={}".format(\
+        remaining, pctDone))
       time.sleep(5)
     pool.close()  # No more work
     pool.join()
@@ -271,7 +271,7 @@ if __name__ == "__main__":
   args = parser.parse_args()
 
   numOffsets = args.coordinateOffsetWidth
-  cellCoordinateOffsets = tuple([i * (0.998 / (numOffsets-1)) + 0.001 for i in xrange(numOffsets)])
+  cellCoordinateOffsets = tuple([i * (0.998 / (numOffsets-1)) + 0.001 for i in range(numOffsets)])
 
   if "all" in args.anchoringMethod or "both" in args.anchoringMethod:
     args.anchoringMethod = ["narrowing", "corners"]

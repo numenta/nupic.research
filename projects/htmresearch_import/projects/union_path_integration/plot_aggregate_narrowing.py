@@ -51,7 +51,7 @@ def aggregateChart(inFilename, outFilename, objectCounts, ylim):
     experiments = json.load(f)
   for exp in experiments:
     numObjects = exp[0]["numObjects"]
-    timestepsByObject = exp[1]["locationLayerTimelineByObject"].values()
+    timestepsByObject = list(exp[1]["locationLayerTimelineByObject"].values())
 
     meanDensityByTimestep = [
       np.mean([len(module["activeCells"])
@@ -72,7 +72,7 @@ def aggregateChart(inFilename, outFilename, objectCounts, ylim):
     errBelow = []
     errAbove = []
 
-    for step, densityByTrial in zip(xrange(numSteps), zip(*trials)):
+    for step, densityByTrial in zip(range(numSteps), list(zip(*trials))):
       x.append(step + 1)
 
       p1, p2, p3 = np.percentile(densityByTrial, percentiles)
@@ -100,7 +100,7 @@ def aggregateChart(inFilename, outFilename, objectCounts, ylim):
   plt.legend(handles, labels, framealpha=framealpha)
 
   filename = os.path.join(CHART_DIR, outFilename)
-  print "Saving", filename
+  print("Saving", filename)
   plt.savefig(filename)
 
 

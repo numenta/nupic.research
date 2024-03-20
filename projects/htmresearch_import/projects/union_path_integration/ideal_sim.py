@@ -35,7 +35,7 @@ import numpy as np
 def generateObjects(numObjects, numFeatures):
   np.random.seed(numObjects)
   objects = {}
-  for i in xrange(numObjects):
+  for i in range(numObjects):
     obj = np.zeros((16,), dtype=np.int32)
     obj.fill(-1)
     obj[:10] = np.random.randint(numFeatures, size=10, dtype=np.int32)
@@ -46,9 +46,9 @@ def generateObjects(numObjects, numFeatures):
 
 def getStartingSpots(objects):
   startingSpots = collections.defaultdict(list)
-  for i, obj in objects.iteritems():
-    for x in xrange(4):
-      for y in xrange(4):
+  for i, obj in objects.items():
+    for x in range(4):
+      for y in range(4):
         feat = obj[x, y]
         if feat != -1:
           startingSpots[feat].append((i, (x, y)))
@@ -59,18 +59,18 @@ def runTrial(objects, startingSpots, numFeatures):
   numObjects = len(objects)
 
   results = collections.defaultdict(int)
-  for targetID in xrange(numObjects):
+  for targetID in range(numObjects):
     #random.seed(targetID)
     targetObject = objects[targetID]
 
     possibleObjects = None
 
     possiblePositions = []
-    for x in xrange(4):
-      for y in xrange(4):
+    for x in range(4):
+      for y in range(4):
         if targetObject[x][y] != -1:
           possiblePositions.append((x, y))
-    idx = range(10)
+    idx = list(range(10))
     #print idx
     random.shuffle(idx)
     #print idx
@@ -123,20 +123,20 @@ def runTrial(objects, startingSpots, numFeatures):
 def runSim(numObjects, numFeatures, numTrials):
   # List of trials, each a map from recognition time to number of occurrences
   results = []
-  for _ in xrange(numTrials):
+  for _ in range(numTrials):
     objects = generateObjects(numObjects, numFeatures)
     # Built map from a feature to all possible positions
     startingSpots = getStartingSpots(objects)
     results.append(runTrial(objects, startingSpots, numFeatures))
 
-  print results
+  print(results)
 
   total = sum(sum(trial.values()) for trial in results)
   average = (sum(numSteps*numOccurrences
                  for trial in results
-                 for numSteps, numOccurrences in trial.iteritems()) /
+                 for numSteps, numOccurrences in trial.items()) /
              float(total))
-  print "average:", average
+  print("average:", average)
 
   with open("results/ideal.json", "w") as f:
     json.dump(results, f)

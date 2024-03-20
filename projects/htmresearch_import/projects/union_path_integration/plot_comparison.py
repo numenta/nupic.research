@@ -46,11 +46,11 @@ def computeCapacity(results, threshold):
       if closestBelow is None:
         closestBelow = (numObjects, accuracy)
   if closestBelow is None or closestAbove is None:
-    print closestBelow, threshold, closestAbove
+    print(closestBelow, threshold, closestAbove)
     raise ValueError(
         "Results must include a value above and below threshold of {}".format(threshold))
 
-  print "  Capacity threshold is between {} and {}".format(closestAbove[0], closestBelow[0])
+  print("  Capacity threshold is between {} and {}".format(closestAbove[0], closestBelow[0]))
 
   return closestAbove[0]
 
@@ -138,11 +138,11 @@ def chart():
   scatterX = []
   scatterY = []
   scatterLabels = []
-  for modSizeI in xrange(4):
-    for numFeaturesI in xrange(4):
+  for modSizeI in range(4):
+    for numFeaturesI in range(4):
       modSize = modSizeMap[modSizeI]
       numFeatures = numFeaturesMap[numFeaturesI]
-      print modSize, numFeatures
+      print(modSize, numFeatures)
       capacity90 = computeCapacity(capacities[(modSize, numFeatures)], 0.9)
       plotData[modSizeI][numFeaturesI] = capacity90
 
@@ -156,10 +156,10 @@ def chart():
   popt, pcov = scipy.optimize.curve_fit(func, np.array(scatterX), scatterY)
   a, b = popt
   perr = np.sqrt(np.diag(pcov))
-  print "Fitted data to linear model"
-  print "  Best fit values:", popt
-  print "  Covariance matrix:", pcov
-  print "  1 stdev:", perr
+  print("Fitted data to linear model")
+  print("  Best fit values:", popt)
+  print("  Covariance matrix:", pcov)
+  print("  1 stdev:", perr)
 
   xlabels = [str(v) for v in numFeaturesMap]
   ylabels = [str(v) for v in modSizeMap]
@@ -175,8 +175,8 @@ def chart():
   plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
            rotation_mode="anchor")
 
-  for i in xrange(len(ylabels)):
-    for j in xrange(len(xlabels)):
+  for i in range(len(ylabels)):
+    for j in range(len(xlabels)):
       text = ax.text(j, i, str(int(plotData[i, j])), ha="center", va="center", color="w")
 
   plt.xlabel("Number of Unique Features")

@@ -85,10 +85,10 @@ def doPointsExperiment(cellDimensions, cellCoordinateOffsets):
     os.makedirs("traces")
 
   locationConfigs = []
-  for i in xrange(5):
+  for i in range(5):
     scale = 10.0 * (math.sqrt(2) ** i)
 
-    for _ in xrange(4):
+    for _ in range(4):
       orientation = np.radians(random.gauss(7.5, 7.5))
       orientation = random.choice([orientation, -orientation])
 
@@ -123,11 +123,11 @@ def doPointsExperiment(cellDimensions, cellCoordinateOffsets):
 
   with io.open(filename, "w", encoding="utf8") as fileOut:
     with trace(fileOut, exp, includeSynapses=True):
-      print "Logging to", filename
+      print("Logging to", filename)
       for objectDescription in OBJECTS:
         succeeded = exp.inferObjectWithRandomMovements(objectDescription)
         if not succeeded:
-          print 'Failed to infer object "{}"'.format(objectDescription["name"])
+          print('Failed to infer object "{}"'.format(objectDescription["name"]))
 
 
 
@@ -143,10 +143,10 @@ def doGaussianExperiment(inverseReadoutResolution):
     os.makedirs("traces")
 
   locationConfigs = []
-  for i in xrange(5):
+  for i in range(5):
     scale = 10.0 * (math.sqrt(2) ** i)
 
-    for _ in xrange(4):
+    for _ in range(4):
       orientation = np.radians(random.gauss(7.5, 7.5))
       orientation = random.choice([orientation, -orientation])
 
@@ -180,11 +180,11 @@ def doGaussianExperiment(inverseReadoutResolution):
 
   with io.open(filename, "w", encoding="utf8") as fileOut:
     with trace(fileOut, exp, includeSynapses=True):
-      print "Logging to", filename
+      print("Logging to", filename)
       for objectDescription in OBJECTS:
         succeeded = exp.inferObjectWithRandomMovements(objectDescription)
         if not succeeded:
-          print 'Failed to infer object "{}"'.format(objectDescription["name"])
+          print('Failed to infer object "{}"'.format(objectDescription["name"]))
 
 
 

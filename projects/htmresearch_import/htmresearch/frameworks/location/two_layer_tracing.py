@@ -24,12 +24,12 @@ Connect the Path Integration Union Narrowing experiment to the
 PathIntegrationUnionNarrowing.js visualization.
 """
 
-from __future__ import print_function
+
 from collections import defaultdict
 import json
 import os
 from pkg_resources import resource_string
-import StringIO
+import io
 
 import numpy as np
 
@@ -91,7 +91,7 @@ class PIUNLogger(PIUNExperimentMonitor):
     print(json.dumps(featureSDR.tolist()), file=self.out)
     print(json.dumps(
       [k
-       for k, sdr in self.exp.features.iteritems()
+       for k, sdr in self.exp.features.items()
        if np.intersect1d(featureSDR, sdr).size == sdr.size]), file=self.out)
 
 
@@ -142,7 +142,7 @@ class PIUNLogger(PIUNExperimentMonitor):
     activeLocationCells = self.exp.column.getLocationRepresentation()
 
     decodings = []
-    for (objectName, iFeature), sdrs in self.locationRepresentations.iteritems():
+    for (objectName, iFeature), sdrs in self.locationRepresentations.items():
       amountContained = np.amax([(np.intersect1d(sdr, activeLocationCells).size /
                          float(sdr.size)) for sdr in sdrs])
       decodings.append([objectName, iFeature, amountContained])
@@ -198,7 +198,7 @@ class PIUNLogger(PIUNExperimentMonitor):
     activeLocationCells = self.exp.column.getLocationRepresentation()
 
     decodings = []
-    for (objectName, iFeature), sdrs in self.locationRepresentations.iteritems():
+    for (objectName, iFeature), sdrs in self.locationRepresentations.items():
       amountContained = np.amax([(np.intersect1d(sdr, activeLocationCells).size /
                                   float(sdr.size)) for sdr in sdrs])
       decodings.append(
@@ -246,7 +246,7 @@ class PIUNLogger(PIUNExperimentMonitor):
 
   def getInputDecodings(self, activeCells):
     decodings = []
-    for (objectName, iFeature, featureName), sdr in self.inputRepresentations.iteritems():
+    for (objectName, iFeature, featureName), sdr in self.inputRepresentations.items():
       amountContained = (np.intersect1d(sdr, activeCells).size /
                          float(sdr.size))
       decodings.append([objectName, iFeature, amountContained])
@@ -290,7 +290,7 @@ class PIUNVisualizer(PIUNLogger):
   """
   def __init__(self, out, *args, **kwargs):
     self.htmlOut = out
-    self.logOut = StringIO.StringIO()
+    self.logOut = io.StringIO()
     super(PIUNVisualizer, self).__init__(self.logOut, *args, **kwargs)
 
 
@@ -315,7 +315,7 @@ class PIUNVisualizer(PIUNLogger):
 
     logText = self.logOut.getvalue()
 
-    page_content = u"""
+    page_content = """
     <!doctype html>
     <html>
     <head>

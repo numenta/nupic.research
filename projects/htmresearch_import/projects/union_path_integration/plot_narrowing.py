@@ -45,10 +45,10 @@ def examplesChart(inFilename, outFilename, objectCount, objectNumbers,
     if numObjects == objectCount:
       locationLayerTimelineByObject = dict(
         (int(k), v)
-        for k, v in exp[1]["locationLayerTimelineByObject"].iteritems())
+        for k, v in exp[1]["locationLayerTimelineByObject"].items())
       inferredStepByObject = dict(
         (int(k), v)
-        for k, v in exp[1]["inferredStepByObject"].iteritems())
+        for k, v in exp[1]["inferredStepByObject"].items())
       break
 
   numSteps = 9
@@ -79,7 +79,7 @@ def examplesChart(inFilename, outFilename, objectCount, objectNumbers,
         stepStop = (step + 1) * width
         plotData[cells, stepStart:stepStop, :] = [0, 0, 0]
 
-    for m in xrange(numModules):
+    for m in range(numModules):
       if inferredStepByObject[obj] is not None:
         axes[m, i].add_patch(matplotlib.patches.Rectangle(
           ((inferredStepByObject[obj] - 1) * width, -1), width,
@@ -107,7 +107,7 @@ def examplesChart(inFilename, outFilename, objectCount, objectNumbers,
 
   plt.subplots_adjust(wspace=3.0)
   filename = os.path.join(CHART_DIR, outFilename)
-  print "Saving", filename
+  print("Saving", filename)
   plt.savefig(filename)
 
 
@@ -122,13 +122,13 @@ if __name__ == "__main__":
   parser.add_argument("--outFile2", type=str, required=True)
   parser.add_argument("--exampleObjectCount", type=int, default=100)
   parser.add_argument("--exampleObjectNumbers", type=int, nargs="+", default=-1)
-  parser.add_argument("--exampleModuleNumbers", type=int, nargs="+", default=range(3))
+  parser.add_argument("--exampleModuleNumbers", type=int, nargs="+", default=list(range(3)))
   parser.add_argument("--scrambleCells", action="store_true")
   args = parser.parse_args()
 
   exampleObjectNumbers = (args.exampleObjectNumbers
                           if args.exampleObjectNumbers != -1 else
-                          range(args.exampleObjectCount))
+                          list(range(args.exampleObjectCount)))
 
   examplesChart(args.inFile, args.outFile1, args.exampleObjectCount,
                 exampleObjectNumbers, args.exampleModuleNumbers,

@@ -56,7 +56,7 @@ def createCharts(inFilename, outFilename, squeezeLegend,
     numModules = exp[0]["numModules"]
 
     recognitionTimes = []
-    for numSensationsStr, numOccurrences in exp[1]["convergence"].items():
+    for numSensationsStr, numOccurrences in list(exp[1]["convergence"].items()):
       if numSensationsStr == "null":
         recognitionTimes += [np.inf] * numOccurrences
       else:
@@ -80,7 +80,7 @@ def createCharts(inFilename, outFilename, squeezeLegend,
   colors = ("C0", "C1", "C2")
   markers = ("o", "o", "o")
   markerSizes = (1.5, 3, 4.5)
-  for moduleWidth, color in reversed(zip(moduleWidths, colors)):
+  for moduleWidth, color in reversed(list(zip(moduleWidths, colors))):
     for numModules, marker, markerSize in zip(moduleCounts, markers, markerSizes):
       resultsByNumObjects = capacityResults[(moduleWidth, numModules)]
 
@@ -89,7 +89,7 @@ def createCharts(inFilename, outFilename, squeezeLegend,
       errBelow = []
       errAbove = []
 
-      for numObjects, results in sorted(resultsByNumObjects.iteritems()):
+      for numObjects, results in sorted(resultsByNumObjects.items()):
         p1, p2, p3 = np.percentile(results, percentiles)
 
         x.append(numObjects)
@@ -109,12 +109,12 @@ def createCharts(inFilename, outFilename, squeezeLegend,
   # RECOGNITION TIME
   #
 
-  for moduleWidth, color in reversed(zip(moduleWidths, colors)):
+  for moduleWidth, color in reversed(list(zip(moduleWidths, colors))):
     for numModules, marker, markerSize in zip(moduleCounts, markers, markerSizes):
       resultsByNumObjects = recognitionTimeResults[(moduleWidth, numModules)]
 
       expResults = sorted((numObjects, np.median(results))
-                          for numObjects, results in resultsByNumObjects.iteritems())
+                          for numObjects, results in resultsByNumObjects.items())
 
       # Results up to the final non-infinite median.
       lineResults = [(numObjects, median)
@@ -128,7 +128,7 @@ def createCharts(inFilename, outFilename, squeezeLegend,
 
       axRecognitionTime.plot([numObjects for numObjects, median in lineResults],
                [median for numObjects, median in lineResults],
-               "{}-".format(marker), markevery=xrange(numCircleMarkers),
+               "{}-".format(marker), markevery=range(numCircleMarkers),
                color=color, linewidth=1, markersize=markerSize)
 
       if (len(lineResults) < len(expResults) and len(lineResults) > 0):
@@ -205,7 +205,7 @@ def createCharts(inFilename, outFilename, squeezeLegend,
   ax2Capacity.tick_params(axis="x", which="major", pad=0)
 
   filePath = os.path.join(CHART_DIR, outFilename)
-  print "Saving", filePath
+  print("Saving", filePath)
   plt.savefig(filePath)
 
 

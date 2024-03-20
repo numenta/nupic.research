@@ -46,11 +46,11 @@ def computeCapacity(results, threshold):
       if closestBelow is None:
         closestBelow = (numObjects, accuracy)
   if closestBelow is None or closestAbove is None:
-    print closestBelow, threshold, closestAbove
+    print(closestBelow, threshold, closestAbove)
     raise ValueError(
         "Results must include a value above and below threshold of {}".format(threshold))
 
-  print "  Capacity threshold is between {} and {}".format(closestAbove[0], closestBelow[0])
+  print("  Capacity threshold is between {} and {}".format(closestAbove[0], closestBelow[0]))
 
   return closestAbove[0]
 
@@ -88,7 +88,7 @@ def chart():
 
     x = []
     y = []
-    for i, j in sorted(capacities.iteritems()):
+    for i, j in sorted(capacities.items()):
       x.append(i)
       y.append(j)
 

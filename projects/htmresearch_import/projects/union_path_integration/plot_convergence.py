@@ -53,9 +53,9 @@ def chart():
     yData = collections.defaultdict(list)
     for exp in convVsObjects:
       numObjects = int(str(exp[0]["numObjects"]))
-      if "null" in exp[1]["convergence"].keys():
+      if "null" in list(exp[1]["convergence"].keys()):
         continue
-      results = exp[1]["convergence"].items()
+      results = list(exp[1]["convergence"].items())
       total = 0
       count = 0
       for i, j in results:
@@ -65,7 +65,7 @@ def chart():
       yData[numObjects].append(y)
 
     x = list(sorted(yData.keys()))
-    yData = sorted(yData.iteritems())
+    yData = sorted(yData.items())
     y = [float(sum(pair[1])) / float(len(pair[1]))
          if None not in pair[1] else None
          for pair in yData]
@@ -83,7 +83,7 @@ def chart():
     #plt.fill_between(xError, yBelow, yAbove, alpha=0.3)
 
   plt.xlabel("Number of Objects")
-  plt.xticks([(i+1)*200 for i in xrange(10)])
+  plt.xticks([(i+1)*200 for i in range(10)])
   plt.ylabel("Average Number of Sensations")
   plt.legend(loc="center right")
 
@@ -155,7 +155,7 @@ def chart():
 
     yData = collections.defaultdict(list)
     for exp in convVsMods100:
-      results = exp[1]["convergence"].items()
+      results = list(exp[1]["convergence"].items())
       total = 0
       count = 0
       for i, j in results:
@@ -168,13 +168,13 @@ def chart():
       numModules = int(str(exp[0]["numModules"]))
       yData[numModules].append(y)
 
-    x = [i+1 for i in xrange(20)]
+    x = [i+1 for i in range(20)]
     #y = [float(sum(pair[1])) / float(len(pair[1])) for pair in yData]
     y = [float(sum(yData[step])) / float(len(yData[step])) for step in x]
     #yData20 = yData[19][1]
     #y20 = float(sum(yData20)) / float(len(yData20))
 
-    yData = sorted(yData.iteritems())
+    yData = sorted(yData.items())
     std = [np.std(pair[1]) for pair in yData]
     yBelow = [yi - stdi for yi, stdi in zip(y, std)]
     yAbove = [yi + stdi for yi, stdi in zip(y, std)]
@@ -192,7 +192,7 @@ def chart():
   plt.ylabel("Average Number of Sensations")
   plt.legend(loc="upper right")
   plt.ylim((0.0, 7.0))
-  plt.xticks([(i+1)*2 for i in xrange(10)])
+  plt.xticks([(i+1)*2 for i in range(10)])
 
   plt.tight_layout()
 
@@ -218,14 +218,14 @@ def chart():
     experiments = json.load(f)
   for exp in experiments:
     cum = 0
-    for i in xrange(40):
+    for i in range(40):
       step = i + 1
       count = exp[1]["convergence"].get(str(step), 0)
       yData[step].append(count)
 
-  x = [i+1 for i in xrange(numSteps)]
+  x = [i+1 for i in range(numSteps)]
   y = []
-  tot = float(sum([sum(counts) for counts in yData.values()]))
+  tot = float(sum([sum(counts) for counts in list(yData.values())]))
   cum = 0.0
   for step in x:
     counts = yData[step]
@@ -248,14 +248,14 @@ def chart():
     experiments = json.load(f)
   for exp in experiments:
     cum = 0
-    for i in xrange(40):
+    for i in range(40):
       step = i + 1
       count = exp[1]["convergence"].get(str(step), 0)
       yData[step].append(count)
 
-  x = [i+1 for i in xrange(numSteps)]
+  x = [i+1 for i in range(numSteps)]
   y = []
-  tot = float(sum([sum(counts) for counts in yData.values()]))
+  tot = float(sum([sum(counts) for counts in list(yData.values())]))
   cum = 0.0
   for step in x:
     counts = yData[step]
@@ -278,14 +278,14 @@ def chart():
     experiments = json.load(f)
   for exp in experiments:
     cum = 0
-    for i in xrange(40):
+    for i in range(40):
       step = i + 1
       count = exp[1]["convergence"].get(str(step), 0)
       yData[step].append(count)
 
-  x = [i+1 for i in xrange(numSteps)]
+  x = [i+1 for i in range(numSteps)]
   y = []
-  tot = float(sum([sum(counts) for counts in yData.values()]))
+  tot = float(sum([sum(counts) for counts in list(yData.values())]))
   cum = 0.0
   for step in x:
     counts = yData[step]
@@ -303,10 +303,10 @@ def chart():
   # Ideal
   with open("results/ideal.json", "r") as f:
     idealResults = json.load(f)
-  x = [i+1 for i in xrange(numSteps)]
+  x = [i+1 for i in range(numSteps)]
   y = []
   std = [np.std(idealResults.get(str(steps), [0])) for steps in x]
-  tot = float(sum([sum(counts) for counts in idealResults.values()]))
+  tot = float(sum([sum(counts) for counts in list(idealResults.values())]))
   cum = 0.0
   for steps in x:
     counts = idealResults.get(str(steps), [])
@@ -324,10 +324,10 @@ def chart():
   # BOF
   with open("results/bof.json", "r") as f:
     bofResults = json.load(f)
-  x = [i+1 for i in xrange(numSteps)]
+  x = [i+1 for i in range(numSteps)]
   y = []
   std = [np.std(bofResults.get(str(steps), [0])) for steps in x]
-  tot = float(sum([sum(counts) for counts in bofResults.values()]))
+  tot = float(sum([sum(counts) for counts in list(bofResults.values())]))
   cum = 0.0
   for steps in x:
     counts = bofResults.get(str(steps), [])
@@ -346,7 +346,7 @@ def chart():
   plt.xlabel("Number of Sensations")
   plt.ylabel("Cumulative Accuracy")
   plt.legend(loc="center right")
-  plt.xticks([(i+1)*2 for i in xrange(6)])
+  plt.xticks([(i+1)*2 for i in range(6)])
 
   plt.tight_layout()
 

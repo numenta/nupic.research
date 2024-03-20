@@ -51,7 +51,7 @@ def chart2(inFilename, outFilename, cellCounts, featureCounts):
     capacitiesByParams[(cellsPerModule, numUniqueFeatures)].append(exp[1]["numObjects"])
 
   meanCapacityByParams = {}
-  for params, capacities in capacitiesByParams.iteritems():
+  for params, capacities in capacitiesByParams.items():
     meanCapacityByParams[params] = sum(capacities) / float(len(capacities))
 
   xlabels = [str(v) for v in featureCounts]
@@ -77,8 +77,8 @@ def chart2(inFilename, outFilename, cellCounts, featureCounts):
   ax.set_yticklabels(ylabels)
   plt.setp(ax.get_xticklabels(), rotation=45, ha="left", rotation_mode="anchor")
 
-  for i in xrange(len(ylabels)):
-    for j in xrange(len(xlabels)):
+  for i in range(len(ylabels)):
+    for j in range(len(xlabels)):
       text = ax.text(j, i, str(int(plotData[i, j])), ha="center", va="center",
                      color="w")
 
@@ -86,7 +86,7 @@ def chart2(inFilename, outFilename, cellCounts, featureCounts):
   plt.ylabel("Cells Per Module")
 
   filePath = os.path.join(CHART_DIR, outFilename)
-  print "Saving", filePath
+  print("Saving", filePath)
   plt.savefig(filePath)
 
 

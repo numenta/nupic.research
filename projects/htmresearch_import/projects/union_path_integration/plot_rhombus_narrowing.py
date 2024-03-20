@@ -23,7 +23,7 @@
 
 import argparse
 import base64
-import cStringIO
+import io
 import json
 import math
 import os
@@ -104,7 +104,7 @@ def insertPointExcitations(parent, bumps, rhombusBase, rhombusHeight,
      columnInRhombus.flatten())] = coloredSquare
 
   png = PIL.Image.fromarray(((bitmap) * 255).astype("uint8"), mode="RGBA")
-  pngBuffer = cStringIO.StringIO()
+  pngBuffer = io.StringIO()
   png.save(pngBuffer, format="PNG")
   pngStr = base64.b64encode(pngBuffer.getvalue())
 
@@ -162,7 +162,7 @@ def rhombusChart(inFilename, outFilename, objectNumber, moduleNumbers, numSteps,
 
   filename = os.path.join(CHART_DIR, outFilename)
   with open(filename, "w") as f:
-    print "Saving", filename
+    print("Saving", filename)
     ET.ElementTree(svg).write(f, encoding="utf-8", xml_declaration=True)
 
 
@@ -172,7 +172,7 @@ if __name__ == "__main__":
   parser.add_argument("--outFile", type=str, required=True)
   parser.add_argument("--objectNumber", type=int, default=47)
   parser.add_argument("--moduleNumbers", type=int, nargs="+",
-                      default=range(0,2,9))
+                      default=list(range(0,2,9)))
   parser.add_argument("--numSteps", type=int, default=None)
   args = parser.parse_args()
 

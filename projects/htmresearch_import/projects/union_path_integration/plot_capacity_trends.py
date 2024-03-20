@@ -74,7 +74,7 @@ def createChart(inFilename, outFilename, modulesYmax, label1Position,
   allFeatureCounts = sorted(allFeatureCounts)
 
   meanCapacityByParams = {}
-  for params, capacities in capacitiesByParams.iteritems():
+  for params, capacities in capacitiesByParams.items():
     meanCapacityByParams[params] = sum(capacities) / float(len(capacities))
 
 
@@ -130,11 +130,11 @@ def createChart(inFilename, outFilename, modulesYmax, label1Position,
                (modulesYmax
                 if modulesYmax is not None
                 else ax1.get_ylim()[1]))
-  xticks = range(0, max(moduleCounts) + 1, 5)
+  xticks = list(range(0, max(moduleCounts) + 1, 5))
   ax1.set_xticks(xticks)
   ax1.set_xticklabels([(x if x % 20 == 0 else "")
                        for x in xticks])
-  yticks = range(0, 501, 100)
+  yticks = list(range(0, 501, 100))
   ax1.set_yticks(yticks)
 
   #
@@ -162,7 +162,7 @@ def createChart(inFilename, outFilename, modulesYmax, label1Position,
 
   ax2.set_xlabel("Cells Per\nModule")
 
-  xticks = range(0, 401, 50)
+  xticks = list(range(0, 401, 50))
   ax2.set_xticks(xticks)
   ax2.set_xticklabels([(x if x % 200 == 0 else "")
                        for x in xticks])
@@ -189,7 +189,7 @@ def createChart(inFilename, outFilename, modulesYmax, label1Position,
     errBelow.append(p2 - p1)
     errAbove.append(p3 - p2)
 
-  print [errBelow, errAbove]
+  print([errBelow, errAbove])
 
   ax3.errorbar(x, y, yerr=[errBelow, errAbove], fmt="o-", color="C1",
                markersize=2.0, capsize=2)
@@ -197,13 +197,13 @@ def createChart(inFilename, outFilename, modulesYmax, label1Position,
   ax3.set_xlabel("Number of\nUnique Features")
   # ax3.set_xlim(0, ax3.get_xlim()[1])
 
-  xticks = range(0, 401, 50)
+  xticks = list(range(0, 401, 50))
   ax3.set_xticks(xticks)
   ax3.set_xticklabels([(x if x % 200 == 0 else "")
                        for x in xticks])
 
   filePath = os.path.join(CHART_DIR, outFilename)
-  print "Saving", filePath
+  print("Saving", filePath)
   plt.savefig(filePath)
 
 

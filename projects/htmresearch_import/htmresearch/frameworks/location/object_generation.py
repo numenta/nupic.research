@@ -36,7 +36,7 @@ def getRandomFeature(probabilityByFeature):
   selectedIndex = np.random.random()
 
   intervalEnd = probabilityByFeature[0]
-  for i in xrange(1, len(probabilityByFeature)):
+  for i in range(1, len(probabilityByFeature)):
     if selectedIndex <= intervalEnd:
       return i - 1
     intervalEnd += probabilityByFeature[i]
@@ -49,7 +49,7 @@ def arrangeFeatures(allObjectFeatures, objectWidth):
 
   objects = []
   for o, objectFeatures in enumerate(allObjectFeatures):
-    positions = random.sample(xrange(objectWidth**2), len(objectFeatures))
+    positions = random.sample(range(objectWidth**2), len(objectFeatures))
     objects.append({
       "features": [{"left": (pos % objectWidth)*featureScale,
                     "top": int(pos / objectWidth)*featureScale,
@@ -82,23 +82,23 @@ def generateObjectFeatures(numObjects, featuresPerObject, numFeatures,
     probabilityByFeature /= np.sum(probabilityByFeature)
 
     return np.array([[getRandomFeature(probabilityByFeature)
-                      for _ in xrange(featuresPerObject)]
-                     for _ in xrange(numObjects)])
+                      for _ in range(featuresPerObject)]
+                     for _ in range(numObjects)])
   elif distribution == "TwoPools_Structured":
     # Divide numFeatures into two pools. Every object gets one feature from the
     # first pool and every other feature from the second.
     secondBinBegin = int(math.ceil(numFeatures / 2.))
     return np.array([[np.random.randint(secondBinBegin)]
                      + [np.random.randint(secondBinBegin, numFeatures)
-                        for _ in xrange(1, featuresPerObject)]
-                     for _ in xrange(numObjects)])
+                        for _ in range(1, featuresPerObject)]
+                     for _ in range(numObjects)])
   elif distribution == "Random":
     probabilityByFeature = np.random.random(numFeatures)
     probabilityByFeature /= np.sum(probabilityByFeature)
 
     return np.array([[getRandomFeature(probabilityByFeature)
-                      for _ in xrange(featuresPerObject)]
-                     for _ in xrange(numObjects)])
+                      for _ in range(featuresPerObject)]
+                     for _ in range(numObjects)])
   else:
     raise ValueError("Unknown distribution", distribution)
 

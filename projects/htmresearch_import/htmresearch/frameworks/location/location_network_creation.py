@@ -371,7 +371,7 @@ def createMultipleL246aLocationColumn(network, numberOfColumns, L2Params,
   # Update L2 numOtherCorticalColumns parameter
   L2Params["numOtherCorticalColumns"] = numberOfColumns - 1
 
-  for i in xrange(numberOfColumns):
+  for i in range(numberOfColumns):
     # Make sure random seed is different for each column
     L2Params["seed"] = L2Params.get("seed", 42) + i
     L4Params["seed"] = L4Params.get("seed", 42) + i
@@ -388,9 +388,9 @@ def createMultipleL246aLocationColumn(network, numberOfColumns, L2Params,
 
   # Now connect the L2 columns laterally
   if numberOfColumns > 1:
-    for i in xrange(numberOfColumns):
+    for i in range(numberOfColumns):
       src = str(i)
-      for j in xrange(numberOfColumns):
+      for j in range(numberOfColumns):
         if i != j:
           dest = str(j)
           network.link(
@@ -474,7 +474,7 @@ class L246aNetwork(object):
     self.L2Regions = []
     self.L4Regions = []
     self.L6aRegions = []
-    for i in xrange(self.numColumns):
+    for i in range(self.numColumns):
       col = str(i)
       self.sensorInput.append(network.regions["sensorInput_" + col].getSelf())
       self.motorInput.append(network.regions["motorInput_" + col].getSelf())
@@ -494,7 +494,7 @@ class L246aNetwork(object):
 
   @LoggingDecorator()
   def sendReset(self):
-    for col in xrange(self.numColumns):
+    for col in range(self.numColumns):
       self.sensorInput[col].addResetToQueue(0)
       self.motorInput[col].addDataToQueue(displacement=[0] * self.numColumns,
                                           reset=True)
@@ -503,7 +503,7 @@ class L246aNetwork(object):
 
   @LoggingDecorator()
   def setLearning(self, learn):
-    for col in xrange(self.numColumns):
+    for col in range(self.numColumns):
       self.L2Regions[col].getSelf().setParameter("learningMode", 0, learn)
       self.L4Regions[col].getSelf().setParameter("learn", 0, learn)
       self.L6aRegions[col].getSelf().setParameter("learningMode", 0, learn)
@@ -523,16 +523,16 @@ class L246aNetwork(object):
     """
     self.setLearning(True)
 
-    for objectName, sensationList in objects.iteritems():
+    for objectName, sensationList in objects.items():
       self.sendReset()
-      print "Learning :", objectName
+      print("Learning :", objectName)
 
       prevLoc = [None] * self.numColumns
       numFeatures = len(sensationList[0])
       displacement = [0] * self.dimensions
 
-      for sensation in xrange(numFeatures):
-        for col in xrange(self.numColumns):
+      for sensation in range(numFeatures):
+        for col in range(self.numColumns):
           location = np.array(sensationList[col][sensation][0])
           feature = sensationList[col][sensation][1]
 
@@ -542,7 +542,7 @@ class L246aNetwork(object):
           prevLoc[col] = location
 
           # learn each pattern multiple times
-          for _ in xrange(self.repeat):
+          for _ in range(self.repeat):
             # Sense feature at location
             self.motorInput[col].addDataToQueue(displacement)
             self.sensorInput[col].addDataToQueue(feature, False, 0)
@@ -578,8 +578,8 @@ class L246aNetwork(object):
 
     prevLoc = [None] * self.numColumns
     numFeatures = len(sensations[0])
-    for sensation in xrange(numFeatures):
-      for col in xrange(self.numColumns):
+    for sensation in range(numFeatures):
+      for col in range(self.numColumns):
         assert numFeatures == len(sensations[col])
 
         location, feature = sensations[col][sensation]
@@ -612,7 +612,7 @@ class L246aNetwork(object):
     L4PredictedCells = self.getL4PredictedCells()
     L2Representation = self.getL2Representations()
 
-    for i in xrange(self.numColumns):
+    for i in range(self.numColumns):
       stats["L6a SensoryAssociatedCells C" + str(i)].append(
         len(L6aSensoryAssociatedCells[i]))
       stats["L6a LearnableCells C" + str(i)].append(
@@ -714,7 +714,7 @@ class L246aNetwork(object):
       maxL2Size = 1.5 * self.sdrSize
 
     numCorrectClassifications = 0
-    for col in xrange(self.numColumns):
+    for col in range(self.numColumns):
       # Ignore inactive column
       if len(l2sdr[col]) == 0:
         continue
@@ -747,10 +747,10 @@ class L246aNetwork(object):
     if minOverlap is None:
       minOverlap = self.sdrSize / 2
 
-    for objectName, objectSdr in self.learnedObjects.iteritems():
+    for objectName, objectSdr in self.learnedObjects.items():
       count = 0
       score = 0.0
-      for col in xrange(self.numColumns):
+      for col in range(self.numColumns):
         # Ignore inactive column
         if len(l2sdr[col]) == 0:
           continue

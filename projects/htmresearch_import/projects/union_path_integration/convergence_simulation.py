@@ -112,7 +112,7 @@ def doExperiment(locationModuleWidth,
   if seed2 != -1:
     random.seed(seed2)
 
-  features = [str(i) for i in xrange(numFeatures)]
+  features = [str(i) for i in range(numFeatures)]
   objects = generateObjects(numObjects, featuresPerObject, objectWidth,
                             numFeatures, featureDistribution)
 
@@ -131,7 +131,7 @@ def doExperiment(locationModuleWidth,
     thresholds = numModules
   perModRange = float((90.0 if bumpType == "square" else 60.0) /
                       float(numModules))
-  for i in xrange(numModules):
+  for i in range(numModules):
     orientation = (float(i) * perModRange) + (perModRange / 2.0)
 
     config = {
@@ -189,7 +189,7 @@ def doExperiment(locationModuleWidth,
       )
       traceFileOut = io.open(filename, "w", encoding="utf8")
       traceHandle = trace(traceFileOut, exp, includeSynapses=True)
-      print "Logging to", filename
+      print("Logging to", filename)
 
     if useRawTrace:
       rawFilename = os.path.join(
@@ -200,7 +200,7 @@ def doExperiment(locationModuleWidth,
       )
       rawTraceFileOut = open(rawFilename, "w")
       rawTraceHandle = rawTrace(rawTraceFileOut, exp, includeSynapses=False)
-      print "Logging to", rawFilename
+      print("Logging to", rawFilename)
 
     if logCellActivity:
       cellActivityTracer = PIUNCellActivityTracer(exp)
@@ -218,7 +218,7 @@ def doExperiment(locationModuleWidth,
           (objectFeatureOccurrences, numSensationsToInference))
       convergence[numSensationsToInference] += 1
       if numSensationsToInference is None:
-        print 'Failed to infer object "{}"'.format(objectDescription["name"])
+        print('Failed to infer object "{}"'.format(objectDescription["name"]))
   finally:
     if useTrace:
       traceHandle.__exit__()
@@ -228,8 +228,8 @@ def doExperiment(locationModuleWidth,
       rawTraceHandle.__exit__()
       rawTraceFileOut.close()
 
-  for step, num in sorted(convergence.iteritems()):
-    print "{}: {}".format(step, num)
+  for step, num in sorted(convergence.items()):
+    print("{}: {}".format(step, num))
 
   result = {
     "convergence": convergence,
@@ -260,7 +260,7 @@ def runMultiprocessNoiseExperiment(resultName, repeat, numWorkers,
   :return: results, in the format [(arguments, results)].  Also saved to json at resultName, in the same format.
   """
   experiments = [{}]
-  for key, values in kwargs.items():
+  for key, values in list(kwargs.items()):
     if type(values) is list:
       newExperiments = []
       for experiment in experiments:
@@ -274,7 +274,7 @@ def runMultiprocessNoiseExperiment(resultName, repeat, numWorkers,
 
   newExperiments = []
   for experiment in experiments:
-    for _ in xrange(repeat):
+    for _ in range(repeat):
       newExperiments.append(copy(experiment))
   experiments = newExperiments
 
@@ -291,7 +291,7 @@ def runExperiments(experiments, resultName, numWorkers=-1, appendResults=False):
     while not rs.ready():
       remaining = rs._number_left
       pctDone = 100.0 - (100.0*remaining) / len(experiments)
-      print "    =>", remaining, "experiments remaining, percent complete=",pctDone
+      print("    =>", remaining, "experiments remaining, percent complete=",pctDone)
       time.sleep(5)
     pool.close()  # No more work
     pool.join()
@@ -313,7 +313,7 @@ def runExperiments(experiments, resultName, numWorkers=-1, appendResults=False):
       pass
 
   with open(os.path.join(SCRIPT_DIR, resultName),"wb") as f:
-    print "Writing results to {}".format(resultName)
+    print("Writing results to {}".format(resultName))
     json.dump(results,f)
 
   return results
@@ -354,7 +354,7 @@ if __name__ == "__main__":
   args = parser.parse_args()
 
   numOffsets = args.coordinateOffsetWidth
-  cellCoordinateOffsets = tuple([i * (0.998 / (numOffsets-1)) + 0.001 for i in xrange(numOffsets)])
+  cellCoordinateOffsets = tuple([i * (0.998 / (numOffsets-1)) + 0.001 for i in range(numOffsets)])
 
   if "both" in args.anchoringMethod:
     args.anchoringMethod = ["narrowing", "corners"]

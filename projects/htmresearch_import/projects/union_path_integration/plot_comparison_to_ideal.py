@@ -39,7 +39,7 @@ def getCumulativeAccuracy(convergenceFrequencies):
   results = []
 
   cum = 0.0
-  for step in xrange(1, 41):
+  for step in range(1, 41):
     cum += convergenceFrequencies.get(str(step), 0)
     results.append(cum / tot)
 
@@ -95,9 +95,9 @@ def createChart(inFilename, outFilename, locationModuleWidths, legendPosition):
     errBelow = []
     errAbove = []
 
-    resultsByStep = zip(*resultsByTrial)
+    resultsByStep = list(zip(*resultsByTrial))
 
-    for step, results in zip(xrange(numSteps), resultsByStep):
+    for step, results in zip(range(numSteps), resultsByStep):
       x.append(step + 1)
       p1, p2, p3 = np.percentile(results, percentiles)
       y.append(p2)
@@ -111,7 +111,7 @@ def createChart(inFilename, outFilename, locationModuleWidths, legendPosition):
   plt.xlabel("Number of Sensations")
   plt.ylabel("Cumulative Accuracy")
 
-  plt.xticks([(i+1) for i in xrange(numSteps)])
+  plt.xticks([(i+1) for i in range(numSteps)])
 
   # Remove the errorbars from the legend.
   handles, labels = plt.gca().get_legend_handles_labels()
@@ -120,7 +120,7 @@ def createChart(inFilename, outFilename, locationModuleWidths, legendPosition):
   plt.legend(handles, labels, loc="center right", bbox_to_anchor=legendPosition)
 
   outFilePath = os.path.join(CHART_DIR, outFilename)
-  print "Saving", outFilePath
+  print("Saving", outFilePath)
   plt.savefig(outFilePath)
 
   plt.clf()

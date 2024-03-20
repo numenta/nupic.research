@@ -71,11 +71,11 @@ def createTheChart(inFilename, outFilename, xlim2):
 
 
   resultsByParams = {}
-  for params, convergenceResultsByMin in convergenceResultsByParams.iteritems():
+  for params, convergenceResultsByMin in convergenceResultsByParams.items():
     resultsByParams[params] = sorted(
       (sampleMinimum, float(sum(1 if r != None else 0
                                 for r in results)) / len(results))
-      for sampleMinimum, results in convergenceResultsByMin.iteritems())
+      for sampleMinimum, results in convergenceResultsByMin.items())
 
   fig, (ax1, ax2) = plt.subplots(figsize=(6.75, 3), ncols=2, sharey=True,
                                  tight_layout = {"pad": 0})
@@ -100,12 +100,12 @@ def createTheChart(inFilename, outFilename, xlim2):
 
     resultsByNumObjects = capacityResults[(featureDistribution, numUniqueFeatures, featuresPerObject)]
     expResults = sorted((numObjects, sum(results) / len(results))
-                        for numObjects, results in resultsByNumObjects.iteritems())
-    x, y = zip(*expResults)
+                        for numObjects, results in resultsByNumObjects.items())
+    x, y = list(zip(*expResults))
     ax1.plot(x, y, "{}-".format(marker), label=label, markersize=markerSize)
 
     results = resultsByParams[(featureDistribution, numUniqueFeatures, featuresPerObject)]
-    x, y = zip(*results)
+    x, y = list(zip(*results))
     ax2.plot(x, y, "{}-".format(marker), label=label, markersize=markerSize)
 
   ax1.set_xlabel("Number of Learned Objects")
@@ -120,7 +120,7 @@ def createTheChart(inFilename, outFilename, xlim2):
   ax2.legend(loc="upper right", framealpha=framealpha)
 
   filePath = os.path.join(CHART_DIR, outFilename)
-  print "Saving", filePath
+  print("Saving", filePath)
   plt.savefig(filePath)
 
 

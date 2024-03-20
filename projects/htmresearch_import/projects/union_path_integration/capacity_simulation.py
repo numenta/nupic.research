@@ -123,7 +123,7 @@ def doExperiment(locationModuleWidth,
   if seed2 != -1:
     random.seed(seed2)
 
-  features = [str(i) for i in xrange(numFeatures)]
+  features = [str(i) for i in range(numFeatures)]
 
   locationConfigs = []
   scale = 40.0
@@ -134,7 +134,7 @@ def doExperiment(locationModuleWidth,
     thresholds = numModules
   perModRange = float((90.0 if bumpType == "square" else 60.0) /
                       float(numModules))
-  for i in xrange(numModules):
+  for i in range(numModules):
     orientation = (float(i) * perModRange) + (perModRange / 2.0)
 
     config = {
@@ -181,7 +181,7 @@ def doExperiment(locationModuleWidth,
   while True:
     currentNumObjects = numObjects + increment
     numFailuresAllowed = currentNumObjects * (1 - minAccuracy)
-    print "Testing", currentNumObjects
+    print("Testing", currentNumObjects)
 
     objects = generateObjects(currentNumObjects, featuresPerObject, objectWidth,
                               numFeatures, featureDistribution)
@@ -211,7 +211,7 @@ def doExperiment(locationModuleWidth,
         )
         traceFileOut = io.open(filename, "w", encoding="utf8")
         traceHandle = trace(traceFileOut, exp, includeSynapses=False)
-        print "Logging to", filename
+        print("Logging to", filename)
 
       for objectDescription in objects:
         numSensationsToInference = exp.inferObjectWithRandomMovements(
@@ -251,7 +251,7 @@ def doExperiment(locationModuleWidth,
     "allLocationsAreUnique": allLocationsAreUnique,
   }
 
-  print result
+  print(result)
   return result
 
 
@@ -266,7 +266,7 @@ def runMultiprocessNoiseExperiment(resultName, repeat, numWorkers,
   :return: results, in the format [(arguments, results)].  Also saved to json at resultName, in the same format.
   """
   experiments = [{}]
-  for key, values in kwargs.items():
+  for key, values in list(kwargs.items()):
     if type(values) is list:
       newExperiments = []
       for experiment in experiments:
@@ -280,7 +280,7 @@ def runMultiprocessNoiseExperiment(resultName, repeat, numWorkers,
 
   newExperiments = []
   for experiment in experiments:
-    for _ in xrange(repeat):
+    for _ in range(repeat):
       newExperiments.append(copy(experiment))
   experiments = newExperiments
 
@@ -297,7 +297,7 @@ def runExperiments(experiments, resultName, numWorkers=-1, appendResults=False):
     while not rs.ready():
       remaining = rs._number_left
       pctDone = 100.0 - (100.0*remaining) / len(experiments)
-      print "    =>", remaining, "experiments remaining, percent complete=",pctDone
+      print("    =>", remaining, "experiments remaining, percent complete=",pctDone)
       time.sleep(5)
     pool.close()  # No more work
     pool.join()
@@ -319,7 +319,7 @@ def runExperiments(experiments, resultName, numWorkers=-1, appendResults=False):
       pass
 
   with open(os.path.join(SCRIPT_DIR, resultName),"wb") as f:
-    print "Writing results to {}".format(resultName)
+    print("Writing results to {}".format(resultName))
     json.dump(results,f)
 
   return results
@@ -360,7 +360,7 @@ if __name__ == "__main__":
 
   numOffsets = args.coordinateOffsetWidth
   cellCoordinateOffsets = tuple([i * (0.998 / (numOffsets-1)) + 0.001
-                                 for i in xrange(numOffsets)])
+                                 for i in range(numOffsets)])
 
   if "both" in args.anchoringMethod:
     args.anchoringMethod = ["narrowing", "corners"]

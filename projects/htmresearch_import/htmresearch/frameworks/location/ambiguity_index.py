@@ -56,7 +56,7 @@ class BinomialDistribution(object):
   def __init__(self, n, p, cache=False):
     self.n = n
     self.p = p
-    self.possibleValues = xrange(0, n+1)
+    self.possibleValues = range(0, n+1)
     self.cache = cache
     if self.cache:
       self._cache()
@@ -64,7 +64,7 @@ class BinomialDistribution(object):
   def _cache(self):
     self._cachedPmf = self._pmf(np.arange(self.n + 1))
     self._cachedCdf = np.zeros(self.n + 1)
-    for k in xrange(self.n + 1):
+    for k in range(self.n + 1):
       self._cachedCdf[k:] += self._cachedPmf[k]
 
   def _pmf(self, k):
@@ -151,7 +151,7 @@ def findBinomialNsWithExpectedSampleMinimum(desiredValuesSorted, p, numSamples, 
     getExpectedValue(
       SampleMinimumDistribution(numSamples,
                                 BinomialDistribution(n, p, cache=True)))
-    for n in xrange(nMax + 1)]
+    for n in range(nMax + 1)]
 
   results = []
 
@@ -240,10 +240,10 @@ def generateExpectedList(numUniqueFeatures, numLocationsPerObject, maxNumObjects
   # *other* occurrences there are of this feature. So we check n - 1 locations.
   maxNumOtherLocations = maxNumObjects*10 - 1
 
-  results = zip(itertools.count(1),
+  results = list(zip(itertools.count(1),
                 findBinomialNsWithExpectedSampleMinimum(
                   itertools.count(1), 1./numUniqueFeatures, numLocationsPerObject,
-                  maxNumOtherLocations))
+                  maxNumOtherLocations)))
 
   finalResults = [(numOtherLocations, interpolatedN / numLocationsPerObject)
                   for numOtherLocations, (interpolatedN, _, _) in results]
@@ -265,11 +265,11 @@ def generateLowerBoundList(confidence, numUniqueFeatures, numLocationsPerObject,
   # *other* occurrences there are of this feature. So we check n - 1 locations.
   maxNumOtherLocations = maxNumObjects*10 - 1
 
-  results = zip(itertools.count(1),
+  results = list(zip(itertools.count(1),
                 findBinomialNsWithLowerBoundSampleMinimum(
                   confidence,
                   itertools.count(1), 1./numUniqueFeatures, numLocationsPerObject,
-                  maxNumOtherLocations))
+                  maxNumOtherLocations)))
 
   finalResults = [(numOtherLocations, interpolatedN / numLocationsPerObject)
                   for numOtherLocations, (interpolatedN, _, _) in results]
@@ -317,4 +317,4 @@ ticks_expectedNumOtherOccurrencesOfMostUniqueFeature_200_features_10_locationsPe
 
 if __name__ == "__main__":
   # print generateExpectedList(100, 10, 100)
-  print generateLowerBoundList(0.5, 100, 10, 800)
+  print(generateLowerBoundList(0.5, 100, 10, 800))

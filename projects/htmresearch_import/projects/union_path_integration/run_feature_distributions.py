@@ -21,7 +21,7 @@
 
 import argparse
 
-import convergence_simulation
+from . import convergence_simulation
 
 
 def experiment(bumpType, numFeatures=100, featuresPerObject=10,

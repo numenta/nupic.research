@@ -21,7 +21,7 @@
 
 import argparse
 
-import capacity_simulation
+from . import capacity_simulation
 
 
 def experiment(bumpType, locationModuleWidth=10, numFeatures=100):
