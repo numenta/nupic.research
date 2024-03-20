@@ -76,19 +76,19 @@ if __name__ == "__main__":
   # Infer the objects without any location input.
   filename = "logs/infer-not-perfect.csv"
   with open(filename, "w") as fileOut:
-    print "Logging to", filename
+    print("Logging to", filename)
     with trace(exp, csv.writer(fileOut)):
       exp.inferObject(newObjectPlacements, "Object 3", (2,0), [(0,1), (0,1)])
 
 
   filename = "logs/infer-recovery.csv"
   with open("logs/infer-recovery.csv", "w") as fileOut:
-    print "Logging to", filename
+    print("Logging to", filename)
     with trace(exp, csv.writer(fileOut)):
       exp.inferObject(newObjectPlacements, "Object 3", (2,0), [(0,1), (0,-1), (0,1)])
 
 
-  print "Visualize these CSV files at:"
-  print "http://numenta.github.io/htmresearch/visualizations/location-layer/single-layer-2d.html"
+  print("Visualize these CSV files at:")
+  print("http://numenta.github.io/htmresearch/visualizations/location-layer/single-layer-2d.html")
   print ("or in a Jupyter notebook with the htmresearchviz0 package and the "
          "printSingleLayer2DExperiment function.")

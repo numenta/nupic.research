@@ -44,19 +44,19 @@ class SingleLayerLocation2DExperiment(object):
 
     # A grid of location SDRs.
     self.locations = dict(
-      ((i, j), np.array(sorted(random.sample(xrange(1000), 30)), dtype="uint32"))
-      for i in xrange(diameter)
-      for j in xrange(diameter))
+      ((i, j), np.array(sorted(random.sample(range(1000), 30)), dtype="uint32"))
+      for i in range(diameter)
+      for j in range(diameter))
 
     # 8 transition SDRs -- one for each straight and diagonal direction.
     self.transitions = dict(
-      ((i, j), np.array(sorted(random.sample(xrange(1000), 30)), dtype="uint32"))
-      for i in xrange(-1, 2)
-      for j in xrange(-1, 2)
+      ((i, j), np.array(sorted(random.sample(range(1000), 30)), dtype="uint32"))
+      for i in range(-1, 2)
+      for j in range(-1, 2)
       if i != 0 or j != 0)
 
     self.features = dict(
-      (k, np.array(sorted(random.sample(xrange(150), 15)), dtype="uint32"))
+      (k, np.array(sorted(random.sample(range(150), 15)), dtype="uint32"))
       for k in featureNames)
 
     self.locationLayer = SingleLayerLocationMemory(**{
@@ -123,7 +123,7 @@ class SingleLayerLocation2DExperiment(object):
     Run one timestep.
     """
 
-    for monitor in self.monitors.values():
+    for monitor in list(self.monitors.values()):
       monitor.beforeTimestep(locationSDR, transitionSDR, featureSDR,
                              egocentricLocation, learn)
 
@@ -135,7 +135,7 @@ class SingleLayerLocation2DExperiment(object):
       "learn": learn,
     }
     self.locationLayer.compute(**params)
-    for monitor in self.monitors.values():
+    for monitor in list(self.monitors.values()):
       monitor.afterLocationCompute(**params)
 
     params = {
@@ -144,7 +144,7 @@ class SingleLayerLocation2DExperiment(object):
       "apicalInput": self.objectLayer.getActiveCells(),
     }
     self.inputLayer.compute(**params)
-    for monitor in self.monitors.values():
+    for monitor in list(self.monitors.values()):
       monitor.afterInputCompute(**params)
 
     params = {
@@ -153,7 +153,7 @@ class SingleLayerLocation2DExperiment(object):
       "learn": learn,
     }
     self.objectLayer.compute(**params)
-    for monitor in self.monitors.values():
+    for monitor in list(self.monitors.values()):
       monitor.afterObjectCompute(**params)
 
 
@@ -163,15 +163,15 @@ class SingleLayerLocation2DExperiment(object):
     it each previous-location + motor command pair.
     """
 
-    print "Learning transitions"
-    for (i, j), locationSDR in self.locations.iteritems():
-      print "i, j", (i, j)
-      for (di, dj), transitionSDR in self.transitions.iteritems():
+    print("Learning transitions")
+    for (i, j), locationSDR in self.locations.items():
+      print("i, j", (i, j))
+      for (di, dj), transitionSDR in self.transitions.items():
         i2 = i + di
         j2 = j + dj
         if (0 <= i2 < self.diameter and
             0 <= j2 < self.diameter):
-          for _ in xrange(5):
+          for _ in range(5):
             self.locationLayer.reset()
             self.locationLayer.compute(newLocation=self.locations[(i,j)])
             self.locationLayer.compute(deltaLocation=transitionSDR,
@@ -195,15 +195,15 @@ class SingleLayerLocation2DExperiment(object):
     - input -> object
     - object -> input
     """
-    for monitor in self.monitors.values():
+    for monitor in list(self.monitors.values()):
       monitor.afterPlaceObjects(objectPlacements)
 
-    for objectName, objectDict in self.objects.iteritems():
+    for objectName, objectDict in self.objects.items():
       self.reset()
 
       objectPlacement = objectPlacements[objectName]
 
-      for locationName, featureName in objectDict.iteritems():
+      for locationName, featureName in objectDict.items():
         egocentricLocation = (locationName[0] + objectPlacement[0],
                               locationName[1] + objectPlacement[1])
 
@@ -214,7 +214,7 @@ class SingleLayerLocation2DExperiment(object):
         self.locationLayer.reset()
         self.inputLayer.reset()
 
-        for _ in xrange(10):
+        for _ in range(10):
           self.doTimestep(locationSDR, transitionSDR, featureSDR,
                           egocentricLocation, learn=True)
 
@@ -233,7 +233,7 @@ class SingleLayerLocation2DExperiment(object):
     """
 
     candidates = list(transition
-                      for transition in self.transitions.keys()
+                      for transition in list(self.transitions.keys())
                       if (allocentricLocation[0] + transition[0],
                           allocentricLocation[1] + transition[1]) in objectDict)
     random.shuffle(candidates)
@@ -257,7 +257,7 @@ class SingleLayerLocation2DExperiment(object):
 
   def inferObject(self, objectPlacements, objectName, startPoint,
                   transitionSequence, settlingTime=2):
-    for monitor in self.monitors.values():
+    for monitor in list(self.monitors.values()):
       monitor.afterPlaceObjects(objectPlacements)
 
     objectDict = self.objects[objectName]
@@ -284,7 +284,7 @@ class SingleLayerLocation2DExperiment(object):
           self.doTimestep(np.empty(0), transitionSDR, featureSDR,
                           egocentricLocation, learn=False)
 
-        transitionName = transitionIterator.next()
+        transitionName = next(transitionIterator)
         allocentricLocation = (allocentricLocation[0] + transitionName[0],
                                allocentricLocation[1] + transitionName[1])
         nextTransitionSDR = self.transitions[transitionName]
@@ -298,23 +298,23 @@ class SingleLayerLocation2DExperiment(object):
     Infer each object without any location input.
     """
 
-    for monitor in self.monitors.values():
+    for monitor in list(self.monitors.values()):
       monitor.afterPlaceObjects(objectPlacements)
 
-    for objectName, objectDict in self.objects.iteritems():
+    for objectName, objectDict in self.objects.items():
       self.reset()
 
       visitCounts = defaultdict(int)
 
       learnedObjectPlacement = self.learnedObjectPlacements[objectName]
 
-      allocentricLocation = random.choice(objectDict.keys())
+      allocentricLocation = random.choice(list(objectDict.keys()))
       nextTransitionSDR = np.empty(0, dtype="uint32")
 
       # Traverse the object until it is inferred.
       success = False
 
-      for _ in xrange(maxTouches):
+      for _ in range(maxTouches):
         featureName = objectDict[allocentricLocation]
         egocentricLocation = (allocentricLocation[0] +
                               objectPlacements[objectName][0],
@@ -358,17 +358,15 @@ class SingleLayerLocation2DExperiment(object):
     self.objectLayer.reset()
     self.inputLayer.reset()
 
-    for monitor in self.monitors.values():
+    for monitor in list(self.monitors.values()):
       monitor.afterReset()
 
 
 
-class SingleLayer2DExperimentMonitor(object):
+class SingleLayer2DExperimentMonitor(object, metaclass=abc.ABCMeta):
   """
   Abstract base class for a SingleLayer2DExperiment monitor.
   """
-
-  __metaclass__ = abc.ABCMeta
 
   @abc.abstractmethod
   def beforeTimestep(self, locationSDR, transitionSDR, featureSDR,

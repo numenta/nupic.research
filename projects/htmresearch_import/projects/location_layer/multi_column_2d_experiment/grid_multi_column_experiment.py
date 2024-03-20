@@ -102,12 +102,12 @@ class MultiColumn2DExperiment(object):
     self.locationConfigs = locationConfigs
 
     self.features = dict(
-      ((iCol, k), np.array(sorted(random.sample(xrange(150), featureW)), dtype="uint32"))
+      ((iCol, k), np.array(sorted(random.sample(range(150), featureW)), dtype="uint32"))
       for k in featureNames
-      for iCol in xrange(numCorticalColumns))
+      for iCol in range(numCorticalColumns))
 
     self.corticalColumns = []
-    for _ in xrange(numCorticalColumns):
+    for _ in range(numCorticalColumns):
       inputLayer = ApicalTiebreakPairMemory(**{
         "columnCount": 150,
         "cellsPerColumn": cellsPerColumn,
@@ -195,7 +195,7 @@ class MultiColumn2DExperiment(object):
       for module, params in zip(c.sensorToBodyModules, paramsByModule):
         module.compute(**params)
 
-    for monitor in self.monitors.itervalues():
+    for monitor in self.monitors.values():
       monitor.afterSensorToBodyCompute(paramsByModuleByColumn)
 
 
@@ -214,7 +214,7 @@ class MultiColumn2DExperiment(object):
                                 paramsByModule):
         module.metricCompute(**params)
 
-    for monitor in self.monitors.itervalues():
+    for monitor in self.monitors.values():
       monitor.afterSensorMetricCompute(paramsByModuleByColumn)
 
 
@@ -230,7 +230,7 @@ class MultiColumn2DExperiment(object):
     for c, params in zip(self.corticalColumns, paramsByColumn):
       c.inputLayer.compute(**params)
 
-    for monitor in self.monitors.itervalues():
+    for monitor in self.monitors.values():
       monitor.afterInputCompute(paramsByColumn)
 
 
@@ -247,7 +247,7 @@ class MultiColumn2DExperiment(object):
     for c, params in zip(self.corticalColumns, paramsByColumn):
       c.objectLayer.compute(**params)
 
-    for monitor in self.monitors.itervalues():
+    for monitor in self.monitors.values():
       monitor.afterObjectCompute(paramsByColumn)
 
 
@@ -261,7 +261,7 @@ class MultiColumn2DExperiment(object):
       for module in c.sensorToSpecificObjectModules:
         module.anchorCompute(**params)
 
-    for monitor in self.monitors.itervalues():
+    for monitor in self.monitors.values():
       monitor.afterSensorLocationAnchor(paramsByColumn)
 
 
@@ -279,7 +279,7 @@ class MultiColumn2DExperiment(object):
                               paramsByModule):
       module.compute(**params)
 
-    for monitor in self.monitors.itervalues():
+    for monitor in self.monitors.values():
       monitor.afterBodyLocationAnchor(paramsByModule)
 
 
@@ -293,10 +293,10 @@ class MultiColumn2DExperiment(object):
     - input -> object
     - object -> input
     """
-    for monitor in self.monitors.itervalues():
+    for monitor in self.monitors.values():
       monitor.afterBodyWorldLocationChanged(bodyPlacement)
 
-    for objectName, objectFeatures in self.objects.iteritems():
+    for objectName, objectFeatures in self.objects.items():
       self.reset()
 
       objectPlacement = self.objectPlacements[objectName]
@@ -304,7 +304,7 @@ class MultiColumn2DExperiment(object):
       for module in self.bodyToSpecificObjectModules:
         module.activateRandomLocation()
 
-      for iFeatureStart in xrange(len(objectFeatures)):
+      for iFeatureStart in range(len(objectFeatures)):
         featureIndexByColumn = np.mod(np.arange(iFeatureStart,
                                                 iFeatureStart +
                                                 self.numCorticalColumns),
@@ -322,11 +322,11 @@ class MultiColumn2DExperiment(object):
         worldLocationByColumn = objectPlacement + locationOnObjectByColumn
         egocentricLocationByColumn = worldLocationByColumn - bodyPlacement
 
-        for monitor in self.monitors.itervalues():
+        for monitor in self.monitors.values():
           monitor.afterSensorWorldLocationChanged(worldLocationByColumn)
 
-        for t in xrange(2):
-          for monitor in self.monitors.itervalues():
+        for t in range(2):
+          for monitor in self.monitors.values():
             monitor.beforeCompute(egocentricLocationByColumn, featureSDRByColumn,
                                   isRepeat=(t > 0))
           self.compute(egocentricLocationByColumn, featureSDRByColumn,
@@ -365,11 +365,11 @@ class MultiColumn2DExperiment(object):
         objects that took that many touches to be uniquely inferred. The 'None'
         key is reserved for objects not recognized after `maxTouches` touches
     """
-    for monitor in self.monitors.itervalues():
+    for monitor in self.monitors.values():
       monitor.afterBodyWorldLocationChanged(bodyPlacement)
 
     numTouchesRequired = collections.defaultdict(int)
-    for objectName, objectFeatures in self.objects.iteritems():
+    for objectName, objectFeatures in self.objects.items():
       self.reset()
 
       objectPlacement = self.objectPlacements[objectName]
@@ -377,9 +377,9 @@ class MultiColumn2DExperiment(object):
       featureIndexByColumnIterator = (
         greedySensorPositions(self.numCorticalColumns, len(objectFeatures)))
 
-      for touch in xrange(maxTouches):
+      for touch in range(maxTouches):
         # Choose where to place each sensor.
-        featureIndexByColumn = featureIndexByColumnIterator.next()
+        featureIndexByColumn = next(featureIndexByColumnIterator)
         sensedFeatures = [objectFeatures[i] for i in featureIndexByColumn]
         featureSDRByColumn = [self.features[(iCol, feature["name"])]
                               for iCol, feature in enumerate(sensedFeatures)]
@@ -388,15 +388,15 @@ class MultiColumn2DExperiment(object):
            objectPlacement[1] + feature["left"] + feature["width"]/2]
           for feature in sensedFeatures])
 
-        for monitor in self.monitors.itervalues():
+        for monitor in self.monitors.values():
           monitor.afterSensorWorldLocationChanged(worldLocationByColumn)
 
         egocentricLocationByColumn = worldLocationByColumn - bodyPlacement
 
         prevCellActivity = None
 
-        for t in xrange(self.maxSettlingTime):
-          for monitor in self.monitors.itervalues():
+        for t in range(self.maxSettlingTime):
+          for monitor in self.monitors.values():
             monitor.beforeCompute(egocentricLocationByColumn, featureSDRByColumn,
                                   isRepeat=(t > 0))
           self.compute(egocentricLocationByColumn, featureSDRByColumn, learn=False)
@@ -409,12 +409,12 @@ class MultiColumn2DExperiment(object):
 
           if cellActivity == prevCellActivity:
             # It settled. Cancel logging this timestep.
-            for monitor in self.monitors.itervalues():
+            for monitor in self.monitors.values():
               monitor.clearUnflushedData()
             break
           else:
             prevCellActivity = cellActivity
-            for monitor in self.monitors.itervalues():
+            for monitor in self.monitors.values():
               monitor.flush()
 
         # Check if the object is narrowed down
@@ -437,17 +437,15 @@ class MultiColumn2DExperiment(object):
     for module in self.bodyToSpecificObjectModules:
       module.reset()
 
-    for monitor in self.monitors.itervalues():
+    for monitor in self.monitors.values():
       monitor.afterReset()
 
 
 
-class MultiColumn2DExperimentMonitor(object):
+class MultiColumn2DExperimentMonitor(object, metaclass=abc.ABCMeta):
   """
   Abstract base class for a MultiColumn2DExperiment monitor.
   """
-
-  __metaclass__ = abc.ABCMeta
 
   def beforeCompute(self, egocentricLocationByColumn, featureSDRByColumn,
                     isRepeat): pass

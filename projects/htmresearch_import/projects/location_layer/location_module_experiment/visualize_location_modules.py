@@ -23,7 +23,7 @@
 Visualize an array of location modules while moving a sensor along simple paths.
 """
 
-from __future__ import print_function
+
 import csv
 import json
 import math
@@ -47,10 +47,10 @@ def go():
     stepsPerScale = 5
 
     locationConfigs = []
-    for i in xrange(9):
+    for i in range(9):
       scale = 10.0 * (math.sqrt(2) ** i)
 
-      for _ in xrange(2):
+      for _ in range(2):
         orientation = random.gauss(7.5, 7.5) * math.pi / 180.0
         orientation = random.choice([orientation, -orientation])
 

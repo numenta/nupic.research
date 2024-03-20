@@ -83,14 +83,14 @@ if __name__ == "__main__":
   # Infer the objects without any location input.
   filename = "logs/infer-no-location.csv"
   with open(filename, "w") as fileOut:
-    print "Logging to", filename
+    print("Logging to", filename)
     with trace(exp, csv.writer(fileOut)):
       exp.inferObjectsWithRandomMovements(objectPlacements)
 
   # Shuffle the objects. Infer them without any location input.
   filename = "logs/infer-shuffled-location.csv"
   with open(filename, "w") as fileOut:
-    print "Logging to", filename
+    print("Logging to", filename)
     with trace(exp, csv.writer(fileOut)):
       exp.inferObjectsWithRandomMovements({
         "Object 1": (7, 6),
@@ -99,7 +99,7 @@ if __name__ == "__main__":
         "Object 4": (3, 3)
       })
 
-  print "Visualize these CSV files at:"
-  print "http://numenta.github.io/htmresearch/visualizations/location-layer/single-layer-2d.html"
+  print("Visualize these CSV files at:")
+  print("http://numenta.github.io/htmresearch/visualizations/location-layer/single-layer-2d.html")
   print ("or in a Jupyter notebook with the htmresearchviz0 package and the "
          "printSingleLayer2DExperiment function.")

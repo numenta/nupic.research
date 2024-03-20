@@ -44,21 +44,21 @@ def doExperiment(numCorticalColumns):
                    "width": CM_PER_UNIT,
                    "height": CM_PER_UNIT,
                    "name": featureName}
-                  for location, featureName in objectDict.iteritems()])
-    for objectName, objectDict in DISCRETE_OBJECTS.iteritems())
+                  for location, featureName in objectDict.items()])
+    for objectName, objectDict in DISCRETE_OBJECTS.items())
 
   objectPlacements = dict(
     (objectName, [placement[0] * CM_PER_UNIT,
                   placement[1] * CM_PER_UNIT])
-    for objectName, placement in OBJECT_PLACEMENTS_LEARN.iteritems())
+    for objectName, placement in OBJECT_PLACEMENTS_LEARN.items())
 
   cellDimensions = (10, 10)
 
   locationConfigs = []
-  for i in xrange(4):
+  for i in range(4):
     scale = 10.0 * (math.sqrt(2) ** i)
 
-    for _ in xrange(4):
+    for _ in range(4):
       orientation = random.gauss(7.5, 7.5) * math.pi / 180.0
       orientation = random.choice([orientation, -orientation])
 
@@ -84,8 +84,8 @@ def doExperiment(numCorticalColumns):
 
   bodyPlacement = [6. * CM_PER_UNIT, 11. * CM_PER_UNIT]
   numTouchesRequired = exp.inferObjects(bodyPlacement, maxTouches=10)
-  for touches, count in sorted(numTouchesRequired.iteritems()):
-    print "{}: {}".format(touches, count)
+  for touches, count in sorted(numTouchesRequired.items()):
+    print("{}: {}".format(touches, count))
 
 
 if __name__ == "__main__":
@@ -97,26 +97,26 @@ if __name__ == "__main__":
 
   OBJ_MAX_DIM = 10
   POSSIBLE_FEATURE_LOCS = []
-  for i in xrange(OBJ_MAX_DIM):
-    for j in xrange(OBJ_MAX_DIM):
+  for i in range(OBJ_MAX_DIM):
+    for j in range(OBJ_MAX_DIM):
       POSSIBLE_FEATURE_LOCS.append((i, j))
 
-  FEATURES = ["{}".format(i) for i in xrange(args.features)]
+  FEATURES = ["{}".format(i) for i in range(args.features)]
 
   NUM_OBJECTS = args.objects
   POINTS_PER_OBJ = 10
   DISCRETE_OBJECTS = {}
   OBJECT_PLACEMENTS_LEARN = {}
-  for i in xrange(NUM_OBJECTS):
+  for i in range(NUM_OBJECTS):
     np.random.shuffle(POSSIBLE_FEATURE_LOCS)
     locs = POSSIBLE_FEATURE_LOCS[0:POINTS_PER_OBJ]
     objName = "Object {}".format(i)
-    feats = [np.random.choice(FEATURES) for _ in xrange(POINTS_PER_OBJ)]
-    DISCRETE_OBJECTS[objName] = dict(zip(locs, feats))
+    feats = [np.random.choice(FEATURES) for _ in range(POINTS_PER_OBJ)]
+    DISCRETE_OBJECTS[objName] = dict(list(zip(locs, feats)))
 
     objLoc = (np.random.randint(OBJ_MAX_DIM),
               np.random.randint(OBJ_MAX_DIM))
     OBJECT_PLACEMENTS_LEARN[objName] = objLoc
 
-  print "Columns: {} Features: {} Objects: {}".format(args.columns, args.features, args.objects)
+  print("Columns: {} Features: {} Objects: {}".format(args.columns, args.features, args.objects))
   doExperiment(args.columns)

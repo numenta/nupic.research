@@ -82,21 +82,21 @@ def doExperiment():
                    "width": CM_PER_UNIT,
                    "height": CM_PER_UNIT,
                    "name": featureName}
-                  for location, featureName in objectDict.iteritems()])
-    for objectName, objectDict in DISCRETE_OBJECTS.iteritems())
+                  for location, featureName in objectDict.items()])
+    for objectName, objectDict in DISCRETE_OBJECTS.items())
 
   objectPlacements = dict(
     (objectName, [placement[0] * CM_PER_UNIT,
                   placement[1] * CM_PER_UNIT])
-    for objectName, placement in DISCRETE_OBJECT_PLACEMENTS.iteritems())
+    for objectName, placement in DISCRETE_OBJECT_PLACEMENTS.items())
 
   cellDimensions = (10, 10)
 
   locationConfigs = []
-  for i in xrange(4):
+  for i in range(4):
     scale = 10.0 * (math.sqrt(2) ** i)
 
-    for _ in xrange(4):
+    for _ in range(4):
       orientation = random.gauss(7.5, 7.5) * math.pi / 180.0
       orientation = random.choice([orientation, -orientation])
 
@@ -119,14 +119,14 @@ def doExperiment():
   filename = "logs/{}-cells-learn.log".format(np.prod(cellDimensions))
   with open(filename, "w") as fileOut:
     with trace(exp, fileOut, includeSynapses=True):
-      print "Logging to", filename
+      print("Logging to", filename)
       bodyPlacement = [6. * CM_PER_UNIT, 1. * CM_PER_UNIT]
       exp.learnObjects(bodyPlacement)
 
   filename = "logs/{}-cells-infer.log".format(np.prod(cellDimensions))
   with open(filename, "w") as fileOut:
     with trace(exp, fileOut, includeSynapses=True):
-      print "Logging to", filename
+      print("Logging to", filename)
 
       bodyPlacement = [6. * CM_PER_UNIT, 11. * CM_PER_UNIT]
       exp.inferObjects(bodyPlacement, maxTouches=2)
@@ -135,7 +135,7 @@ def doExperiment():
 if __name__ == "__main__":
   doExperiment()
 
-  print "Visualize these logs at:"
-  print "http://numenta.github.io/htmresearch/visualizations/location-layer/multi-column-inference.html"
+  print("Visualize these logs at:")
+  print("http://numenta.github.io/htmresearch/visualizations/location-layer/multi-column-inference.html")
   print ("or in a Jupyter notebook with the htmresearchviz0 package and the "
          "printMultiColumnInferenceRecording function.")

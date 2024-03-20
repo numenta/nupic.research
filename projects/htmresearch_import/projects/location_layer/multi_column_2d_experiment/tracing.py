@@ -24,7 +24,7 @@ Connect the MultiColumn2DExperiment to the locationModuleInference.js
 visualization.
 """
 
-from __future__ import print_function
+
 from collections import defaultdict
 import json
 
@@ -87,7 +87,7 @@ class MultiColumn2DExperimentVisualizer(MultiColumn2DExperimentMonitor):
                       for featureSDR in featureSDRByColumn]),
           file=self.out)
     print(json.dumps([[k
-                       for (iCol2, k), sdr in self.exp.features.iteritems()
+                       for (iCol2, k), sdr in self.exp.features.items()
                        if iCol == iCol2
                        if np.intersect1d(featureSDR, sdr,
                                          assume_unique=True).size == sdr.size]
@@ -172,7 +172,7 @@ class MultiColumn2DExperimentVisualizer(MultiColumn2DExperimentMonitor):
       activeLocationCells = c.getSensorToSpecificObjectSDR()
 
       for ((objectName, location),
-           sdr) in c.sensorLocationRepresentations.iteritems():
+           sdr) in c.sensorLocationRepresentations.items():
         amountContained = (np.intersect1d(sdr, activeLocationCells,
                                           assume_unique=True).size /
                            float(sdr.size))
@@ -218,7 +218,7 @@ class MultiColumn2DExperimentVisualizer(MultiColumn2DExperimentMonitor):
       activeLocationCells = c.getSensorToSpecificObjectSDR()
 
       for ((objectName, location),
-           sdr) in c.sensorLocationRepresentations.iteritems():
+           sdr) in c.sensorLocationRepresentations.items():
         amountContained = (np.intersect1d(sdr, activeLocationCells,
                                           assume_unique=True).size /
                            float(sdr.size))
@@ -334,7 +334,7 @@ class MultiColumn2DExperimentVisualizer(MultiColumn2DExperimentMonitor):
 
         inputSynapsesForActiveCells = []
         objectSynapsesForActiveCellsBySourceColumn = [
-          [] for _ in xrange(self.exp.numCorticalColumns)]
+          [] for _ in range(self.exp.numCorticalColumns)]
 
         for i, cell in enumerate(activeCells):
           inputSynapsesForActiveCells.append(_getActiveSynapses(
@@ -342,7 +342,7 @@ class MultiColumn2DExperimentVisualizer(MultiColumn2DExperimentMonitor):
             cell, params["feedforwardInput"],
             c.objectLayer.connectedPermanenceProximal))
 
-          for iPresynapticCol in xrange(self.exp.numCorticalColumns):
+          for iPresynapticCol in range(self.exp.numCorticalColumns):
             if iPresynapticCol == iCol:
               synapsesOnSegment = _getActiveSynapses(
                 c.objectLayer.internalDistalPermanences,
@@ -376,7 +376,7 @@ class MultiColumn2DExperimentVisualizer(MultiColumn2DExperimentMonitor):
 
       decodingsByColumn.append(
         [k
-         for k, sdr in c.objectRepresentations.iteritems()
+         for k, sdr in c.objectRepresentations.items()
          if np.intersect1d(activeCells, sdr,
                            assume_unique=True).size == sdr.size])
 
@@ -426,7 +426,7 @@ def _getActiveSynapses(matrix, cell, activeInput, connectedPermanence):
 
 def _getInputDecodings(c, activeCells):
   decodings = []
-  for (objectName, location, feature), sdr in c.inputRepresentations.iteritems():
+  for (objectName, location, feature), sdr in c.inputRepresentations.items():
     amountContained = (np.intersect1d(sdr, activeCells,
                                       assume_unique=True).size /
                        float(sdr.size))

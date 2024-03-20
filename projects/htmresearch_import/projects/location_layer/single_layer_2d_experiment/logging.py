@@ -47,8 +47,8 @@ class SingleLayer2DExperimentVisualizer(SingleLayer2DExperimentMonitor):
     self.subscriberToken = exp.addMonitor(self)
 
     # Make it compatible with JSON -- can only use strings as dict keys.
-    objects = dict((objectName, featureLocationPairs.items())
-                   for objectName, featureLocationPairs in exp.objects.iteritems())
+    objects = dict((objectName, list(featureLocationPairs.items()))
+                   for objectName, featureLocationPairs in exp.objects.items())
 
     self.csvOut.writerow((exp.diameter,))
     self.csvOut.writerow((json.dumps({"A": "red",
@@ -81,21 +81,21 @@ class SingleLayer2DExperimentVisualizer(SingleLayer2DExperimentMonitor):
     self.csvOut.writerow([json.dumps(locationSDR.tolist())])
     self.csvOut.writerow([json.dumps(
       [decoding
-       for decoding, sdr in self.exp.locations.iteritems()
+       for decoding, sdr in self.exp.locations.items()
        if np.intersect1d(locationSDR, sdr).size == sdr.size])])
 
     self.csvOut.writerow(("input", "deltaLocation"))
     self.csvOut.writerow([json.dumps(transitionSDR.tolist())])
     self.csvOut.writerow([json.dumps(
       [decoding
-       for decoding, sdr in self.exp.transitions.iteritems()
+       for decoding, sdr in self.exp.transitions.items()
        if np.intersect1d(transitionSDR, sdr).size == sdr.size])])
 
     self.csvOut.writerow(("input", "feature"))
     self.csvOut.writerow([json.dumps(featureSDR.tolist())])
     self.csvOut.writerow([json.dumps(
       [k
-       for k, sdr in self.exp.features.iteritems()
+       for k, sdr in self.exp.features.items()
        if np.intersect1d(featureSDR, sdr).size == sdr.size])])
 
     self.csvOut.writerow(("egocentricLocation",))
@@ -173,10 +173,10 @@ class SingleLayer2DExperimentVisualizer(SingleLayer2DExperimentMonitor):
       cells[cellForFeatureLocationSegment[i]].append(segmentData)
 
     self.csvOut.writerow(("layer", "location"))
-    self.csvOut.writerow([json.dumps(cells.items())])
+    self.csvOut.writerow([json.dumps(list(cells.items()))])
 
     decodings = [k
-                 for k, sdr in self.locationRepresentations.iteritems()
+                 for k, sdr in self.locationRepresentations.items()
                  if np.intersect1d(activeCells, sdr).size == sdr.size]
     self.csvOut.writerow([json.dumps(decodings)])
 
@@ -235,10 +235,10 @@ class SingleLayer2DExperimentVisualizer(SingleLayer2DExperimentMonitor):
       cells[cellForApicalSegment[i]].append(segmentData)
 
     self.csvOut.writerow(("layer", "input"))
-    self.csvOut.writerow([json.dumps(cells.items())])
+    self.csvOut.writerow([json.dumps(list(cells.items()))])
 
     decodings = [k
-                 for k, sdr in self.inputRepresentations.iteritems()
+                 for k, sdr in self.inputRepresentations.items()
                  if np.intersect1d(activeCells, sdr).size == sdr.size]
     self.csvOut.writerow([json.dumps(decodings)])
 
@@ -263,9 +263,9 @@ class SingleLayer2DExperimentVisualizer(SingleLayer2DExperimentMonitor):
       cells[cell].append(segmentData)
 
     self.csvOut.writerow(("layer", "object"))
-    self.csvOut.writerow([json.dumps(cells.items())])
+    self.csvOut.writerow([json.dumps(list(cells.items()))])
 
     decodings = [k
-                 for k, sdr in self.objectRepresentations.iteritems()
+                 for k, sdr in self.objectRepresentations.items()
                  if np.intersect1d(activeCells, sdr).size == sdr.size]
     self.csvOut.writerow([json.dumps(decodings)])

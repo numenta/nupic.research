@@ -35,7 +35,7 @@ def init_notebook_mode():
     </style>
     """
 
-    script_inject = u"""
+    script_inject = """
     <script type='text/javascript'>
       if(!window.htmresearchviz0) {{
         define('htmresearchviz0', function(require, exports, module) {{

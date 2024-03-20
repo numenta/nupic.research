@@ -24,7 +24,7 @@ Connect the Grid2DLocationExperiment to the locationModuleInference.js
 visualization.
 """
 
-from __future__ import print_function
+
 from collections import defaultdict
 import json
 
@@ -94,7 +94,7 @@ class Grid2DLocationExperimentVisualizer(Grid2DLocationExperimentMonitor):
     print(json.dumps(featureSDR.tolist()), file=self.out)
     print(json.dumps(
       [k
-       for k, sdr in self.exp.features.iteritems()
+       for k, sdr in self.exp.features.items()
        if np.intersect1d(featureSDR, sdr).size == sdr.size]), file=self.out)
 
 
@@ -131,7 +131,7 @@ class Grid2DLocationExperimentVisualizer(Grid2DLocationExperimentMonitor):
     activeLocationCells = self.exp.getActiveLocationCells()
 
     decodings = []
-    for (objectName, location), sdr in self.locationRepresentations.iteritems():
+    for (objectName, location), sdr in self.locationRepresentations.items():
       amountContained = (np.intersect1d(sdr, activeLocationCells).size /
                          float(sdr.size))
       decodings.append(
@@ -183,7 +183,7 @@ class Grid2DLocationExperimentVisualizer(Grid2DLocationExperimentMonitor):
     activeLocationCells = self.exp.getActiveLocationCells()
 
     decodings = []
-    for (objectName, location), sdr in self.locationRepresentations.iteritems():
+    for (objectName, location), sdr in self.locationRepresentations.items():
       amountContained = (np.intersect1d(sdr, activeLocationCells).size /
                          float(sdr.size))
       decodings.append(
@@ -232,7 +232,7 @@ class Grid2DLocationExperimentVisualizer(Grid2DLocationExperimentMonitor):
 
   def getInputDecodings(self, activeCells):
     decodings = []
-    for (objectName, location, feature), sdr in self.inputRepresentations.iteritems():
+    for (objectName, location, feature), sdr in self.inputRepresentations.items():
       amountContained = (np.intersect1d(sdr, activeCells).size /
                          float(sdr.size))
       decodings.append([objectName, location[0], location[1], amountContained])
@@ -288,6 +288,6 @@ class Grid2DLocationExperimentVisualizer(Grid2DLocationExperimentMonitor):
       print(json.dumps([activeCells.tolist()]), file=self.out)
 
     decodings = [k
-                 for k, sdr in self.objectRepresentations.iteritems()
+                 for k, sdr in self.objectRepresentations.items()
                  if np.intersect1d(activeCells, sdr).size == sdr.size]
     print(json.dumps(decodings), file=self.out)

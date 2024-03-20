@@ -24,9 +24,9 @@ Functions that generate and cache SDRs on the filesystem, and a standalone
 SDR generator that can run from the command line.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+
+
+
 
 import glob
 import json
@@ -76,7 +76,7 @@ def createEvenlySpreadSDRs(numSDRs, n, w):
 
   SDRs = []
 
-  for _ in xrange(numSDRs):
+  for _ in range(numSDRs):
     selected = available[:w]
     available = available[w:]
 
@@ -111,14 +111,14 @@ def carefullyCollideContexts(numContexts, numCells, numMinicolumns):
   """
   minicolumns = []
 
-  for _ in xrange(numMinicolumns):
-    contextsForCell = [set() for _ in xrange(numCells)]
+  for _ in range(numMinicolumns):
+    contextsForCell = [set() for _ in range(numCells)]
 
-    contexts = range(numContexts)
+    contexts = list(range(numContexts))
     random.shuffle(contexts)
 
     while len(contexts) > 0:
-      eligibleCells = range(len(contextsForCell))
+      eligibleCells = list(range(len(contextsForCell)))
       while len(contexts) > 0 and len(eligibleCells) > 0:
         candidateAdditions = [(context, cell)
                               for context in contexts

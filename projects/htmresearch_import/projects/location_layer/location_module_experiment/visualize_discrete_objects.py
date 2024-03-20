@@ -81,19 +81,19 @@ def doExperiment(cellDimensions, cellCoordinateOffsets):
                    "width": CM_PER_UNIT,
                    "height": CM_PER_UNIT,
                    "name": featureName}
-                  for location, featureName in objectDict.iteritems()])
-    for objectName, objectDict in DISCRETE_OBJECTS.iteritems())
+                  for location, featureName in objectDict.items()])
+    for objectName, objectDict in DISCRETE_OBJECTS.items())
 
   objectPlacements = dict(
     (objectName, [placement[0] * CM_PER_UNIT,
                   placement[1] * CM_PER_UNIT])
-    for objectName, placement in DISCRETE_OBJECT_PLACEMENTS.iteritems())
+    for objectName, placement in DISCRETE_OBJECT_PLACEMENTS.items())
 
   locationConfigs = []
-  for i in xrange(9):
+  for i in range(9):
     scale = 10.0 * (math.sqrt(2) ** i)
 
-    for _ in xrange(2):
+    for _ in range(2):
       orientation = random.gauss(7.5, 7.5) * math.pi / 180.0
       orientation = random.choice([orientation, -orientation])
 
@@ -122,8 +122,8 @@ def doExperiment(cellDimensions, cellCoordinateOffsets):
        open(synapseFilename, "w") as synapseFileOut:
     with trace(exp, fileOut, includeSynapses=False), \
          trace(exp, synapseFileOut, includeSynapses=True):
-      print "Logging to", filename
-      print "Logging to", synapseFilename
+      print("Logging to", filename)
+      print("Logging to", synapseFilename)
       exp.inferObjectsWithRandomMovements()
 
 
@@ -138,7 +138,7 @@ if __name__ == "__main__":
   doExperiment(cellDimensions=(10, 10),
                cellCoordinateOffsets=(0.05, 0.5, 0.95))
 
-  print "Visualize these logs at:"
-  print "http://numenta.github.io/htmresearch/visualizations/location-layer/location-module-inference.html"
+  print("Visualize these logs at:")
+  print("http://numenta.github.io/htmresearch/visualizations/location-layer/location-module-inference.html")
   print ("or in a Jupyter notebook with the htmresearchviz0 package and the "
          "printLocationModuleInference function.")

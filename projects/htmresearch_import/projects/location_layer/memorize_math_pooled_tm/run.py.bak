@@ -34,9 +34,9 @@ location-offset pair, or for determining an offset from a location-location
 pair.
 """
 
-
-
-
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 from collections import defaultdict
 import glob
 import json
@@ -259,9 +259,9 @@ class PoolOfPairsLocation1DExperiment(object):
     """
     additionalSDRCounts = []
 
-    for _ in range(numTests):
-      iContexts = random.sample(range(self.numLocations), unionSize)
-      iDriving = random.choice(range(self.numLocations))
+    for _ in xrange(numTests):
+      iContexts = random.sample(xrange(self.numLocations), unionSize)
+      iDriving = random.choice(xrange(self.numLocations))
       cDriving = self.drivingOperandSDRs[iDriving]
 
       cContext = np.unique(np.concatenate(
@@ -307,7 +307,7 @@ def runExperiment(n, w, threshold, cellsPerColumn, folder, numTrials=5,
       folder, n, w, threshold, cellsPerColumn))
 
     result = defaultdict(list)
-    for _ in range(numTrials):
+    for _ in xrange(numTrials):
 
       exp = PoolOfPairsLocation1DExperiment(**{
         "numMinicolumns": n,
@@ -329,7 +329,7 @@ def runExperiment(n, w, threshold, cellsPerColumn, folder, numTrials=5,
         result[unionSize] += additionalSDRCounts
 
     with open(filename, "w") as fOut:
-      json.dump(sorted(list(result.items()), key=lambda x: x[0]),
+      json.dump(sorted(result.items(), key=lambda x: x[0]),
                 fOut)
       print("Wrote:", filename)
 

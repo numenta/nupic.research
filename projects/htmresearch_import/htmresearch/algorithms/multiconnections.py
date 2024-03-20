@@ -44,7 +44,7 @@ class Multiconnections(object):
 
     self.connectionsBySource = dict(
       (source, SparseMatrixConnections(cellCount, presynapticCellCount))
-      for source, presynapticCellCount in cellCountBySource.iteritems())
+      for source, presynapticCellCount in cellCountBySource.items())
 
 
   def computeActivity(self, activeInputsBySource, permanenceThreshold=None):
@@ -57,7 +57,7 @@ class Multiconnections(object):
     """
     overlaps = None
 
-    for source, connections in self.connectionsBySource.iteritems():
+    for source, connections in self.connectionsBySource.items():
       o = connections.computeActivity(activeInputsBySource[source],
                                       permanenceThreshold)
       if overlaps is None:
@@ -76,7 +76,7 @@ class Multiconnections(object):
     """
     segments = None
 
-    for connections in self.connectionsBySource.itervalues():
+    for connections in self.connectionsBySource.values():
       created = connections.createSegments(cells)
 
       if segments is None:
@@ -101,7 +101,7 @@ class Multiconnections(object):
 
     @param initialPermanence (float)
     """
-    for source, connections in self.connectionsBySource.iteritems():
+    for source, connections in self.connectionsBySource.items():
       connections.growSynapses(segments, activeInputsBySource[source],
                                initialPermanence)
 
@@ -131,7 +131,7 @@ class Multiconnections(object):
     """
     permanences = np.repeat(np.float32(permanence), len(segments))
 
-    for source, connections in self.connectionsBySource.iteritems():
+    for source, connections in self.connectionsBySource.items():
       if source in presynapticCellsBySource:
         connections.matrix.setElements(segments, presynapticCellsBySource[source],
                                        permanences)
@@ -141,5 +141,5 @@ class Multiconnections(object):
     """
     @param segments (numpy array)
     """
-    connections = next(self.connectionsBySource.itervalues())
+    connections = next(iter(self.connectionsBySource.values()))
     return connections.mapSegmentsToCells(segments)

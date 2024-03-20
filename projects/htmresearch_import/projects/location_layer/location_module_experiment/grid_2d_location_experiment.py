@@ -47,7 +47,7 @@ class Grid2DLocationExperiment(object):
     self.worldDimensions = worldDimensions
 
     self.features = dict(
-      (k, np.array(sorted(random.sample(xrange(150), 15)), dtype="uint32"))
+      (k, np.array(sorted(random.sample(range(150), 15)), dtype="uint32"))
       for k in featureNames)
 
     self.locationModules = [Superficial2DLocationModule(anchorInputSize=150*32,
@@ -138,7 +138,7 @@ class Grid2DLocationExperiment(object):
       deltaLocation = (locationInWorld[0] - self.locationInWorld[0],
                        locationInWorld[1] - self.locationInWorld[1])
 
-      for monitor in self.monitors.values():
+      for monitor in list(self.monitors.values()):
         monitor.beforeMove(deltaLocation)
 
       params = {
@@ -147,17 +147,17 @@ class Grid2DLocationExperiment(object):
       for module in self.locationModules:
         module.movementCompute(**params)
 
-      for monitor in self.monitors.values():
+      for monitor in list(self.monitors.values()):
         monitor.afterLocationShift(**params)
 
     self.locationInWorld = locationInWorld
-    for monitor in self.monitors.values():
+    for monitor in list(self.monitors.values()):
       monitor.afterWorldLocationChanged(locationInWorld)
 
 
   def _senseInferenceMode(self, featureSDR):
     prevCellActivity = None
-    for i in xrange(self.maxSettlingTime):
+    for i in range(self.maxSettlingTime):
       inputParams = {
         "activeColumns": featureSDR,
         "basalInput": self.getActiveLocationCells(),
@@ -190,7 +190,7 @@ class Grid2DLocationExperiment(object):
         break
       else:
         prevCellActivity = cellActivity
-        for monitor in self.monitors.values():
+        for monitor in list(self.monitors.values()):
           if i > 0:
             monitor.markSensoryRepetition()
 
@@ -223,13 +223,13 @@ class Grid2DLocationExperiment(object):
     for module in self.locationModules:
       module.sensoryCompute(**locationParams)
 
-    for monitor in self.monitors.values():
+    for monitor in list(self.monitors.values()):
       monitor.afterInputCompute(**inputParams)
       monitor.afterObjectCompute(**objectParams)
 
 
   def sense(self, featureSDR, learn):
-    for monitor in self.monitors.values():
+    for monitor in list(self.monitors.values()):
       monitor.beforeSense(featureSDR)
 
     if learn:
@@ -248,7 +248,7 @@ class Grid2DLocationExperiment(object):
     - input -> object
     - object -> input
     """
-    for objectName, objectFeatures in self.objects.iteritems():
+    for objectName, objectFeatures in self.objects.items():
       self.reset()
 
       for module in self.locationModules:
@@ -261,7 +261,7 @@ class Grid2DLocationExperiment(object):
 
         featureName = feature["name"]
         featureSDR = self.features[featureName]
-        for _ in xrange(10):
+        for _ in range(10):
           self.sense(featureSDR, learn=True)
 
         self.locationRepresentations[(objectName, locationOnObject)] = (
@@ -276,13 +276,13 @@ class Grid2DLocationExperiment(object):
     """
     Infer each object without any location input.
     """
-    for objectName, objectFeatures in self.objects.iteritems():
+    for objectName, objectFeatures in self.objects.items():
       self.reset()
 
       inferred = False
       prevTouchSequence = None
 
-      for _ in xrange(4):
+      for _ in range(4):
 
         while True:
           touchSequence = list(objectFeatures)
@@ -332,17 +332,15 @@ class Grid2DLocationExperiment(object):
 
     self.locationInWorld = None
 
-    for monitor in self.monitors.values():
+    for monitor in list(self.monitors.values()):
       monitor.afterReset()
 
 
 
-class Grid2DLocationExperimentMonitor(object):
+class Grid2DLocationExperimentMonitor(object, metaclass=abc.ABCMeta):
   """
   Abstract base class for a Grid2DLocationExperiment monitor.
   """
-
-  __metaclass__ = abc.ABCMeta
 
   def beforeSense(self, featureSDR): pass
   def beforeMove(self, deltaLocation): pass
