@@ -47,7 +47,7 @@ import random
 import numpy as np
 
 from nupic.bindings.math import SparseMatrixConnections, SparseMatrix
-from htmresearch.algorithms.apical_tiebreak_temporal_memory import (
+from nupic.research.frameworks.columns import (
   ApicalTiebreakPairMemory)
 
 from generate_sdrs import (generateMinicolumnSDRs, createEvenlySpreadSDRs,

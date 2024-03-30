@@ -30,7 +30,7 @@ import math
 import os
 import random
 
-from htmresearch.algorithms.location_modules import Superficial2DLocationModule
+from nupic.research.frameworks.location.location_modules import Superficial2DLocationModule
 
 
 def go():
@@ -46,6 +46,7 @@ def go():
 
     stepsPerScale = 5
 
+    loggedLocationConfigs = []
     locationConfigs = []
     for i in range(9):
       scale = 10.0 * (math.sqrt(2) ** i)
@@ -55,6 +56,12 @@ def go():
         orientation = random.choice([orientation, -orientation])
 
         locationConfigs.append({
+          "cellsPerAxis": 5,
+          "scale": scale,
+          "orientation": orientation,
+          "cellCoordinateOffsets": (0.5,),
+        })
+        loggedLocationConfigs.append({
           "cellDimensions": (5, 5),
           "moduleMapDimensions": (scale, scale),
           "orientation": orientation,
@@ -63,7 +70,7 @@ def go():
 
     print(json.dumps({"width": worldWidth,
                       "height": worldHeight}), file=fileOut)
-    print(json.dumps(locationConfigs), file=fileOut)
+    print(json.dumps(loggedLocationConfigs), file=fileOut)
 
     modules = [Superficial2DLocationModule(anchorInputSize=0, **config)
                for config in locationConfigs]

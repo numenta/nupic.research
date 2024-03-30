@@ -234,7 +234,7 @@ def doExperiment(locationModuleWidth,
       foundUpperBound = True
 
     if foundUpperBound:
-      increment /= 2
+      increment //= 2
 
       goalResolution = capacityResolution
 
@@ -318,7 +318,7 @@ def runExperiments(experiments, resultName, numWorkers=-1, appendResults=False):
     except IOError:
       pass
 
-  with open(os.path.join(SCRIPT_DIR, resultName),"wb") as f:
+  with open(os.path.join(SCRIPT_DIR, resultName), "w") as f:
     print("Writing results to {}".format(resultName))
     json.dump(results,f)
 

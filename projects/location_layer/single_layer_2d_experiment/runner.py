@@ -25,10 +25,11 @@ import random
 
 import numpy as np
 
-from htmresearch.algorithms.apical_tiebreak_temporal_memory import (
-  ApicalTiebreakPairMemory)
-from htmresearch.algorithms.column_pooler import ColumnPooler
-from htmresearch.algorithms.single_layer_location_memory import (
+from nupic.research.frameworks.columns import (
+  ApicalTiebreakPairMemory,
+  ColumnPooler,
+)
+from nupic.research.frameworks.location.single_layer_location_memory import (
   SingleLayerLocationMemory)
 
 

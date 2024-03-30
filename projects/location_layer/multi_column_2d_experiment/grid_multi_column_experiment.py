@@ -30,13 +30,13 @@ import random
 
 import numpy as np
 
-from htmresearch.algorithms.apical_tiebreak_temporal_memory import (
-  ApicalTiebreakPairMemory)
-from htmresearch.algorithms.location_modules import (
+from nupic.research.frameworks.columns import (
+  ApicalTiebreakPairMemory,
+  ColumnPooler)
+from nupic.research.frameworks.location.location_modules import (
   BodyToSpecificObjectModule2D, SensorToBodyModule2D,
   SensorToSpecificObjectModule)
-from htmresearch.algorithms.column_pooler import ColumnPooler
-from htmresearch.frameworks.layers.sensor_placement import greedySensorPositions
+from nupic.research.frameworks.columns.sensor_placement import greedySensorPositions
 
 
 class CorticalColumn(object):

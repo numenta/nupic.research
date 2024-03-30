@@ -98,11 +98,11 @@ def doExperiment(cellDimensions, cellCoordinateOffsets):
       orientation = random.choice([orientation, -orientation])
 
       locationConfigs.append({
-        "cellDimensions": cellDimensions,
-        "moduleMapDimensions": (scale, scale),
-        "orientation": orientation,
-        "cellCoordinateOffsets": cellCoordinateOffsets,
-      })
+          "cellsPerAxis": 5,
+          "scale": scale,
+          "orientation": orientation,
+          "cellCoordinateOffsets": cellCoordinateOffsets,
+        })
 
   exp = Grid2DLocationExperiment(
     featureNames=("A", "B"),

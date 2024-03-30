@@ -25,8 +25,8 @@ A single-layer approach to computing a location
 
 import numpy as np
 
-from htmresearch.support import numpy_helpers as np2
 from nupic.bindings.math import SparseMatrixConnections, Random
+from nupic.research.frameworks.columns import numpy_helpers as np2
 
 
 

@@ -28,10 +28,11 @@ import random
 
 import numpy as np
 
-from htmresearch.algorithms.apical_tiebreak_temporal_memory import (
-  ApicalTiebreakPairMemory)
-from htmresearch.algorithms.column_pooler import ColumnPooler
-from htmresearch.algorithms.location_modules import Superficial2DLocationModule
+from nupic.research.frameworks.columns import (
+  ApicalTiebreakPairMemory,
+  ColumnPooler,
+)
+from nupic.research.frameworks.location.location_modules import Superficial2DLocationModule
 
 
 class Grid2DLocationExperiment(object):
@@ -57,7 +58,7 @@ class Grid2DLocationExperiment(object):
     self.inputLayer = ApicalTiebreakPairMemory(**{
       "columnCount": 150,
       "cellsPerColumn": 32,
-      "basalInputSize": 18 * sum(np.prod(config["cellDimensions"])
+      "basalInputSize": 18 * sum(config["cellsPerAxis"] ** 2
                                  for config in locationConfigs),
       "apicalInputSize": 4096
     })
