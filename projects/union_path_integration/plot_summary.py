@@ -227,7 +227,13 @@ def createCharts(
     locs, labels = ambiguity_index.getTotalExpectedOccurrencesTicks_2_5(
         ambiguity_index.numOtherOccurrencesOfMostUniqueFeature_lowerBound50_100features_10locationsPerObject
     )
-    locs = [loc for loc in locs if loc < axRecognitionTime.get_xlim()[1] - 10]
+    locs_ = []
+    labels_ = []
+    for loc, label in zip(locs, labels):
+        if loc < axRecognitionTime.get_xlim()[1] - 10:
+            locs_.append(loc)
+            labels_.append(label)
+    locs, labels = locs_, labels_
 
     ax2RecognitionTime = axRecognitionTime.twiny()
     ax2RecognitionTime.set_xlabel(

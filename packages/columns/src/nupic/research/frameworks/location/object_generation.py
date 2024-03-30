@@ -84,7 +84,7 @@ def generateObjectFeatures(numObjects, featuresPerObject, numFeatures, distribut
         return allFeatures.reshape(numObjects, featuresPerObject)
     elif distribution == "TwoPools_Replacement":
         probabilityByFeature = np.ones(numFeatures, dtype="float")
-        probabilityByFeature[numFeatures / 2 :] = 2.5
+        probabilityByFeature[numFeatures // 2 :] = 2.5
         probabilityByFeature /= np.sum(probabilityByFeature)
 
         return np.array(
