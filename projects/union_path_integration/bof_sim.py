@@ -28,53 +28,52 @@ import numpy as np
 
 
 def generateObjects(numObjects, numFeatures):
-  objects = {}
-  for i in range(numObjects):
-    obj = np.random.randint(numFeatures, size=10, dtype=np.int32)
-    objects[i] = obj
-  return objects
+    objects = {}
+    for i in range(numObjects):
+        obj = np.random.randint(numFeatures, size=10, dtype=np.int32)
+        objects[i] = obj
+    return objects
 
 
 def runTrial(objects):
-  results = collections.defaultdict(int)
+    results = collections.defaultdict(int)
 
-  objectSets = []
-  for targetID, targetObj in objects.items():
-    objectSets.append((targetID, frozenset(targetObj)))
+    objectSets = []
+    for targetID, targetObj in objects.items():
+        objectSets.append((targetID, frozenset(targetObj)))
 
+    for _targetID, targetObj in objects.items():
+        np.random.shuffle(targetObj)
 
-  for targetID, targetObj in objects.items():
-    np.random.shuffle(targetObj)
+        candidates = objectSets
+        for i in range(len(targetObj)):
+            step = i + 1
+            feats = frozenset(targetObj[:step])
+            newCandidates = []
+            for objID, obj in candidates:
+                if feats <= obj:
+                    newCandidates.append((objID, obj))
+            candidates = newCandidates
+            if len(candidates) == 1:
+                results[step] += 1
+                break
+        else:
+            results[None] += 1
 
-    candidates = objectSets
-    for i in range(len(targetObj)):
-      step = i + 1
-      feats = frozenset(targetObj[:step])
-      newCandidates = []
-      for objID, obj in candidates:
-        if feats <= obj:
-          newCandidates.append((objID, obj))
-      candidates = newCandidates
-      if len(candidates) == 1:
-        results[step] += 1
-        break
-    else:
-      results[None] += 1
-
-  return results
+    return results
 
 
 def runSim(numObjects, numFeatures, numTrials):
-  # List of trials, each a map from recognition time to number of occurrences
-  results = []
+    # List of trials, each a map from recognition time to number of occurrences
+    results = []
 
-  for _ in range(numTrials):
-    objects = generateObjects(numObjects, numFeatures)
-    results.append(runTrial(objects))
+    for _ in range(numTrials):
+        objects = generateObjects(numObjects, numFeatures)
+        results.append(runTrial(objects))
 
-  with open("results/bof.json", "w") as f:
-    json.dump(results, f)
+    with open("results/bof.json", "w") as f:
+        json.dump(results, f)
 
 
 if __name__ == "__main__":
-  runSim(100, 10, 10)
+    runSim(100, 10, 10)

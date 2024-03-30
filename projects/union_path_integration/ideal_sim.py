@@ -33,114 +33,120 @@ import numpy as np
 
 
 def generateObjects(numObjects, numFeatures):
-  np.random.seed(numObjects)
-  objects = {}
-  for i in range(numObjects):
-    obj = np.zeros((16,), dtype=np.int32)
-    obj.fill(-1)
-    obj[:10] = np.random.randint(numFeatures, size=10, dtype=np.int32)
-    np.random.shuffle(obj)
-    objects[i] = obj.reshape((4, 4))
-  return objects
+    np.random.seed(numObjects)
+    objects = {}
+    for i in range(numObjects):
+        obj = np.zeros((16,), dtype=np.int32)
+        obj.fill(-1)
+        obj[:10] = np.random.randint(numFeatures, size=10, dtype=np.int32)
+        np.random.shuffle(obj)
+        objects[i] = obj.reshape((4, 4))
+    return objects
 
 
 def getStartingSpots(objects):
-  startingSpots = collections.defaultdict(list)
-  for i, obj in objects.items():
-    for x in range(4):
-      for y in range(4):
-        feat = obj[x, y]
-        if feat != -1:
-          startingSpots[feat].append((i, (x, y)))
-  return startingSpots
+    startingSpots = collections.defaultdict(list)
+    for i, obj in objects.items():
+        for x in range(4):
+            for y in range(4):
+                feat = obj[x, y]
+                if feat != -1:
+                    startingSpots[feat].append((i, (x, y)))
+    return startingSpots
 
 
 def runTrial(objects, startingSpots, numFeatures):
-  numObjects = len(objects)
+    numObjects = len(objects)
 
-  results = collections.defaultdict(int)
-  for targetID in range(numObjects):
-    #random.seed(targetID)
-    targetObject = objects[targetID]
+    results = collections.defaultdict(int)
+    for targetID in range(numObjects):
+        # random.seed(targetID)
+        targetObject = objects[targetID]
 
-    possibleObjects = None
+        possibleObjects = None
 
-    possiblePositions = []
-    for x in range(4):
-      for y in range(4):
-        if targetObject[x][y] != -1:
-          possiblePositions.append((x, y))
-    idx = list(range(10))
-    #print idx
-    random.shuffle(idx)
-    #print idx
-    possiblePositions = [possiblePositions[i] for i in idx]
-    #print possiblePositions
-    steps = 0
+        possiblePositions = []
+        for x in range(4):
+            for y in range(4):
+                if targetObject[x][y] != -1:
+                    possiblePositions.append((x, y))
+        idx = list(range(10))
+        # print idx
+        random.shuffle(idx)
+        # print idx
+        possiblePositions = [possiblePositions[i] for i in idx]
+        # print possiblePositions
+        steps = 0
 
-    for x, y in possiblePositions:
-      feat = targetObject[x, y]
-      #print x, y, feat
+        prevPos = None
+        for x, y in possiblePositions:
+            feat = targetObject[x, y]
+            # print x, y, feat
 
-      steps += 1
-      curPos = (x, y)
+            steps += 1
+            curPos = (x, y)
 
-      if possibleObjects is None:
-        possibleObjects = startingSpots[feat]
-      else:
-        changeX = x - prevPos[0]
-        changeY = y - prevPos[1]
+            if possibleObjects is None:
+                possibleObjects = startingSpots[feat]
+            else:
+                changeX = x - prevPos[0]
+                changeY = y - prevPos[1]
 
-        newPossibleObjects = []
-        for objectID, coords in possibleObjects:
-          newX = coords[0] + changeX
-          newY = coords[1] + changeY
-          if (newX < 0 or newX >= objects[objectID].shape[0] or
-              newY < 0 or newY >= objects[objectID].shape[1]):
-            continue
-          expectedFeat = objects[objectID][newX, newY]
-          if expectedFeat == feat:
-            newPossibleObjects.append((objectID, (newX, newY)))
-        possibleObjects = newPossibleObjects
+                newPossibleObjects = []
+                for objectID, coords in possibleObjects:
+                    newX = coords[0] + changeX
+                    newY = coords[1] + changeY
+                    if (
+                        newX < 0
+                        or newX >= objects[objectID].shape[0]
+                        or newY < 0
+                        or newY >= objects[objectID].shape[1]
+                    ):
+                        continue
+                    expectedFeat = objects[objectID][newX, newY]
+                    if expectedFeat == feat:
+                        newPossibleObjects.append((objectID, (newX, newY)))
+                possibleObjects = newPossibleObjects
 
-      possibleObjectIDs = set([pair[0] for pair in possibleObjects])
-      if len(possibleObjects) == 1:
-        assert list(possibleObjectIDs)[0] == targetID
-        results[steps] += 1
-        break
+            possibleObjectIDs = set([pair[0] for pair in possibleObjects])
+            if len(possibleObjects) == 1:
+                assert list(possibleObjectIDs)[0] == targetID
+                results[steps] += 1
+                break
 
-      prevPos = curPos
+            prevPos = curPos
 
-    assert len(possibleObjects) > 0
+        assert len(possibleObjects) > 0
 
-    #if len(possibleObjectIDs) > 1:
-    if len(possibleObjects) > 1:
-      results[None] += 1
+        # if len(possibleObjectIDs) > 1:
+        if len(possibleObjects) > 1:
+            results[None] += 1
 
-  return results
+    return results
 
 
 def runSim(numObjects, numFeatures, numTrials):
-  # List of trials, each a map from recognition time to number of occurrences
-  results = []
-  for _ in range(numTrials):
-    objects = generateObjects(numObjects, numFeatures)
-    # Built map from a feature to all possible positions
-    startingSpots = getStartingSpots(objects)
-    results.append(runTrial(objects, startingSpots, numFeatures))
+    # List of trials, each a map from recognition time to number of occurrences
+    results = []
+    for _ in range(numTrials):
+        objects = generateObjects(numObjects, numFeatures)
+        # Built map from a feature to all possible positions
+        startingSpots = getStartingSpots(objects)
+        results.append(runTrial(objects, startingSpots, numFeatures))
 
-  print(results)
+    print(results)
 
-  total = sum(sum(trial.values()) for trial in results)
-  average = (sum(numSteps*numOccurrences
-                 for trial in results
-                 for numSteps, numOccurrences in trial.items()) /
-             float(total))
-  print("average:", average)
+    total = sum(sum(trial.values()) for trial in results)
+    average = sum(
+        numSteps * numOccurrences
+        for trial in results
+        for numSteps, numOccurrences in trial.items()
+    ) / float(total)
+    print("average:", average)
 
-  with open("results/ideal.json", "w") as f:
-    json.dump(results, f)
+    with open("results/ideal.json", "w") as f:
+        json.dump(results, f)
 
 
 if __name__ == "__main__":
-  runSim(100, 10, 10)
+    runSim(100, 10, 10)

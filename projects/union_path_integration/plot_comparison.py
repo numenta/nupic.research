@@ -34,182 +34,184 @@ CHART_DIR = os.path.join(CWD, "charts")
 
 
 def computeCapacity(results, threshold):
-  """Returns largest number of objects with accuracy above threshold."""
-  closestBelow = None
-  closestAbove = None
-  for numObjects, accuracy in sorted(results):
-    if accuracy >= threshold:
-      if closestAbove is None or closestAbove[0] < numObjects:
-        closestAbove = (numObjects, accuracy)
-        closestBelow = None
-    else:
-      if closestBelow is None:
-        closestBelow = (numObjects, accuracy)
-  if closestBelow is None or closestAbove is None:
-    print(closestBelow, threshold, closestAbove)
-    raise ValueError(
-        "Results must include a value above and below threshold of {}".format(threshold))
+    """Returns largest number of objects with accuracy above threshold."""
+    closestBelow = None
+    closestAbove = None
+    for numObjects, accuracy in sorted(results):
+        if accuracy >= threshold:
+            if closestAbove is None or closestAbove[0] < numObjects:
+                closestAbove = (numObjects, accuracy)
+                closestBelow = None
+        else:
+            if closestBelow is None:
+                closestBelow = (numObjects, accuracy)
+    if closestBelow is None or closestAbove is None:
+        print(closestBelow, threshold, closestAbove)
+        raise ValueError(
+            "Results must include a value above and below threshold of {}".format(
+                threshold
+            )
+        )
 
-  print("  Capacity threshold is between {} and {}".format(closestAbove[0], closestBelow[0]))
+    print(
+        "  Capacity threshold is between {} and {}".format(
+            closestAbove[0], closestBelow[0]
+        )
+    )
 
-  return closestAbove[0]
+    return closestAbove[0]
 
 
 def chart():
-  if not os.path.exists(CHART_DIR):
-    os.makedirs(CHART_DIR)
+    if not os.path.exists(CHART_DIR):
+        os.makedirs(CHART_DIR)
 
-  # Convergence vs. number of objects, comparing # unique features
+    # Convergence vs. number of objects, comparing # unique features
 
-  #plt.style.use("ggplot")
+    # plt.style.use("ggplot")
 
-  # Generate with:
-  # Todo: narrow down the actual number of objects so these can more efficiently be run.
-  # python convergence_simulation.py --numObjects 4000 4500 5000 --numUniqueFeatures 200 --locationModuleWidth 14 --resultName results/convergence_vs_num_objs_196_cpm_200_feats_2.json
-  #python convergence_simulation.py --numObjects 3000 3500 4000 --numUniqueFeatures 200 --locationModuleWidth 12 --resultName results/convergence_vs_num_objs_144_cpm_200_feats_2.json
-  # python convergence_simulation.py --numObjects 2500 3000 3500 --numUniqueFeatures 200 --locationModuleWidth 10 --resultName results/convergence_vs_num_objs_100_cpm_200_feats_2.json
-  # python convergence_simulation.py --numObjects 1500 2000 2500 --numUniqueFeatures 200 --locationModuleWidth 7 --resultName results/convergence_vs_num_objs_49_cpm_200_feats_2.json
-  fnames = (
-      "results/comparison_400_cpm_400_feats.json",
-      "results/comparison_289_cpm_400_feats.json",
-      "results/comparison_196_cpm_400_feats.json",
-      "results/comparison_100_cpm_400_feats.json",
+    # Generate with:
+    # Todo: narrow down the actual number of objects so these can more efficiently be run.
+    # python convergence_simulation.py --numObjects 4000 4500 5000 --numUniqueFeatures 200 --locationModuleWidth 14 --resultName results/convergence_vs_num_objs_196_cpm_200_feats_2.json
+    # python convergence_simulation.py --numObjects 3000 3500 4000 --numUniqueFeatures 200 --locationModuleWidth 12 --resultName results/convergence_vs_num_objs_144_cpm_200_feats_2.json
+    # python convergence_simulation.py --numObjects 2500 3000 3500 --numUniqueFeatures 200 --locationModuleWidth 10 --resultName results/convergence_vs_num_objs_100_cpm_200_feats_2.json
+    # python convergence_simulation.py --numObjects 1500 2000 2500 --numUniqueFeatures 200 --locationModuleWidth 7 --resultName results/convergence_vs_num_objs_49_cpm_200_feats_2.json
+    fnames = (
+        "results/comparison_400_cpm_400_feats.json",
+        "results/comparison_289_cpm_400_feats.json",
+        "results/comparison_196_cpm_400_feats.json",
+        "results/comparison_100_cpm_400_feats.json",
+        "results/comparison_400_cpm_300_feats.json",
+        "results/comparison_289_cpm_300_feats.json",
+        "results/comparison_196_cpm_300_feats.json",
+        "results/comparison_100_cpm_300_feats.json",
+        "results/comparison_400_cpm_200_feats.json",
+        "results/comparison_289_cpm_200_feats.json",
+        "results/comparison_196_cpm_200_feats.json",
+        "results/comparison_100_cpm_200_feats.json",
+        "results/comparison_400_cpm_100_feats.json",
+        "results/comparison_289_cpm_100_feats.json",
+        "results/comparison_196_cpm_100_feats.json",
+        "results/comparison_100_cpm_100_feats.json",
+        # "results/convergence_vs_num_objs_196_cpm_175_feats.json",
+        # "results/convergence_vs_num_objs_196_cpm_125_feats.json",
+        # "results/convergence_vs_num_objs_196_cpm_75_feats.json",
+        # "results/convergence_vs_num_objs_196_cpm_25_feats.json",
+        # "results/convergence_vs_num_objs_144_cpm_175_feats.json",
+        # "results/convergence_vs_num_objs_144_cpm_125_feats.json",
+        # "results/convergence_vs_num_objs_144_cpm_75_feats.json",
+        # "results/convergence_vs_num_objs_144_cpm_25_feats.json",
+        # "results/convergence_vs_num_objs_144_cpm_125_feats_2.json",
+        # "results/convergence_vs_num_objs_100_cpm_175_feats.json",
+        # "results/convergence_vs_num_objs_100_cpm_175_feats_2.json",
+        # "results/convergence_vs_num_objs_100_cpm_125_feats.json",
+        # "results/convergence_vs_num_objs_100_cpm_75_feats.json",
+        # "results/convergence_vs_num_objs_100_cpm_25_feats.json",
+        # "results/convergence_vs_num_objs_49_cpm_175_feats.json",
+        # "results/convergence_vs_num_objs_49_cpm_125_feats.json",
+        # "results/convergence_vs_num_objs_49_cpm_75_feats.json",
+        # "results/convergence_vs_num_objs_49_cpm_25_feats.json",
+    )
 
-      "results/comparison_400_cpm_300_feats.json",
-      "results/comparison_289_cpm_300_feats.json",
-      "results/comparison_196_cpm_300_feats.json",
-      "results/comparison_100_cpm_300_feats.json",
+    # (modSize, numFeats) -> [(numObjs, accuracy), ...]
+    capacities = collections.defaultdict(list)
+    for fname in fnames:
+        with open(fname, "r") as f:
+            data = json.load(f)
 
-      "results/comparison_400_cpm_200_feats.json",
-      "results/comparison_289_cpm_200_feats.json",
-      "results/comparison_196_cpm_200_feats.json",
-      "results/comparison_100_cpm_200_feats.json",
+        for exp in data:
+            modSize = np.prod(exp[0]["cellDimensions"])
+            numFeatures = exp[0]["numFeatures"]
+            k = (modSize, numFeatures)
+            numObjects = exp[0]["numObjects"]
 
-      "results/comparison_400_cpm_100_feats.json",
-      "results/comparison_289_cpm_100_feats.json",
-      "results/comparison_196_cpm_100_feats.json",
-      "results/comparison_100_cpm_100_feats.json",
+            failed = exp[1]["convergence"].get("null", 0)
+            accuracy = (float(numObjects) - float(failed)) / float(numObjects)
+            capacities[k].append((numObjects, accuracy))
 
-      #"results/convergence_vs_num_objs_196_cpm_175_feats.json",
-      #"results/convergence_vs_num_objs_196_cpm_125_feats.json",
-      #"results/convergence_vs_num_objs_196_cpm_75_feats.json",
-      #"results/convergence_vs_num_objs_196_cpm_25_feats.json",
+    plotData = np.zeros((4, 4))
+    modSizeMap = (100, 196, 289, 400)
+    # modSizeMap = (49, 100, 144, 196)
+    numFeaturesMap = (100, 200, 300, 400)
+    # numFeaturesMap = (50, 100, 150, 200)
+    # numFeaturesMap = (25, 50, 75, 100, 125, 150, 175, 200)
+    scatterX = []
+    scatterY = []
+    scatterLabels = []
+    for modSizeI in range(4):
+        for numFeaturesI in range(4):
+            modSize = modSizeMap[modSizeI]
+            numFeatures = numFeaturesMap[numFeaturesI]
+            print(modSize, numFeatures)
+            capacity90 = computeCapacity(capacities[(modSize, numFeatures)], 0.9)
+            plotData[modSizeI][numFeaturesI] = capacity90
 
-      #"results/convergence_vs_num_objs_144_cpm_175_feats.json",
-      #"results/convergence_vs_num_objs_144_cpm_125_feats.json",
-      #"results/convergence_vs_num_objs_144_cpm_75_feats.json",
-      #"results/convergence_vs_num_objs_144_cpm_25_feats.json",
-      #"results/convergence_vs_num_objs_144_cpm_125_feats_2.json",
+            scatterX.append(modSize * numFeatures)
+            scatterY.append(capacity90)
+            scatterLabels.append("({}, {})".format(modSize, numFeatures))
 
-      #"results/convergence_vs_num_objs_100_cpm_175_feats.json",
-      #"results/convergence_vs_num_objs_100_cpm_175_feats_2.json",
-      #"results/convergence_vs_num_objs_100_cpm_125_feats.json",
-      #"results/convergence_vs_num_objs_100_cpm_75_feats.json",
-      #"results/convergence_vs_num_objs_100_cpm_25_feats.json",
+    # Fit data
+    def func(x, a, b):
+        return (x * a) + b
 
-      #"results/convergence_vs_num_objs_49_cpm_175_feats.json",
-      #"results/convergence_vs_num_objs_49_cpm_125_feats.json",
-      #"results/convergence_vs_num_objs_49_cpm_75_feats.json",
-      #"results/convergence_vs_num_objs_49_cpm_25_feats.json",
-  )
+    popt, pcov = scipy.optimize.curve_fit(func, np.array(scatterX), scatterY)
+    a, b = popt
+    perr = np.sqrt(np.diag(pcov))
+    print("Fitted data to linear model")
+    print("  Best fit values:", popt)
+    print("  Covariance matrix:", pcov)
+    print("  1 stdev:", perr)
 
-  # (modSize, numFeats) -> [(numObjs, accuracy), ...]
-  capacities = collections.defaultdict(list)
-  for fname in fnames:
-    with open(fname, "r") as f:
-      data = json.load(f)
+    xlabels = [str(v) for v in numFeaturesMap]
+    ylabels = [str(v) for v in modSizeMap]
 
-    for exp in data:
-      modSize = np.prod(exp[0]["cellDimensions"])
-      numFeatures = exp[0]["numFeatures"]
-      k = (modSize, numFeatures)
-      numObjects = exp[0]["numObjects"]
+    fig, ax = plt.subplots()
+    plt.imshow(plotData)
 
-      failed = exp[1]["convergence"].get("null", 0)
-      accuracy = (float(numObjects) - float(failed)) / float(numObjects)
-      capacities[k].append((numObjects, accuracy))
+    ax.invert_yaxis()
+    ax.set_xticks(np.arange(len(xlabels)))
+    ax.set_yticks(np.arange(len(ylabels)))
+    ax.set_xticklabels(xlabels)
+    ax.set_yticklabels(ylabels)
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
 
-  plotData = np.zeros((4, 4))
-  modSizeMap = (100, 196, 289, 400)
-  #modSizeMap = (49, 100, 144, 196)
-  numFeaturesMap = (100, 200, 300, 400)
-  #numFeaturesMap = (50, 100, 150, 200)
-  #numFeaturesMap = (25, 50, 75, 100, 125, 150, 175, 200)
-  scatterX = []
-  scatterY = []
-  scatterLabels = []
-  for modSizeI in range(4):
-    for numFeaturesI in range(4):
-      modSize = modSizeMap[modSizeI]
-      numFeatures = numFeaturesMap[numFeaturesI]
-      print(modSize, numFeatures)
-      capacity90 = computeCapacity(capacities[(modSize, numFeatures)], 0.9)
-      plotData[modSizeI][numFeaturesI] = capacity90
+    for i in range(len(ylabels)):
+        for j in range(len(xlabels)):
+            ax.text(
+                j, i, str(int(plotData[i, j])), ha="center", va="center", color="w"
+            )
 
-      scatterX.append(modSize * numFeatures)
-      scatterY.append(capacity90)
-      scatterLabels.append("({}, {})".format(modSize, numFeatures))
+    plt.xlabel("Number of Unique Features")
+    plt.ylabel("Cells Per Module")
 
-  # Fit data
-  def func(x, a, b):
-    return (x * a) + b
-  popt, pcov = scipy.optimize.curve_fit(func, np.array(scatterX), scatterY)
-  a, b = popt
-  perr = np.sqrt(np.diag(pcov))
-  print("Fitted data to linear model")
-  print("  Best fit values:", popt)
-  print("  Covariance matrix:", pcov)
-  print("  1 stdev:", perr)
+    fig.tight_layout()
 
-  xlabels = [str(v) for v in numFeaturesMap]
-  ylabels = [str(v) for v in modSizeMap]
+    plt.savefig(os.path.join(CHART_DIR, "comparison_modsize_vs_feats.pdf"))
 
-  fig, ax = plt.subplots()
-  plt.imshow(plotData)
+    plt.clf()
 
-  ax.invert_yaxis()
-  ax.set_xticks(np.arange(len(xlabels)))
-  ax.set_yticks(np.arange(len(ylabels)))
-  ax.set_xticklabels(xlabels)
-  ax.set_yticklabels(ylabels)
-  plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
-           rotation_mode="anchor")
+    # Module size vs. # features comparison scatter plot
 
-  for i in range(len(ylabels)):
-    for j in range(len(xlabels)):
-      text = ax.text(j, i, str(int(plotData[i, j])), ha="center", va="center", color="w")
+    plt.plot([0, 160000], [b, (a * 160000) + b], "k-")
+    # aBelow = a - perr[0]
+    # aAbove = a + perr[0]
+    # bBelow = b - perr[1]
+    # bAbove = b + perr[1]
+    # yBelow = [bBelow, (aBelow * 160000) + bBelow]
+    # yAbove = [bAbove, (aAbove * 160000) + bAbove]
+    # plt.fill_between([0, 40000], yBelow, yAbove, alpha=0.3)
+    plt.scatter(scatterX, scatterY, c="000", marker="D")
 
-  plt.xlabel("Number of Unique Features")
-  plt.ylabel("Cells Per Module")
+    # plt.figure(figsize=(4, 3))
 
-  fig.tight_layout()
+    plt.xlabel("Cells Per Module x Number of Unique Features")
+    plt.ylabel("Capacity")
+    fig.tight_layout()
 
-  plt.savefig(os.path.join(CHART_DIR, "comparison_modsize_vs_feats.pdf"))
+    plt.savefig(os.path.join(CHART_DIR, "comparison_with_fit.pdf"))
 
-  plt.clf()
-
-  # Module size vs. # features comparison scatter plot
-
-  plt.plot([0, 160000], [b, (a * 160000) + b], "k-")
-  aBelow = a - perr[0]
-  aAbove = a + perr[0]
-  bBelow = b - perr[1]
-  bAbove = b + perr[1]
-  yBelow = [bBelow, (aBelow * 160000) + bBelow]
-  yAbove = [bAbove, (aAbove * 160000) + bAbove]
-  #plt.fill_between([0, 40000], yBelow, yAbove, alpha=0.3)
-  plt.scatter(scatterX, scatterY, c="000", marker="D")
-
-  #plt.figure(figsize=(4, 3))
-
-  plt.xlabel("Cells Per Module x Number of Unique Features")
-  plt.ylabel("Capacity")
-  fig.tight_layout()
-
-  plt.savefig(os.path.join(CHART_DIR, "comparison_with_fit.pdf"))
-
-  plt.clf()
+    plt.clf()
 
 
 if __name__ == "__main__":
-  chart()
+    chart()

@@ -22,86 +22,85 @@
 """Plot comparison chart."""
 
 import argparse
-from collections import defaultdict
 import json
 import os
+from collections import defaultdict
 
-import matplotlib.pyplot as plt
 import matplotlib.colors as colors
+import matplotlib.pyplot as plt
 import numpy as np
-import scipy.optimize
 
 CWD = os.path.dirname(os.path.realpath(__file__))
 CHART_DIR = os.path.join(CWD, "charts")
 
 
 def chart2(inFilename, outFilename, cellCounts, featureCounts):
-  if not os.path.exists(CHART_DIR):
-    os.makedirs(CHART_DIR)
+    if not os.path.exists(CHART_DIR):
+        os.makedirs(CHART_DIR)
 
-  capacitiesByParams = defaultdict(list)
-  with open(inFilename, "r") as f:
-    experiments = json.load(f)
-  for exp in experiments:
-    locationModuleWidth = exp[0]["locationModuleWidth"]
-    numUniqueFeatures = exp[0]["numFeatures"]
+    capacitiesByParams = defaultdict(list)
+    with open(inFilename, "r") as f:
+        experiments = json.load(f)
+    for exp in experiments:
+        locationModuleWidth = exp[0]["locationModuleWidth"]
+        numUniqueFeatures = exp[0]["numFeatures"]
 
-    cellsPerModule = locationModuleWidth*locationModuleWidth
+        cellsPerModule = locationModuleWidth * locationModuleWidth
 
-    capacitiesByParams[(cellsPerModule, numUniqueFeatures)].append(exp[1]["numObjects"])
+        capacitiesByParams[(cellsPerModule, numUniqueFeatures)].append(
+            exp[1]["numObjects"]
+        )
 
-  meanCapacityByParams = {}
-  for params, capacities in capacitiesByParams.items():
-    meanCapacityByParams[params] = sum(capacities) / float(len(capacities))
+    meanCapacityByParams = {}
+    for params, capacities in capacitiesByParams.items():
+        meanCapacityByParams[params] = sum(capacities) / float(len(capacities))
 
-  xlabels = [str(v) for v in featureCounts]
-  ylabels = [str(v) for v in cellCounts]
+    xlabels = [str(v) for v in featureCounts]
+    ylabels = [str(v) for v in cellCounts]
 
-  plotData = np.empty((len(cellCounts), len(featureCounts)), dtype="float")
-  for i, cellsPerModule in enumerate(cellCounts):
-    for j, numUniqueFeatures in enumerate(featureCounts):
-      plotData[i, j] = meanCapacityByParams[(cellsPerModule, numUniqueFeatures)]
+    plotData = np.empty((len(cellCounts), len(featureCounts)), dtype="float")
+    for i, cellsPerModule in enumerate(cellCounts):
+        for j, numUniqueFeatures in enumerate(featureCounts):
+            plotData[i, j] = meanCapacityByParams[(cellsPerModule, numUniqueFeatures)]
 
-  fig, ax = plt.subplots(figsize=(3.25, 3.25), tight_layout = {"pad": 0})
+    fig, ax = plt.subplots(figsize=(3.25, 3.25), tight_layout={"pad": 0})
 
-  # Customize vmax so that the colors stay suffiently dark so that the white
-  # text is readable.
-  plt.imshow(plotData,
-             norm=colors.LogNorm(vmin=plotData.min(), vmax=plotData.max()*3.0))
+    # Customize vmax so that the colors stay suffiently dark so that the white
+    # text is readable.
+    plt.imshow(
+        plotData, norm=colors.LogNorm(vmin=plotData.min(), vmax=plotData.max() * 3.0)
+    )
 
-  ax.xaxis.set_label_position('top')
-  ax.xaxis.tick_top()
-  ax.set_xticks(np.arange(len(xlabels)))
-  ax.set_yticks(np.arange(len(ylabels)))
-  ax.set_xticklabels(xlabels)
-  ax.set_yticklabels(ylabels)
-  plt.setp(ax.get_xticklabels(), rotation=45, ha="left", rotation_mode="anchor")
+    ax.xaxis.set_label_position("top")
+    ax.xaxis.tick_top()
+    ax.set_xticks(np.arange(len(xlabels)))
+    ax.set_yticks(np.arange(len(ylabels)))
+    ax.set_xticklabels(xlabels)
+    ax.set_yticklabels(ylabels)
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="left", rotation_mode="anchor")
 
-  for i in range(len(ylabels)):
-    for j in range(len(xlabels)):
-      text = ax.text(j, i, str(int(plotData[i, j])), ha="center", va="center",
-                     color="w")
+    for i in range(len(ylabels)):
+        for j in range(len(xlabels)):
+            ax.text(
+                j, i, str(int(plotData[i, j])), ha="center", va="center", color="w"
+            )
 
-  plt.xlabel("Number of Unique Features")
-  plt.ylabel("Cells Per Module")
+    plt.xlabel("Number of Unique Features")
+    plt.ylabel("Cells Per Module")
 
-  filePath = os.path.join(CHART_DIR, outFilename)
-  print("Saving", filePath)
-  plt.savefig(filePath)
+    filePath = os.path.join(CHART_DIR, outFilename)
+    print("Saving", filePath)
+    plt.savefig(filePath)
 
 
 if __name__ == "__main__":
-  plt.rc("font",**{"family": "sans-serif",
-                   "sans-serif": ["Arial"],
-                   "size": 8})
+    plt.rc("font", **{"family": "sans-serif", "sans-serif": ["Arial"], "size": 8})
 
-  parser = argparse.ArgumentParser()
-  parser.add_argument("--inFile", type=str, required=True)
-  parser.add_argument("--outFile", type=str, required=True)
-  args = parser.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--inFile", type=str, required=True)
+    parser.add_argument("--outFile", type=str, required=True)
+    args = parser.parse_args()
 
-  counts = [w**2 for w in [6, 8, 10, 14, 17, 20]]
+    counts = [w**2 for w in [6, 8, 10, 14, 17, 20]]
 
-  chart2(args.inFile, args.outFile,
-         cellCounts=counts,
-         featureCounts=counts)
+    chart2(args.inFile, args.outFile, cellCounts=counts, featureCounts=counts)

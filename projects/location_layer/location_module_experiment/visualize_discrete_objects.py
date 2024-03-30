@@ -32,113 +32,121 @@ import numpy as np
 from grid_2d_location_experiment import Grid2DLocationExperiment
 from three_layer_tracing import Grid2DLocationExperimentVisualizer as trace
 
-
 DISCRETE_OBJECTS = {
-  "Object 1": {(0,0): "A",
-               (0,1): "B",
-               (0,2): "A",
-               (1,0): "A",
-               (1,2): "A"},
-  "Object 2": {(0,1): "A",
-               (1,0): "B",
-               (1,1): "B",
-               (1,2): "B",
-               (2,1): "A"},
-  "Object 3": {(0,1): "A",
-               (1,0): "A",
-               (1,1): "B",
-               (1,2): "A",
-               (2,0): "B",
-               (2,1): "A",
-               (2,2): "B"},
-  "Object 4": {(0,0): "A",
-               (0,1): "A",
-               (0,2): "A",
-               (1,0): "A",
-               (1,2): "B",
-               (2,0): "B",
-               (2,1): "B",
-               (2,2): "B"},
+    "Object 1": {(0, 0): "A", (0, 1): "B", (0, 2): "A", (1, 0): "A", (1, 2): "A"},
+    "Object 2": {(0, 1): "A", (1, 0): "B", (1, 1): "B", (1, 2): "B", (2, 1): "A"},
+    "Object 3": {
+        (0, 1): "A",
+        (1, 0): "A",
+        (1, 1): "B",
+        (1, 2): "A",
+        (2, 0): "B",
+        (2, 1): "A",
+        (2, 2): "B",
+    },
+    "Object 4": {
+        (0, 0): "A",
+        (0, 1): "A",
+        (0, 2): "A",
+        (1, 0): "A",
+        (1, 2): "B",
+        (2, 0): "B",
+        (2, 1): "B",
+        (2, 2): "B",
+    },
 }
 
 DISCRETE_OBJECT_PLACEMENTS = {
-  "Object 1": (2, 3),
-  "Object 2": (6, 2),
-  "Object 3": (3, 7),
-  "Object 4": (7, 6)
+    "Object 1": (2, 3),
+    "Object 2": (6, 2),
+    "Object 3": (3, 7),
+    "Object 4": (7, 6),
 }
 
 CM_PER_UNIT = 100.0 / 12.0
 
 
 def doExperiment(cellDimensions, cellCoordinateOffsets):
-  if not os.path.exists("logs"):
-    os.makedirs("logs")
+    if not os.path.exists("logs"):
+        os.makedirs("logs")
 
-  objects = dict(
-    (objectName, [{"top": location[0] * CM_PER_UNIT,
-                   "left": location[1] * CM_PER_UNIT,
-                   "width": CM_PER_UNIT,
-                   "height": CM_PER_UNIT,
-                   "name": featureName}
-                  for location, featureName in objectDict.items()])
-    for objectName, objectDict in DISCRETE_OBJECTS.items())
+    objects = dict(
+        (
+            objectName,
+            [
+                {
+                    "top": location[0] * CM_PER_UNIT,
+                    "left": location[1] * CM_PER_UNIT,
+                    "width": CM_PER_UNIT,
+                    "height": CM_PER_UNIT,
+                    "name": featureName,
+                }
+                for location, featureName in objectDict.items()
+            ],
+        )
+        for objectName, objectDict in DISCRETE_OBJECTS.items()
+    )
 
-  objectPlacements = dict(
-    (objectName, [placement[0] * CM_PER_UNIT,
-                  placement[1] * CM_PER_UNIT])
-    for objectName, placement in DISCRETE_OBJECT_PLACEMENTS.items())
+    objectPlacements = dict(
+        (objectName, [placement[0] * CM_PER_UNIT, placement[1] * CM_PER_UNIT])
+        for objectName, placement in DISCRETE_OBJECT_PLACEMENTS.items()
+    )
 
-  locationConfigs = []
-  for i in range(9):
-    scale = 10.0 * (math.sqrt(2) ** i)
+    locationConfigs = []
+    for i in range(9):
+        scale = 10.0 * (math.sqrt(2) ** i)
 
-    for _ in range(2):
-      orientation = random.gauss(7.5, 7.5) * math.pi / 180.0
-      orientation = random.choice([orientation, -orientation])
+        for _ in range(2):
+            orientation = random.gauss(7.5, 7.5) * math.pi / 180.0
+            orientation = random.choice([orientation, -orientation])
 
-      locationConfigs.append({
-          "cellsPerAxis": 5,
-          "scale": scale,
-          "orientation": orientation,
-          "cellCoordinateOffsets": cellCoordinateOffsets,
-        })
+            locationConfigs.append(
+                {
+                    "cellsPerAxis": 5,
+                    "scale": scale,
+                    "orientation": orientation,
+                    "cellCoordinateOffsets": cellCoordinateOffsets,
+                }
+            )
 
-  exp = Grid2DLocationExperiment(
-    featureNames=("A", "B"),
-    objects=objects,
-    objectPlacements=objectPlacements,
-    locationConfigs=locationConfigs,
-    worldDimensions=(100, 100))
+    exp = Grid2DLocationExperiment(
+        featureNames=("A", "B"),
+        objects=objects,
+        objectPlacements=objectPlacements,
+        locationConfigs=locationConfigs,
+        worldDimensions=(100, 100),
+    )
 
-  exp.learnObjects()
+    exp.learnObjects()
 
-  filename = "logs/{}-points-{}-cells.log".format(
-    len(cellCoordinateOffsets)**2, np.prod(cellDimensions))
-  synapseFilename = "logs/{}-points-{}-cells-synapses.log".format(
-    len(cellCoordinateOffsets)**2, np.prod(cellDimensions))
+    filename = "logs/{}-points-{}-cells.log".format(
+        len(cellCoordinateOffsets) ** 2, np.prod(cellDimensions)
+    )
+    synapseFilename = "logs/{}-points-{}-cells-synapses.log".format(
+        len(cellCoordinateOffsets) ** 2, np.prod(cellDimensions)
+    )
 
-  with open(filename, "w") as fileOut, \
-       open(synapseFilename, "w") as synapseFileOut:
-    with trace(exp, fileOut, includeSynapses=False), \
-         trace(exp, synapseFileOut, includeSynapses=True):
-      print("Logging to", filename)
-      print("Logging to", synapseFilename)
-      exp.inferObjectsWithRandomMovements()
-
+    with open(filename, "w") as fileOut, open(synapseFilename, "w") as synapseFileOut:
+        with trace(exp, fileOut, includeSynapses=False), trace(
+            exp, synapseFileOut, includeSynapses=True
+        ):
+            print("Logging to", filename)
+            print("Logging to", synapseFilename)
+            exp.inferObjectsWithRandomMovements()
 
 
 if __name__ == "__main__":
-  doExperiment(cellDimensions=(5, 5),
-               cellCoordinateOffsets=(0.5,))
+    doExperiment(cellDimensions=(5, 5), cellCoordinateOffsets=(0.5,))
 
-  doExperiment(cellDimensions=(5, 5),
-               cellCoordinateOffsets=(0.05, 0.5, 0.95))
+    doExperiment(cellDimensions=(5, 5), cellCoordinateOffsets=(0.05, 0.5, 0.95))
 
-  doExperiment(cellDimensions=(10, 10),
-               cellCoordinateOffsets=(0.05, 0.5, 0.95))
+    doExperiment(cellDimensions=(10, 10), cellCoordinateOffsets=(0.05, 0.5, 0.95))
 
-  print("Visualize these logs at:")
-  print("http://numenta.github.io/htmresearch/visualizations/location-layer/location-module-inference.html")
-  print ("or in a Jupyter notebook with the htmresearchviz0 package and the "
-         "printLocationModuleInference function.")
+    print("Visualize these logs at:")
+    print(
+        "http://numenta.github.io/htmresearch/visualizations/location-layer/location-module-inference.html"
+    )
+    print(
+        "or in a Jupyter notebook with the htmresearchviz0 package and the "
+        "printLocationModuleInference function."
+    )

@@ -33,109 +33,119 @@ import numpy as np
 from grid_multi_column_experiment import MultiColumn2DExperiment
 from tracing import MultiColumn2DExperimentVisualizer as trace
 
-
 DISCRETE_OBJECTS = {
-  "Object 1": {(0,0): "A",
-               (0,1): "B",
-               (0,2): "A",
-               (1,0): "A",
-               (1,2): "A"},
-  "Object 2": {(0,1): "A",
-               (1,0): "B",
-               (1,1): "B",
-               (1,2): "B",
-               (2,1): "A"},
-  "Object 3": {(0,1): "A",
-               (1,0): "A",
-               (1,1): "B",
-               (1,2): "A",
-               (2,0): "B",
-               (2,1): "A",
-               (2,2): "B"},
-  "Object 4": {(0,0): "A",
-               (0,1): "A",
-               (0,2): "A",
-               (1,0): "A",
-               (1,2): "B",
-               (2,0): "B",
-               (2,1): "B",
-               (2,2): "B"},
+    "Object 1": {(0, 0): "A", (0, 1): "B", (0, 2): "A", (1, 0): "A", (1, 2): "A"},
+    "Object 2": {(0, 1): "A", (1, 0): "B", (1, 1): "B", (1, 2): "B", (2, 1): "A"},
+    "Object 3": {
+        (0, 1): "A",
+        (1, 0): "A",
+        (1, 1): "B",
+        (1, 2): "A",
+        (2, 0): "B",
+        (2, 1): "A",
+        (2, 2): "B",
+    },
+    "Object 4": {
+        (0, 0): "A",
+        (0, 1): "A",
+        (0, 2): "A",
+        (1, 0): "A",
+        (1, 2): "B",
+        (2, 0): "B",
+        (2, 1): "B",
+        (2, 2): "B",
+    },
 }
 
 DISCRETE_OBJECT_PLACEMENTS = {
-  "Object 1": (2, 3),
-  "Object 2": (6, 2),
-  "Object 3": (3, 7),
-  "Object 4": (7, 6)
+    "Object 1": (2, 3),
+    "Object 2": (6, 2),
+    "Object 3": (3, 7),
+    "Object 4": (7, 6),
 }
 
 CM_PER_UNIT = 100.0 / 12.0
 
 
 def doExperiment():
-  if not os.path.exists("logs"):
-    os.makedirs("logs")
+    if not os.path.exists("logs"):
+        os.makedirs("logs")
 
-  objects = dict(
-    (objectName, [{"top": location[0] * CM_PER_UNIT,
-                   "left": location[1] * CM_PER_UNIT,
-                   "width": CM_PER_UNIT,
-                   "height": CM_PER_UNIT,
-                   "name": featureName}
-                  for location, featureName in objectDict.items()])
-    for objectName, objectDict in DISCRETE_OBJECTS.items())
+    objects = dict(
+        (
+            objectName,
+            [
+                {
+                    "top": location[0] * CM_PER_UNIT,
+                    "left": location[1] * CM_PER_UNIT,
+                    "width": CM_PER_UNIT,
+                    "height": CM_PER_UNIT,
+                    "name": featureName,
+                }
+                for location, featureName in objectDict.items()
+            ],
+        )
+        for objectName, objectDict in DISCRETE_OBJECTS.items()
+    )
 
-  objectPlacements = dict(
-    (objectName, [placement[0] * CM_PER_UNIT,
-                  placement[1] * CM_PER_UNIT])
-    for objectName, placement in DISCRETE_OBJECT_PLACEMENTS.items())
+    objectPlacements = dict(
+        (objectName, [placement[0] * CM_PER_UNIT, placement[1] * CM_PER_UNIT])
+        for objectName, placement in DISCRETE_OBJECT_PLACEMENTS.items()
+    )
 
-  cellDimensions = (10, 10)
+    cellDimensions = (10, 10)
 
-  locationConfigs = []
-  for i in range(4):
-    scale = 10.0 * (math.sqrt(2) ** i)
+    locationConfigs = []
+    for i in range(4):
+        scale = 10.0 * (math.sqrt(2) ** i)
 
-    for _ in range(4):
-      orientation = random.gauss(7.5, 7.5) * math.pi / 180.0
-      orientation = random.choice([orientation, -orientation])
+        for _ in range(4):
+            orientation = random.gauss(7.5, 7.5) * math.pi / 180.0
+            orientation = random.choice([orientation, -orientation])
 
-      locationConfigs.append({
-        "cellDimensions": cellDimensions,
-        "moduleMapDimensions": (scale, scale),
-        "orientation": orientation,
-      })
+            locationConfigs.append(
+                {
+                    "cellDimensions": cellDimensions,
+                    "moduleMapDimensions": (scale, scale),
+                    "orientation": orientation,
+                }
+            )
 
-  print("Initializing experiment")
-  exp = MultiColumn2DExperiment(
-    featureNames=("A", "B"),
-    objects=objects,
-    objectPlacements=objectPlacements,
-    locationConfigs=locationConfigs,
-    numCorticalColumns=3,
-    worldDimensions=(100, 100))
+    print("Initializing experiment")
+    exp = MultiColumn2DExperiment(
+        featureNames=("A", "B"),
+        objects=objects,
+        objectPlacements=objectPlacements,
+        locationConfigs=locationConfigs,
+        numCorticalColumns=3,
+        worldDimensions=(100, 100),
+    )
 
-  print("Learning objects")
-  filename = "logs/{}-cells-learn.log".format(np.prod(cellDimensions))
-  with open(filename, "w") as fileOut:
-    with trace(exp, fileOut, includeSynapses=True):
-      print("Logging to", filename)
-      bodyPlacement = [6. * CM_PER_UNIT, 1. * CM_PER_UNIT]
-      exp.learnObjects(bodyPlacement)
+    print("Learning objects")
+    filename = "logs/{}-cells-learn.log".format(np.prod(cellDimensions))
+    with open(filename, "w") as fileOut:
+        with trace(exp, fileOut, includeSynapses=True):
+            print("Logging to", filename)
+            bodyPlacement = [6.0 * CM_PER_UNIT, 1.0 * CM_PER_UNIT]
+            exp.learnObjects(bodyPlacement)
 
-  filename = "logs/{}-cells-infer.log".format(np.prod(cellDimensions))
-  with open(filename, "w") as fileOut:
-    with trace(exp, fileOut, includeSynapses=True):
-      print("Logging to", filename)
+    filename = "logs/{}-cells-infer.log".format(np.prod(cellDimensions))
+    with open(filename, "w") as fileOut:
+        with trace(exp, fileOut, includeSynapses=True):
+            print("Logging to", filename)
 
-      bodyPlacement = [6. * CM_PER_UNIT, 11. * CM_PER_UNIT]
-      exp.inferObjects(bodyPlacement, maxTouches=2)
+            bodyPlacement = [6.0 * CM_PER_UNIT, 11.0 * CM_PER_UNIT]
+            exp.inferObjects(bodyPlacement, maxTouches=2)
 
 
 if __name__ == "__main__":
-  doExperiment()
+    doExperiment()
 
-  print("Visualize these logs at:")
-  print("http://numenta.github.io/htmresearch/visualizations/location-layer/multi-column-inference.html")
-  print ("or in a Jupyter notebook with the htmresearchviz0 package and the "
-         "printMultiColumnInferenceRecording function.")
+    print("Visualize these logs at:")
+    print(
+        "http://numenta.github.io/htmresearch/visualizations/location-layer/multi-column-inference.html"
+    )
+    print(
+        "or in a Jupyter notebook with the htmresearchviz0 package and the "
+        "printMultiColumnInferenceRecording function."
+    )

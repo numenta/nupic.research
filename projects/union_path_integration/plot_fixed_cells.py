@@ -27,85 +27,96 @@ import math
 import os
 
 import matplotlib.pyplot as plt
-import numpy as np
 
 CWD = os.path.dirname(os.path.realpath(__file__))
 CHART_DIR = os.path.join(CWD, "charts")
 
 
 def computeCapacity(results, threshold):
-  """Returns largest number of objects with accuracy above threshold."""
-  closestBelow = None
-  closestAbove = None
-  for numObjects, accuracy in sorted(results):
-    if accuracy >= threshold:
-      if closestAbove is None or closestAbove[0] < numObjects:
-        closestAbove = (numObjects, accuracy)
-        closestBelow = None
-    else:
-      if closestBelow is None:
-        closestBelow = (numObjects, accuracy)
-  if closestBelow is None or closestAbove is None:
-    print(closestBelow, threshold, closestAbove)
-    raise ValueError(
-        "Results must include a value above and below threshold of {}".format(threshold))
+    """Returns largest number of objects with accuracy above threshold."""
+    closestBelow = None
+    closestAbove = None
+    for numObjects, accuracy in sorted(results):
+        if accuracy >= threshold:
+            if closestAbove is None or closestAbove[0] < numObjects:
+                closestAbove = (numObjects, accuracy)
+                closestBelow = None
+        else:
+            if closestBelow is None:
+                closestBelow = (numObjects, accuracy)
+    if closestBelow is None or closestAbove is None:
+        print(closestBelow, threshold, closestAbove)
+        raise ValueError(
+            "Results must include a value above and below threshold of {}".format(
+                threshold
+            )
+        )
 
-  print("  Capacity threshold is between {} and {}".format(closestAbove[0], closestBelow[0]))
+    print(
+        "  Capacity threshold is between {} and {}".format(
+            closestAbove[0], closestBelow[0]
+        )
+    )
 
-  return closestAbove[0]
+    return closestAbove[0]
 
 
 def chart():
-  if not os.path.exists(CHART_DIR):
-    os.makedirs(CHART_DIR)
+    if not os.path.exists(CHART_DIR):
+        os.makedirs(CHART_DIR)
 
-  # 5000 cells max
-  #
-  # Generated with:
-  # TODO
+    # 5000 cells max
+    #
+    # Generated with:
+    # TODO
 
-  for totalCells in (5000, 10000):
-    accuracies = collections.defaultdict(list)
-    capacities = {}
-    for modules in (1, 2, 3, 4, 5, 6, 7, 8):
-      numCells = (int(math.sqrt(int(totalCells / modules))) ** 2) * modules
-      with open("results/fixed_cells_{}_cells_{}_modules.json".format(str(totalCells), str(modules)), "r") as f:
-        data = json.load(f)
-      for exp in data:
-        modSize = np.prod(exp[0]["cellDimensions"])
-        numFeatures = exp[0]["numFeatures"]
-        k = (modSize, numFeatures)
-        numObjects = exp[0]["numObjects"]
+    for totalCells in (5000, 10000):
+        accuracies = collections.defaultdict(list)
+        capacities = {}
+        for modules in (1, 2, 3, 4, 5, 6, 7, 8):
+            numCells = (int(math.sqrt(int(totalCells / modules))) ** 2) * modules
+            with open(
+                "results/fixed_cells_{}_cells_{}_modules.json".format(
+                    str(totalCells), str(modules)
+                ),
+                "r",
+            ) as f:
+                data = json.load(f)
+            for exp in data:
+                numObjects = exp[0]["numObjects"]
 
-        failed = exp[1]["convergence"].get("null", 0)
-        accuracy = (float(numObjects) - float(failed)) / float(numObjects)
+                failed = exp[1]["convergence"].get("null", 0)
+                accuracy = (float(numObjects) - float(failed)) / float(numObjects)
 
-        accuracies[modules].append((numObjects, accuracy))
+                accuracies[modules].append((numObjects, accuracy))
 
-      moduleCapacity = computeCapacity(accuracies[modules], 0.9)
-      objsPerCell = float(moduleCapacity) / float(numCells)
-      capacities[modules] = objsPerCell
+            moduleCapacity = computeCapacity(accuracies[modules], 0.9)
+            objsPerCell = float(moduleCapacity) / float(numCells)
+            capacities[modules] = objsPerCell
 
-    x = []
-    y = []
-    for i, j in sorted(capacities.items()):
-      x.append(i)
-      y.append(j)
+        x = []
+        y = []
+        for i, j in sorted(capacities.items()):
+            x.append(i)
+            y.append(j)
 
-    plt.plot(
-      x, y, "o-", label="{} Total Cells".format(str(totalCells)),
-    )
+        plt.plot(
+            x,
+            y,
+            "o-",
+            label="{} Total Cells".format(str(totalCells)),
+        )
 
-  plt.xlabel("Number of Modules")
-  plt.ylabel("Capacity (objects per cell)")
-  plt.legend(loc="upper right")
+    plt.xlabel("Number of Modules")
+    plt.ylabel("Capacity (objects per cell)")
+    plt.legend(loc="upper right")
 
-  plt.tight_layout()
+    plt.tight_layout()
 
-  plt.savefig(os.path.join(CHART_DIR, "fixed_cells.pdf"))
+    plt.savefig(os.path.join(CHART_DIR, "fixed_cells.pdf"))
 
-  plt.clf()
+    plt.clf()
 
 
 if __name__ == "__main__":
-  chart()
+    chart()

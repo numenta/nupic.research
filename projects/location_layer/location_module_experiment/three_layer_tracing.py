@@ -25,269 +25,301 @@ visualization.
 """
 
 
-from collections import defaultdict
 import json
+from collections import defaultdict
 
 import numpy as np
 
 from grid_2d_location_experiment import Grid2DLocationExperimentMonitor
 
 
-
 class Grid2DLocationExperimentVisualizer(Grid2DLocationExperimentMonitor):
-  """
-  Logs the state of the world and the state of each layer to a file.
-  """
-
-  def __init__(self, exp, out, includeSynapses=True):
-    self.exp = exp
-    self.out = out
-    self.includeSynapses = includeSynapses
-
-    self.locationRepresentations = exp.locationRepresentations
-    self.inputRepresentations = exp.inputRepresentations
-    self.objectRepresentations = exp.objectRepresentations
-
-    self.locationModules = exp.locationModules
-    self.inputLayer = exp.inputLayer
-    self.objectLayer = exp.objectLayer
-
-    self.subscriberToken = exp.addMonitor(self)
-
-    # World dimensions
-    print(json.dumps({"width": exp.worldDimensions[1],
-                      "height": exp.worldDimensions[0]}),
-          file=self.out)
-
-    print(json.dumps({"A": "red",
-                      "B": "blue",
-                      "C": "gray"}),
-          file=self.out)
-    print(json.dumps(exp.objects), file=self.out)
-
-    print(json.dumps([{"cellDimensions": module.cellDimensions.tolist(),
-                       "moduleMapDimensions": module.moduleMapDimensions.tolist(),
-                       "orientation": module.orientation}
-                      for module in exp.locationModules]),
-          file=self.out)
-
-    print("objectPlacements", file=self.out)
-    print(json.dumps(exp.objectPlacements), file=self.out)
-
-
-  def __enter__(self, *args):
-    pass
-
-
-  def __exit__(self, *args):
-    self.unsubscribe()
-
-
-  def unsubscribe(self):
-
-    self.exp.removeMonitor(self.subscriberToken)
-    self.subscriberToken = None
-
-
-  def beforeSense(self, featureSDR):
-    print("sense", file=self.out)
-    print(json.dumps(featureSDR.tolist()), file=self.out)
-    print(json.dumps(
-      [k
-       for k, sdr in self.exp.features.items()
-       if np.intersect1d(featureSDR, sdr).size == sdr.size]), file=self.out)
-
-
-  def beforeMove(self, deltaLocation):
-    print("move", file=self.out)
-    print(json.dumps(list(deltaLocation)), file=self.out)
-
-
-  def afterReset(self):
-    print("reset", file=self.out)
-
-
-  def markSensoryRepetition(self):
-    print("sensoryRepetition", file=self.out)
-
-
-  def afterWorldLocationChanged(self, locationInWorld):
-    print("locationInWorld", file=self.out)
-    print(json.dumps(locationInWorld), file=self.out)
-
-
-  def afterLocationShift(self, displacement):
-    print("shift", file=self.out)
-
-    cellsByModule = [module.getActiveCells().tolist()
-                     for module in self.locationModules]
-    print(json.dumps(cellsByModule), file=self.out)
-
-    phasesByModule = []
-    for module in self.locationModules:
-      phasesByModule.append(module.activePhases.tolist())
-    print(json.dumps(phasesByModule), file=self.out)
-
-    activeLocationCells = self.exp.getActiveLocationCells()
-
-    decodings = []
-    for (objectName, location), sdr in self.locationRepresentations.items():
-      amountContained = (np.intersect1d(sdr, activeLocationCells).size /
-                         float(sdr.size))
-      decodings.append(
-        [objectName, location[0], location[1], amountContained])
-
-    print(json.dumps(decodings), file=self.out)
-
-
-  def afterLocationAnchor(self, anchorInput, **kwargs):
-    print("locationLayer", file=self.out)
-
-    cellsByModule = []
-    for module in self.locationModules:
-      activeCells = module.getActiveCells()
-
-      if self.includeSynapses:
-        segmentsForActiveCellsDict = defaultdict(list)
-
-        activeSegments = module.connections.filterSegmentsByCell(
-          module.activeSegments, activeCells)
-        cellForActiveSegments = (
-          module.connections.mapSegmentsToCells(activeSegments))
-
-        for i, segment in enumerate(activeSegments):
-          connectedSynapses = np.where(
-            module.connections.matrix.getRow(segment)
-            >= module.connectedPermanence)[0]
-
-          activeSynapses = np.intersect1d(connectedSynapses, anchorInput)
-          segmentsForActiveCellsDict[cellForActiveSegments[i]].append(
-            activeSynapses.tolist())
-
-        segmentsForActiveCells = [segmentsForActiveCellsDict[cell]
-                                  for cell in activeCells]
-
-        cellsByModule.append([activeCells.tolist(),
-                              {"inputLayer": segmentsForActiveCells}])
-      else:
-        cellsByModule.append([activeCells.tolist()])
-
-    print(json.dumps(cellsByModule), file=self.out)
-
-    phasesByModule = []
-    for module in self.locationModules:
-      phasesByModule.append(module.activePhases.tolist())
-    print(json.dumps(phasesByModule), file=self.out)
-
-
-    activeLocationCells = self.exp.getActiveLocationCells()
-
-    decodings = []
-    for (objectName, location), sdr in self.locationRepresentations.items():
-      amountContained = (np.intersect1d(sdr, activeLocationCells).size /
-                         float(sdr.size))
-      decodings.append(
-        [objectName, location[0], location[1], amountContained])
-    print(json.dumps(decodings), file=self.out)
-
-
-  def getInputSegments(self, cells, basalInput, apicalInput):
-    basalSegmentsForCellDict = defaultdict(list)
-
-    basalSegments = self.inputLayer.basalConnections.filterSegmentsByCell(
-      self.inputLayer.activeBasalSegments, cells)
-    cellForBasalSegment = self.inputLayer.basalConnections.mapSegmentsToCells(
-      basalSegments)
-
-    for i, segment in enumerate(basalSegments):
-      connectedSynapses = np.where(
-        self.inputLayer.basalConnections.matrix.getRow(
-          segment) >= self.inputLayer.connectedPermanence)[0]
-
-      activeSynapses = np.intersect1d(connectedSynapses, basalInput)
-      basalSegmentsForCellDict[cellForBasalSegment[i]].append(
-        activeSynapses.tolist())
-
-    apicalSegmentsForCellDict = defaultdict(list)
-
-    apicalSegments = self.inputLayer.apicalConnections.filterSegmentsByCell(
-      self.inputLayer.activeApicalSegments, cells)
-    cellForApicalSegment = (
-      self.inputLayer.apicalConnections.mapSegmentsToCells(apicalSegments))
-
-    for i, segment in enumerate(apicalSegments):
-      connectedSynapses = np.where(
-        self.inputLayer.apicalConnections.matrix.getRow(segment)
-        >= self.inputLayer.connectedPermanence)[0]
-
-      activeSynapses = np.intersect1d(connectedSynapses, apicalInput)
-      apicalSegmentsForCellDict[cellForApicalSegment[i]].append(
-        activeSynapses.tolist())
-
-    return {
-      "locationLayer": [basalSegmentsForCellDict[cell] for cell in cells],
-      "objectLayer": [apicalSegmentsForCellDict[cell] for cell in cells],
-    }
-
-
-  def getInputDecodings(self, activeCells):
-    decodings = []
-    for (objectName, location, feature), sdr in self.inputRepresentations.items():
-      amountContained = (np.intersect1d(sdr, activeCells).size /
-                         float(sdr.size))
-      decodings.append([objectName, location[0], location[1], amountContained])
-
-    return decodings
-
-
-  def afterInputCompute(self, activeColumns, basalInput, apicalInput, **kwargs):
-    activeCells = self.inputLayer.getActiveCells().tolist()
-    predictedCells = self.inputLayer.getPredictedCells().tolist()
-
-    print("inputLayer", file=self.out)
-
-    if self.includeSynapses:
-      segmentsForActiveCells = self.getInputSegments(activeCells, basalInput,
-                                                     apicalInput)
-      segmentsForPredictedCells = self.getInputSegments(predictedCells, basalInput,
-                                                        apicalInput)
-
-      print(json.dumps(
-        [activeCells, predictedCells, segmentsForActiveCells,
-         segmentsForPredictedCells]), file=self.out)
-
-    else:
-      print(json.dumps(
-        [activeCells, predictedCells]), file=self.out)
-
-    print(json.dumps({
-      "activeCellDecodings": self.getInputDecodings(activeCells),
-      "predictedCellDecodings": self.getInputDecodings(predictedCells)
-    }), file=self.out)
-
-
-  def afterObjectCompute(self, feedforwardInput, **kwargs):
-    activeCells = self.objectLayer.getActiveCells()
-
-    print("objectLayer", file=self.out)
-    if self.includeSynapses:
-      segmentsForActiveCells = [[] for _ in activeCells]
-
-      for i, cell in enumerate(activeCells):
-        connectedSynapses = np.where(
-          self.objectLayer.proximalPermanences.getRow(cell)
-          >= self.objectLayer.connectedPermanenceProximal)[0]
-
-        activeSynapses = np.intersect1d(connectedSynapses, feedforwardInput)
-        segmentsForActiveCells[i].append(activeSynapses.tolist())
-
-      print(json.dumps([activeCells.tolist(),
-                        {"inputLayer": segmentsForActiveCells}]),
-            file=self.out)
-    else:
-      print(json.dumps([activeCells.tolist()]), file=self.out)
-
-    decodings = [k
-                 for k, sdr in self.objectRepresentations.items()
-                 if np.intersect1d(activeCells, sdr).size == sdr.size]
-    print(json.dumps(decodings), file=self.out)
+    """
+    Logs the state of the world and the state of each layer to a file.
+    """
+
+    def __init__(self, exp, out, includeSynapses=True):
+        self.exp = exp
+        self.out = out
+        self.includeSynapses = includeSynapses
+
+        self.locationRepresentations = exp.locationRepresentations
+        self.inputRepresentations = exp.inputRepresentations
+        self.objectRepresentations = exp.objectRepresentations
+
+        self.locationModules = exp.locationModules
+        self.inputLayer = exp.inputLayer
+        self.objectLayer = exp.objectLayer
+
+        self.subscriberToken = exp.addMonitor(self)
+
+        # World dimensions
+        print(
+            json.dumps(
+                {"width": exp.worldDimensions[1], "height": exp.worldDimensions[0]}
+            ),
+            file=self.out,
+        )
+
+        print(json.dumps({"A": "red", "B": "blue", "C": "gray"}), file=self.out)
+        print(json.dumps(exp.objects), file=self.out)
+
+        print(
+            json.dumps(
+                [
+                    {
+                        "cellDimensions": module.cellDimensions.tolist(),
+                        "moduleMapDimensions": module.moduleMapDimensions.tolist(),
+                        "orientation": module.orientation,
+                    }
+                    for module in exp.locationModules
+                ]
+            ),
+            file=self.out,
+        )
+
+        print("objectPlacements", file=self.out)
+        print(json.dumps(exp.objectPlacements), file=self.out)
+
+    def __enter__(self, *args):
+        pass
+
+    def __exit__(self, *args):
+        self.unsubscribe()
+
+    def unsubscribe(self):
+
+        self.exp.removeMonitor(self.subscriberToken)
+        self.subscriberToken = None
+
+    def beforeSense(self, featureSDR):
+        print("sense", file=self.out)
+        print(json.dumps(featureSDR.tolist()), file=self.out)
+        print(
+            json.dumps(
+                [
+                    k
+                    for k, sdr in self.exp.features.items()
+                    if np.intersect1d(featureSDR, sdr).size == sdr.size
+                ]
+            ),
+            file=self.out,
+        )
+
+    def beforeMove(self, deltaLocation):
+        print("move", file=self.out)
+        print(json.dumps(list(deltaLocation)), file=self.out)
+
+    def afterReset(self):
+        print("reset", file=self.out)
+
+    def markSensoryRepetition(self):
+        print("sensoryRepetition", file=self.out)
+
+    def afterWorldLocationChanged(self, locationInWorld):
+        print("locationInWorld", file=self.out)
+        print(json.dumps(locationInWorld), file=self.out)
+
+    def afterLocationShift(self, displacement):
+        print("shift", file=self.out)
+
+        cellsByModule = [
+            module.getActiveCells().tolist() for module in self.locationModules
+        ]
+        print(json.dumps(cellsByModule), file=self.out)
+
+        phasesByModule = []
+        for module in self.locationModules:
+            phasesByModule.append(module.activePhases.tolist())
+        print(json.dumps(phasesByModule), file=self.out)
+
+        activeLocationCells = self.exp.getActiveLocationCells()
+
+        decodings = []
+        for (objectName, location), sdr in self.locationRepresentations.items():
+            amountContained = np.intersect1d(sdr, activeLocationCells).size / float(
+                sdr.size
+            )
+            decodings.append([objectName, location[0], location[1], amountContained])
+
+        print(json.dumps(decodings), file=self.out)
+
+    def afterLocationAnchor(self, anchorInput, **kwargs):
+        print("locationLayer", file=self.out)
+
+        cellsByModule = []
+        for module in self.locationModules:
+            activeCells = module.getActiveCells()
+
+            if self.includeSynapses:
+                segmentsForActiveCellsDict = defaultdict(list)
+
+                activeSegments = module.connections.filterSegmentsByCell(
+                    module.activeSegments, activeCells
+                )
+                cellForActiveSegments = module.connections.mapSegmentsToCells(
+                    activeSegments
+                )
+
+                for i, segment in enumerate(activeSegments):
+                    connectedSynapses = np.where(
+                        module.connections.matrix.getRow(segment)
+                        >= module.connectedPermanence
+                    )[0]
+
+                    activeSynapses = np.intersect1d(connectedSynapses, anchorInput)
+                    segmentsForActiveCellsDict[cellForActiveSegments[i]].append(
+                        activeSynapses.tolist()
+                    )
+
+                segmentsForActiveCells = [
+                    segmentsForActiveCellsDict[cell] for cell in activeCells
+                ]
+
+                cellsByModule.append(
+                    [activeCells.tolist(), {"inputLayer": segmentsForActiveCells}]
+                )
+            else:
+                cellsByModule.append([activeCells.tolist()])
+
+        print(json.dumps(cellsByModule), file=self.out)
+
+        phasesByModule = []
+        for module in self.locationModules:
+            phasesByModule.append(module.activePhases.tolist())
+        print(json.dumps(phasesByModule), file=self.out)
+
+        activeLocationCells = self.exp.getActiveLocationCells()
+
+        decodings = []
+        for (objectName, location), sdr in self.locationRepresentations.items():
+            amountContained = np.intersect1d(sdr, activeLocationCells).size / float(
+                sdr.size
+            )
+            decodings.append([objectName, location[0], location[1], amountContained])
+        print(json.dumps(decodings), file=self.out)
+
+    def getInputSegments(self, cells, basalInput, apicalInput):
+        basalSegmentsForCellDict = defaultdict(list)
+
+        basalSegments = self.inputLayer.basalConnections.filterSegmentsByCell(
+            self.inputLayer.activeBasalSegments, cells
+        )
+        cellForBasalSegment = self.inputLayer.basalConnections.mapSegmentsToCells(
+            basalSegments
+        )
+
+        for i, segment in enumerate(basalSegments):
+            connectedSynapses = np.where(
+                self.inputLayer.basalConnections.matrix.getRow(segment)
+                >= self.inputLayer.connectedPermanence
+            )[0]
+
+            activeSynapses = np.intersect1d(connectedSynapses, basalInput)
+            basalSegmentsForCellDict[cellForBasalSegment[i]].append(
+                activeSynapses.tolist()
+            )
+
+        apicalSegmentsForCellDict = defaultdict(list)
+
+        apicalSegments = self.inputLayer.apicalConnections.filterSegmentsByCell(
+            self.inputLayer.activeApicalSegments, cells
+        )
+        cellForApicalSegment = self.inputLayer.apicalConnections.mapSegmentsToCells(
+            apicalSegments
+        )
+
+        for i, segment in enumerate(apicalSegments):
+            connectedSynapses = np.where(
+                self.inputLayer.apicalConnections.matrix.getRow(segment)
+                >= self.inputLayer.connectedPermanence
+            )[0]
+
+            activeSynapses = np.intersect1d(connectedSynapses, apicalInput)
+            apicalSegmentsForCellDict[cellForApicalSegment[i]].append(
+                activeSynapses.tolist()
+            )
+
+        return {
+            "locationLayer": [basalSegmentsForCellDict[cell] for cell in cells],
+            "objectLayer": [apicalSegmentsForCellDict[cell] for cell in cells],
+        }
+
+    def getInputDecodings(self, activeCells):
+        decodings = []
+        for (objectName, location, _feature), sdr in self.inputRepresentations.items():
+            amountContained = np.intersect1d(sdr, activeCells).size / float(sdr.size)
+            decodings.append([objectName, location[0], location[1], amountContained])
+
+        return decodings
+
+    def afterInputCompute(self, activeColumns, basalInput, apicalInput, **kwargs):
+        activeCells = self.inputLayer.getActiveCells().tolist()
+        predictedCells = self.inputLayer.getPredictedCells().tolist()
+
+        print("inputLayer", file=self.out)
+
+        if self.includeSynapses:
+            segmentsForActiveCells = self.getInputSegments(
+                activeCells, basalInput, apicalInput
+            )
+            segmentsForPredictedCells = self.getInputSegments(
+                predictedCells, basalInput, apicalInput
+            )
+
+            print(
+                json.dumps(
+                    [
+                        activeCells,
+                        predictedCells,
+                        segmentsForActiveCells,
+                        segmentsForPredictedCells,
+                    ]
+                ),
+                file=self.out,
+            )
+
+        else:
+            print(json.dumps([activeCells, predictedCells]), file=self.out)
+
+        print(
+            json.dumps(
+                {
+                    "activeCellDecodings": self.getInputDecodings(activeCells),
+                    "predictedCellDecodings": self.getInputDecodings(predictedCells),
+                }
+            ),
+            file=self.out,
+        )
+
+    def afterObjectCompute(self, feedforwardInput, **kwargs):
+        activeCells = self.objectLayer.getActiveCells()
+
+        print("objectLayer", file=self.out)
+        if self.includeSynapses:
+            segmentsForActiveCells = [[] for _ in activeCells]
+
+            for i, cell in enumerate(activeCells):
+                connectedSynapses = np.where(
+                    self.objectLayer.proximalPermanences.getRow(cell)
+                    >= self.objectLayer.connectedPermanenceProximal
+                )[0]
+
+                activeSynapses = np.intersect1d(connectedSynapses, feedforwardInput)
+                segmentsForActiveCells[i].append(activeSynapses.tolist())
+
+            print(
+                json.dumps(
+                    [activeCells.tolist(), {"inputLayer": segmentsForActiveCells}]
+                ),
+                file=self.out,
+            )
+        else:
+            print(json.dumps([activeCells.tolist()]), file=self.out)
+
+        decodings = [
+            k
+            for k, sdr in self.objectRepresentations.items()
+            if np.intersect1d(activeCells, sdr).size == sdr.size
+        ]
+        print(json.dumps(decodings), file=self.out)

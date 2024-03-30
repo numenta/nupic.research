@@ -26,80 +26,93 @@ in other locations.
 
 import csv
 import os
-
-from runner import SingleLayerLocation2DExperiment
 from logging import SingleLayer2DExperimentVisualizer as trace
 
-
+from runner import SingleLayerLocation2DExperiment
 
 if __name__ == "__main__":
-  if not os.path.exists("logs"):
-    os.makedirs("logs")
+    if not os.path.exists("logs"):
+        os.makedirs("logs")
 
-  exp = SingleLayerLocation2DExperiment(
-    diameter=12,
-    featureNames=["A", "B"],
-    objects={
-      "Object 1": {(0,0): "A",
-                   (0,1): "B",
-                   (0,2): "A",
-                   (1,0): "A",
-                   (1,2): "A"},
-      "Object 2": {(0,1): "A",
-                   (1,0): "B",
-                   (1,1): "B",
-                   (1,2): "B",
-                   (2,1): "A"},
-      "Object 3": {(0,1): "A",
-                   (1,0): "A",
-                   (1,1): "B",
-                   (1,2): "A",
-                   (2,0): "B",
-                   (2,1): "A",
-                   (2,2): "B"},
-      "Object 4": {(0,0): "A",
-                   (0,1): "A",
-                   (0,2): "A",
-                   (1,0): "A",
-                   (1,2): "B",
-                   (2,0): "B",
-                   (2,1): "B",
-                   (2,2): "B"}
-    })
+    exp = SingleLayerLocation2DExperiment(
+        diameter=12,
+        featureNames=["A", "B"],
+        objects={
+            "Object 1": {
+                (0, 0): "A",
+                (0, 1): "B",
+                (0, 2): "A",
+                (1, 0): "A",
+                (1, 2): "A",
+            },
+            "Object 2": {
+                (0, 1): "A",
+                (1, 0): "B",
+                (1, 1): "B",
+                (1, 2): "B",
+                (2, 1): "A",
+            },
+            "Object 3": {
+                (0, 1): "A",
+                (1, 0): "A",
+                (1, 1): "B",
+                (1, 2): "A",
+                (2, 0): "B",
+                (2, 1): "A",
+                (2, 2): "B",
+            },
+            "Object 4": {
+                (0, 0): "A",
+                (0, 1): "A",
+                (0, 2): "A",
+                (1, 0): "A",
+                (1, 2): "B",
+                (2, 0): "B",
+                (2, 1): "B",
+                (2, 2): "B",
+            },
+        },
+    )
 
-  # Learn how motor commands correspond to changes in location.
-  exp.learnTransitions()
+    # Learn how motor commands correspond to changes in location.
+    exp.learnTransitions()
 
-  objectPlacements = {
-    "Object 1": (2, 3),
-    "Object 2": (6, 2),
-    "Object 3": (3, 7),
-    "Object 4": (7, 6)
-  }
+    objectPlacements = {
+        "Object 1": (2, 3),
+        "Object 2": (6, 2),
+        "Object 3": (3, 7),
+        "Object 4": (7, 6),
+    }
 
-  # Learn objects in egocentric space.
-  exp.learnObjects(objectPlacements)
+    # Learn objects in egocentric space.
+    exp.learnObjects(objectPlacements)
 
-  # Infer the objects without any location input.
-  filename = "logs/infer-no-location.csv"
-  with open(filename, "w") as fileOut:
-    print("Logging to", filename)
-    with trace(exp, csv.writer(fileOut)):
-      exp.inferObjectsWithRandomMovements(objectPlacements)
+    # Infer the objects without any location input.
+    filename = "logs/infer-no-location.csv"
+    with open(filename, "w") as fileOut:
+        print("Logging to", filename)
+        with trace(exp, csv.writer(fileOut)):
+            exp.inferObjectsWithRandomMovements(objectPlacements)
 
-  # Shuffle the objects. Infer them without any location input.
-  filename = "logs/infer-shuffled-location.csv"
-  with open(filename, "w") as fileOut:
-    print("Logging to", filename)
-    with trace(exp, csv.writer(fileOut)):
-      exp.inferObjectsWithRandomMovements({
-        "Object 1": (7, 6),
-        "Object 2": (2, 7),
-        "Object 3": (7, 2),
-        "Object 4": (3, 3)
-      })
+    # Shuffle the objects. Infer them without any location input.
+    filename = "logs/infer-shuffled-location.csv"
+    with open(filename, "w") as fileOut:
+        print("Logging to", filename)
+        with trace(exp, csv.writer(fileOut)):
+            exp.inferObjectsWithRandomMovements(
+                {
+                    "Object 1": (7, 6),
+                    "Object 2": (2, 7),
+                    "Object 3": (7, 2),
+                    "Object 4": (3, 3),
+                }
+            )
 
-  print("Visualize these CSV files at:")
-  print("http://numenta.github.io/htmresearch/visualizations/location-layer/single-layer-2d.html")
-  print ("or in a Jupyter notebook with the htmresearchviz0 package and the "
-         "printSingleLayer2DExperiment function.")
+    print("Visualize these CSV files at:")
+    print(
+        "http://numenta.github.io/htmresearch/visualizations/location-layer/single-layer-2d.html"
+    )
+    print(
+        "or in a Jupyter notebook with the htmresearchviz0 package and the "
+        "printSingleLayer2DExperiment function."
+    )

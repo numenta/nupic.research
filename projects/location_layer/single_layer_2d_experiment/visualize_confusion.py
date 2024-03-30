@@ -26,69 +26,74 @@ inference to take longer.
 
 import csv
 import os
-
-from runner import SingleLayerLocation2DExperiment
 from logging import SingleLayer2DExperimentVisualizer as trace
 
-
+from runner import SingleLayerLocation2DExperiment
 
 if __name__ == "__main__":
-  if not os.path.exists("logs"):
-    os.makedirs("logs")
+    if not os.path.exists("logs"):
+        os.makedirs("logs")
 
-  exp = SingleLayerLocation2DExperiment(
-    diameter=12,
-    featureNames=["A", "B", "C"],
-    objects={
-      "Object 1": {(0,0): "C",
-                   (0,1): "B",
-                   (1,1): "C",
-                   (2,0): "A",
-                   (2,1): "C"},
-      "Object 2": {(0,0): "A",
-                   (0,1): "C",
-                   (1,1): "C",
-                   (2,0): "C",
-                   (2,1): "C"},
-      "Object 3": {(2,0): "A",
-                   (2,1): "B",
-                   (2,2): "C"}
-    })
+    exp = SingleLayerLocation2DExperiment(
+        diameter=12,
+        featureNames=["A", "B", "C"],
+        objects={
+            "Object 1": {
+                (0, 0): "C",
+                (0, 1): "B",
+                (1, 1): "C",
+                (2, 0): "A",
+                (2, 1): "C",
+            },
+            "Object 2": {
+                (0, 0): "A",
+                (0, 1): "C",
+                (1, 1): "C",
+                (2, 0): "C",
+                (2, 1): "C",
+            },
+            "Object 3": {(2, 0): "A", (2, 1): "B", (2, 2): "C"},
+        },
+    )
 
-  # Learn how motor commands correspond to changes in location.
-  exp.learnTransitions()
+    # Learn how motor commands correspond to changes in location.
+    exp.learnTransitions()
 
-  objectPlacements = {
-    "Object 1": (4, 4),
-    "Object 2": (4, 4),
-    "Object 3": (4, 4),
-  }
+    objectPlacements = {
+        "Object 1": (4, 4),
+        "Object 2": (4, 4),
+        "Object 3": (4, 4),
+    }
 
-  # Learn objects in egocentric space.
-  exp.learnObjects(objectPlacements)
+    # Learn objects in egocentric space.
+    exp.learnObjects(objectPlacements)
 
-  newObjectPlacements = {
-    "Object 1": (3, 3),
-    "Object 2": (5, 6),
-    "Object 3": (7, 3),
-  }
+    newObjectPlacements = {
+        "Object 1": (3, 3),
+        "Object 2": (5, 6),
+        "Object 3": (7, 3),
+    }
 
-  # Infer the objects without any location input.
-  filename = "logs/infer-not-perfect.csv"
-  with open(filename, "w") as fileOut:
-    print("Logging to", filename)
-    with trace(exp, csv.writer(fileOut)):
-      exp.inferObject(newObjectPlacements, "Object 3", (2,0), [(0,1), (0,1)])
+    # Infer the objects without any location input.
+    filename = "logs/infer-not-perfect.csv"
+    with open(filename, "w") as fileOut:
+        print("Logging to", filename)
+        with trace(exp, csv.writer(fileOut)):
+            exp.inferObject(newObjectPlacements, "Object 3", (2, 0), [(0, 1), (0, 1)])
 
+    filename = "logs/infer-recovery.csv"
+    with open("logs/infer-recovery.csv", "w") as fileOut:
+        print("Logging to", filename)
+        with trace(exp, csv.writer(fileOut)):
+            exp.inferObject(
+                newObjectPlacements, "Object 3", (2, 0), [(0, 1), (0, -1), (0, 1)]
+            )
 
-  filename = "logs/infer-recovery.csv"
-  with open("logs/infer-recovery.csv", "w") as fileOut:
-    print("Logging to", filename)
-    with trace(exp, csv.writer(fileOut)):
-      exp.inferObject(newObjectPlacements, "Object 3", (2,0), [(0,1), (0,-1), (0,1)])
-
-
-  print("Visualize these CSV files at:")
-  print("http://numenta.github.io/htmresearch/visualizations/location-layer/single-layer-2d.html")
-  print ("or in a Jupyter notebook with the htmresearchviz0 package and the "
-         "printSingleLayer2DExperiment function.")
+    print("Visualize these CSV files at:")
+    print(
+        "http://numenta.github.io/htmresearch/visualizations/location-layer/single-layer-2d.html"
+    )
+    print(
+        "or in a Jupyter notebook with the htmresearchviz0 package and the "
+        "printSingleLayer2DExperiment function."
+    )

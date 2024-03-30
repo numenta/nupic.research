@@ -25,9 +25,6 @@ SDR generator that can run from the command line.
 """
 
 
-
-
-
 import glob
 import json
 import multiprocessing
@@ -41,124 +38,138 @@ from htmresearch_core.experimental import enumerateDistantSDRsBruteForce
 
 
 def generateMinicolumnSDRs(n, w, threshold):
-  """
-  Wraps enumerateDistantSDRsBruteForce, caching its result on the filesystem.
-  """
-  if not os.path.exists("sdrs"):
-    os.makedirs("sdrs")
+    """
+    Wraps enumerateDistantSDRsBruteForce, caching its result on the filesystem.
+    """
+    if not os.path.exists("sdrs"):
+        os.makedirs("sdrs")
 
-  filename = "sdrs/{}_{}_{}.json".format(n, w, threshold)
+    filename = "sdrs/{}_{}_{}.json".format(n, w, threshold)
 
-  if len(glob.glob(filename)) > 0:
-    with open(filename, "r") as fIn:
-      sdrs = json.load(fIn)
-  else:
-    begin = time.time()
-    sdrs = enumerateDistantSDRsBruteForce(n, w, threshold)
-    end = time.time()
-    with open(filename, "w") as fOut:
-      json.dump([sdr.tolist() for sdr in sdrs], fOut)
-      print("Saved", filename)
-    print("Elapsed time: {:.2f} seconds".format(end - begin))
+    if len(glob.glob(filename)) > 0:
+        with open(filename, "r") as fIn:
+            sdrs = json.load(fIn)
+    else:
+        begin = time.time()
+        sdrs = enumerateDistantSDRsBruteForce(n, w, threshold)
+        end = time.time()
+        with open(filename, "w") as fOut:
+            json.dump([sdr.tolist() for sdr in sdrs], fOut)
+            print("Saved", filename)
+        print("Elapsed time: {:.2f} seconds".format(end - begin))
 
-  return sdrs
+    return sdrs
 
 
 def createEvenlySpreadSDRs(numSDRs, n, w):
-  """
-  Return a set of ~random SDRs that use every available bit
-  an equal number of times, +- 1.
-  """
-  assert w <= n
+    """
+    Return a set of ~random SDRs that use every available bit
+    an equal number of times, +- 1.
+    """
+    assert w <= n
 
-  available = np.arange(n)
-  np.random.shuffle(available)
+    available = np.arange(n)
+    np.random.shuffle(available)
 
-  SDRs = []
+    SDRs = []
 
-  for _ in range(numSDRs):
-    selected = available[:w]
-    available = available[w:]
+    for _ in range(numSDRs):
+        selected = available[:w]
+        available = available[w:]
 
-    if available.size == 0:
-      remainderSelected = np.random.choice(
-        np.setdiff1d(np.arange(n), selected),
-        size=(w - selected.size),
-        replace= False)
-      selected = np.append(selected, remainderSelected)
+        if available.size == 0:
+            remainderSelected = np.random.choice(
+                np.setdiff1d(np.arange(n), selected),
+                size=(w - selected.size),
+                replace=False,
+            )
+            selected = np.append(selected, remainderSelected)
 
-      available = np.setdiff1d(np.arange(n), remainderSelected)
-      np.random.shuffle(available)
+            available = np.setdiff1d(np.arange(n), remainderSelected)
+            np.random.shuffle(available)
 
-    selected.sort()
-    SDRs.append(selected)
+        selected.sort()
+        SDRs.append(selected)
 
-  return SDRs
+    return SDRs
 
 
 def carefullyCollideContexts(numContexts, numCells, numMinicolumns):
-  """
-  Use a greedy algorithm to choose how each minicolumn should distribute
-  contexts between its cells.
+    """
+    Use a greedy algorithm to choose how each minicolumn should distribute
+    contexts between its cells.
 
-  @return (list of lists of lists of ints)
-  iContext integers for each cell, grouped by minicolumn. For example,
-    [[[1, 3], [2,4]],
-     [[1, 2]]]
-  would specify that cell 0 connects to location 1 and location 3, while cell
-  1 connects to locations 2 and 4, and cell 2 (in the second minicolumn)
-  connects to locations 1 and 2.
-  """
-  minicolumns = []
+    @return (list of lists of lists of ints)
+    iContext integers for each cell, grouped by minicolumn. For example,
+      [[[1, 3], [2,4]],
+       [[1, 2]]]
+    would specify that cell 0 connects to location 1 and location 3, while cell
+    1 connects to locations 2 and 4, and cell 2 (in the second minicolumn)
+    connects to locations 1 and 2.
+    """
+    minicolumns = []
 
-  for _ in range(numMinicolumns):
-    contextsForCell = [set() for _ in range(numCells)]
+    for _ in range(numMinicolumns):
+        contextsForCell = [set() for _ in range(numCells)]
 
-    contexts = list(range(numContexts))
-    random.shuffle(contexts)
+        contexts = list(range(numContexts))
+        random.shuffle(contexts)
 
-    while len(contexts) > 0:
-      eligibleCells = list(range(len(contextsForCell)))
-      while len(contexts) > 0 and len(eligibleCells) > 0:
-        candidateAdditions = [(context, cell)
-                              for context in contexts
-                              for cell in eligibleCells]
+        while len(contexts) > 0:
+            eligibleCells = list(range(len(contextsForCell)))
+            while len(contexts) > 0 and len(eligibleCells) > 0:
+                candidateAdditions = [
+                    (context, cell) for context in contexts for cell in eligibleCells
+                ]
 
-        # How many new duplicate collisions will come from this addition?
-        #
-        # For every other context in on this cell, check how many times this
-        # pair occurs elsewhere.
-        badness = [sum(sum(1 if (context in otherCellContexts and
-                                 otherContext in otherCellContexts) else 0
-                           for minicolumn in minicolumns
-                           for otherCellContexts in minicolumn)
-                       for otherContext in contextsForCell[cell])
-                   for context, cell in candidateAdditions]
+                # How many new duplicate collisions will come from this addition?
+                #
+                # For every other context in on this cell, check how many times this
+                # pair occurs elsewhere.
+                badness = [
+                    sum(
+                        sum(
+                            (
+                                1
+                                if (
+                                    context in otherCellContexts
+                                    and otherContext in otherCellContexts
+                                )
+                                else 0
+                            )
+                            for minicolumn in minicolumns
+                            for otherCellContexts in minicolumn
+                        )
+                        for otherContext in contextsForCell[cell]
+                    )
+                    for context, cell in candidateAdditions
+                ]
 
-        selectedContext, selectedCell = candidateAdditions[
-          badness.index(min(badness))]
+                selectedContext, selectedCell = candidateAdditions[
+                    badness.index(min(badness))
+                ]
 
-        contextsForCell[selectedCell].add(selectedContext)
-        eligibleCells.remove(selectedCell)
-        contexts.remove(selectedContext)
+                contextsForCell[selectedCell].add(selectedContext)
+                eligibleCells.remove(selectedCell)
+                contexts.remove(selectedContext)
 
-    minicolumns.append(contextsForCell)
+        minicolumns.append(contextsForCell)
 
-  return minicolumns
+    return minicolumns
 
 
 def doGenerateMinicolumnSDRs(kwargs):
-  print("Starting:", kwargs)
-  sdrs = generateMinicolumnSDRs(**kwargs)
-  print("Finished: {}. Result: {} SDRs".format(kwargs, len(sdrs)))
+    print("Starting:", kwargs)
+    sdrs = generateMinicolumnSDRs(**kwargs)
+    print("Finished: {}. Result: {} SDRs".format(kwargs, len(sdrs)))
 
 
 if __name__ == "__main__":
-  # Change these, then run "python generate_sdrs.py" to generate SDRs and print
-  # the number of generated SDRs.
-  allParams = [
-    {"n": 15, "w": 10, "threshold": 8},
-    {"n": 16, "w": 11, "threshold": 9},
-  ]
+    # Change these, then run "python generate_sdrs.py" to generate SDRs and print
+    # the number of generated SDRs.
+    allParams = [
+        {"n": 15, "w": 10, "threshold": 8},
+        {"n": 16, "w": 11, "threshold": 9},
+    ]
 
-  multiprocessing.Pool().map(doGenerateMinicolumnSDRs, allParams)
+    multiprocessing.Pool().map(doGenerateMinicolumnSDRs, allParams)

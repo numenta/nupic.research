@@ -28,327 +28,349 @@ import random
 
 import numpy as np
 
-from nupic.research.frameworks.columns import (
-  ApicalTiebreakPairMemory,
-  ColumnPooler,
+from nupic.research.frameworks.columns import ApicalTiebreakPairMemory, ColumnPooler
+from nupic.research.frameworks.location.location_modules import (
+    Superficial2DLocationModule,
 )
-from nupic.research.frameworks.location.location_modules import Superficial2DLocationModule
 
 
 class Grid2DLocationExperiment(object):
-  """
-  The experiment code organized into a class.
-  """
-
-  def __init__(self, objects, objectPlacements, featureNames, locationConfigs,
-               worldDimensions):
-
-    self.objects = objects
-    self.objectPlacements = objectPlacements
-    self.worldDimensions = worldDimensions
-
-    self.features = dict(
-      (k, np.array(sorted(random.sample(range(150), 15)), dtype="uint32"))
-      for k in featureNames)
-
-    self.locationModules = [Superficial2DLocationModule(anchorInputSize=150*32,
-                                                        **config)
-                            for config in locationConfigs]
-
-    self.inputLayer = ApicalTiebreakPairMemory(**{
-      "columnCount": 150,
-      "cellsPerColumn": 32,
-      "basalInputSize": 18 * sum(config["cellsPerAxis"] ** 2
-                                 for config in locationConfigs),
-      "apicalInputSize": 4096
-    })
-
-    self.objectLayer = ColumnPooler(**{
-      "inputWidth": 150 * 32
-    })
-
-    # Use these for classifying SDRs and for testing whether they're correct.
-    self.locationRepresentations = {
-      # Example:
-      # (objectName, (top, left)): [0, 26, 54, 77, 101, ...]
-    }
-    self.inputRepresentations = {
-      # Example:
-      # (objectName, (top, left), featureName): [0, 26, 54, 77, 101, ...]
-    }
-    self.objectRepresentations = {
-      # Example:
-      # objectName: [14, 19, 54, 107, 201, ...]
-    }
-
-    self.locationInWorld = None
-
-    self.maxSettlingTime = 10
-
-    self.monitors = {}
-    self.nextMonitorToken = 1
-
-
-  def addMonitor(self, monitor):
     """
-    Subscribe to Grid2DLocationExperimentMonitor events.
-
-    @param monitor (Grid2DLocationExperimentMonitor)
-    An object that implements a set of monitor methods
-
-    @return (object)
-    An opaque object that can be used to refer to this monitor.
+    The experiment code organized into a class.
     """
 
-    token = self.nextMonitorToken
-    self.nextMonitorToken += 1
+    def __init__(
+        self, objects, objectPlacements, featureNames, locationConfigs, worldDimensions
+    ):
 
-    self.monitors[token] = monitor
+        self.objects = objects
+        self.objectPlacements = objectPlacements
+        self.worldDimensions = worldDimensions
 
-    return token
+        self.features = dict(
+            (k, np.array(sorted(random.sample(range(150), 15)), dtype="uint32"))
+            for k in featureNames
+        )
 
+        self.locationModules = [
+            Superficial2DLocationModule(anchorInputSize=150 * 32, **config)
+            for config in locationConfigs
+        ]
 
-  def removeMonitor(self, monitorToken):
-    """
-    Unsubscribe from LocationExperiment events.
+        self.inputLayer = ApicalTiebreakPairMemory(
+            **{
+                "columnCount": 150,
+                "cellsPerColumn": 32,
+                "basalInputSize": 18
+                * sum(config["cellsPerAxis"] ** 2 for config in locationConfigs),
+                "apicalInputSize": 4096,
+            }
+        )
 
-    @param monitorToken (object)
-    The return value of addMonitor() from when this monitor was added
-    """
-    del self.monitors[monitorToken]
+        self.objectLayer = ColumnPooler(**{"inputWidth": 150 * 32})
 
+        # Use these for classifying SDRs and for testing whether they're correct.
+        self.locationRepresentations = {
+            # Example:
+            # (objectName, (top, left)): [0, 26, 54, 77, 101, ...]
+        }
+        self.inputRepresentations = {
+            # Example:
+            # (objectName, (top, left), featureName): [0, 26, 54, 77, 101, ...]
+        }
+        self.objectRepresentations = {
+            # Example:
+            # objectName: [14, 19, 54, 107, 201, ...]
+        }
 
-  def getActiveLocationCells(self):
-    activeCells = np.array([], dtype="uint32")
+        self.locationInWorld = None
 
-    totalPrevCells = 0
-    for i, module in enumerate(self.locationModules):
-      activeCells = np.append(activeCells,
-                              module.getActiveCells() + totalPrevCells)
-      totalPrevCells += module.numberOfCells()
+        self.maxSettlingTime = 10
 
-    return activeCells
+        self.monitors = {}
+        self.nextMonitorToken = 1
 
+    def addMonitor(self, monitor):
+        """
+        Subscribe to Grid2DLocationExperimentMonitor events.
 
-  def move(self, objectName, locationOnObject):
-    objectPlacement = self.objectPlacements[objectName]
-    locationInWorld = (objectPlacement[0] + locationOnObject[0],
-                       objectPlacement[1] + locationOnObject[1])
+        @param monitor (Grid2DLocationExperimentMonitor)
+        An object that implements a set of monitor methods
 
-    if self.locationInWorld is not None:
-      deltaLocation = (locationInWorld[0] - self.locationInWorld[0],
-                       locationInWorld[1] - self.locationInWorld[1])
+        @return (object)
+        An opaque object that can be used to refer to this monitor.
+        """
 
-      for monitor in list(self.monitors.values()):
-        monitor.beforeMove(deltaLocation)
+        token = self.nextMonitorToken
+        self.nextMonitorToken += 1
 
-      params = {
-        "displacement": deltaLocation
-      }
-      for module in self.locationModules:
-        module.movementCompute(**params)
+        self.monitors[token] = monitor
 
-      for monitor in list(self.monitors.values()):
-        monitor.afterLocationShift(**params)
+        return token
 
-    self.locationInWorld = locationInWorld
-    for monitor in list(self.monitors.values()):
-      monitor.afterWorldLocationChanged(locationInWorld)
+    def removeMonitor(self, monitorToken):
+        """
+        Unsubscribe from LocationExperiment events.
 
+        @param monitorToken (object)
+        The return value of addMonitor() from when this monitor was added
+        """
+        del self.monitors[monitorToken]
 
-  def _senseInferenceMode(self, featureSDR):
-    prevCellActivity = None
-    for i in range(self.maxSettlingTime):
-      inputParams = {
-        "activeColumns": featureSDR,
-        "basalInput": self.getActiveLocationCells(),
-        "apicalInput": self.objectLayer.getActiveCells(),
-        "learn": False
-      }
-      self.inputLayer.compute(**inputParams)
+    def getActiveLocationCells(self):
+        activeCells = np.array([], dtype="uint32")
 
-      objectParams = {
-        "feedforwardInput": self.inputLayer.getActiveCells(),
-        "feedforwardGrowthCandidates": self.inputLayer.getPredictedActiveCells(),
-        "learn": False,
-      }
-      self.objectLayer.compute(**objectParams)
+        totalPrevCells = 0
+        for module in self.locationModules:
+            activeCells = np.append(
+                activeCells, module.getActiveCells() + totalPrevCells
+            )
+            totalPrevCells += module.numberOfCells()
 
-      locationParams = {
-        "anchorInput": self.inputLayer.getActiveCells(),
-        "anchorGrowthCandidates": self.inputLayer.getWinnerCells(),
-        "learn": False
-      }
-      for module in self.locationModules:
-        module.sensoryCompute(**locationParams)
+        return activeCells
 
-      cellActivity = (set(self.objectLayer.getActiveCells()),
-                      set(self.inputLayer.getActiveCells()),
-                      set(self.getActiveLocationCells()))
+    def move(self, objectName, locationOnObject):
+        objectPlacement = self.objectPlacements[objectName]
+        locationInWorld = (
+            objectPlacement[0] + locationOnObject[0],
+            objectPlacement[1] + locationOnObject[1],
+        )
 
-      if cellActivity == prevCellActivity:
-        # It settled. Don't even log this timestep.
-        break
-      else:
-        prevCellActivity = cellActivity
+        if self.locationInWorld is not None:
+            deltaLocation = (
+                locationInWorld[0] - self.locationInWorld[0],
+                locationInWorld[1] - self.locationInWorld[1],
+            )
+
+            for monitor in list(self.monitors.values()):
+                monitor.beforeMove(deltaLocation)
+
+            params = {"displacement": deltaLocation}
+            for module in self.locationModules:
+                module.movementCompute(**params)
+
+            for monitor in list(self.monitors.values()):
+                monitor.afterLocationShift(**params)
+
+        self.locationInWorld = locationInWorld
         for monitor in list(self.monitors.values()):
-          if i > 0:
-            monitor.markSensoryRepetition()
+            monitor.afterWorldLocationChanged(locationInWorld)
 
-          monitor.afterInputCompute(**inputParams)
-          monitor.afterObjectCompute(**objectParams)
-          monitor.afterLocationAnchor(**locationParams)
+    def _senseInferenceMode(self, featureSDR):
+        prevCellActivity = None
+        for i in range(self.maxSettlingTime):
+            inputParams = {
+                "activeColumns": featureSDR,
+                "basalInput": self.getActiveLocationCells(),
+                "apicalInput": self.objectLayer.getActiveCells(),
+                "learn": False,
+            }
+            self.inputLayer.compute(**inputParams)
 
+            objectParams = {
+                "feedforwardInput": self.inputLayer.getActiveCells(),
+                "feedforwardGrowthCandidates": self.inputLayer.getPredictedActiveCells(),
+                "learn": False,
+            }
+            self.objectLayer.compute(**objectParams)
 
-  def _senseLearningMode(self, featureSDR):
-    inputParams = {
-      "activeColumns": featureSDR,
-      "basalInput": self.getActiveLocationCells(),
-      "apicalInput": self.objectLayer.getActiveCells(),
-      "learn": True
-    }
-    self.inputLayer.compute(**inputParams)
+            locationParams = {
+                "anchorInput": self.inputLayer.getActiveCells(),
+                "anchorGrowthCandidates": self.inputLayer.getWinnerCells(),
+                "learn": False,
+            }
+            for module in self.locationModules:
+                module.sensoryCompute(**locationParams)
 
-    objectParams = {
-      "feedforwardInput": self.inputLayer.getActiveCells(),
-      "feedforwardGrowthCandidates": self.inputLayer.getPredictedActiveCells(),
-      "learn": True,
-    }
-    self.objectLayer.compute(**objectParams)
+            cellActivity = (
+                set(self.objectLayer.getActiveCells()),
+                set(self.inputLayer.getActiveCells()),
+                set(self.getActiveLocationCells()),
+            )
 
-    locationParams = {
-      "anchorInput": self.inputLayer.getActiveCells(),
-      "anchorGrowthCandidates": self.inputLayer.getWinnerCells(),
-      "learn": True,
-    }
-    for module in self.locationModules:
-      module.sensoryCompute(**locationParams)
+            if cellActivity == prevCellActivity:
+                # It settled. Don't even log this timestep.
+                break
+            else:
+                prevCellActivity = cellActivity
+                for monitor in list(self.monitors.values()):
+                    if i > 0:
+                        monitor.markSensoryRepetition()
 
-    for monitor in list(self.monitors.values()):
-      monitor.afterInputCompute(**inputParams)
-      monitor.afterObjectCompute(**objectParams)
+                    monitor.afterInputCompute(**inputParams)
+                    monitor.afterObjectCompute(**objectParams)
+                    monitor.afterLocationAnchor(**locationParams)
 
+    def _senseLearningMode(self, featureSDR):
+        inputParams = {
+            "activeColumns": featureSDR,
+            "basalInput": self.getActiveLocationCells(),
+            "apicalInput": self.objectLayer.getActiveCells(),
+            "learn": True,
+        }
+        self.inputLayer.compute(**inputParams)
 
-  def sense(self, featureSDR, learn):
-    for monitor in list(self.monitors.values()):
-      monitor.beforeSense(featureSDR)
+        objectParams = {
+            "feedforwardInput": self.inputLayer.getActiveCells(),
+            "feedforwardGrowthCandidates": self.inputLayer.getPredictedActiveCells(),
+            "learn": True,
+        }
+        self.objectLayer.compute(**objectParams)
 
-    if learn:
-      self._senseLearningMode(featureSDR)
-    else:
-      self._senseInferenceMode(featureSDR)
+        locationParams = {
+            "anchorInput": self.inputLayer.getActiveCells(),
+            "anchorGrowthCandidates": self.inputLayer.getWinnerCells(),
+            "learn": True,
+        }
+        for module in self.locationModules:
+            module.sensoryCompute(**locationParams)
 
+        for monitor in list(self.monitors.values()):
+            monitor.afterInputCompute(**inputParams)
+            monitor.afterObjectCompute(**objectParams)
 
-  def learnObjects(self):
-    """
-    Learn each provided object.
+    def sense(self, featureSDR, learn):
+        for monitor in list(self.monitors.values()):
+            monitor.beforeSense(featureSDR)
 
-    This method simultaneously learns 4 sets of synapses:
-    - location -> input
-    - input -> location
-    - input -> object
-    - object -> input
-    """
-    for objectName, objectFeatures in self.objects.items():
-      self.reset()
+        if learn:
+            self._senseLearningMode(featureSDR)
+        else:
+            self._senseInferenceMode(featureSDR)
 
-      for module in self.locationModules:
-        module.activateRandomLocation()
+    def learnObjects(self):
+        """
+        Learn each provided object.
 
-      for feature in objectFeatures:
-        locationOnObject = (feature["top"] + feature["height"]/2,
-                            feature["left"] + feature["width"]/2)
-        self.move(objectName, locationOnObject)
+        This method simultaneously learns 4 sets of synapses:
+        - location -> input
+        - input -> location
+        - input -> object
+        - object -> input
+        """
+        for objectName, objectFeatures in self.objects.items():
+            self.reset()
 
-        featureName = feature["name"]
-        featureSDR = self.features[featureName]
-        for _ in range(10):
-          self.sense(featureSDR, learn=True)
+            for module in self.locationModules:
+                module.activateRandomLocation()
 
-        self.locationRepresentations[(objectName, locationOnObject)] = (
-          self.getActiveLocationCells())
-        self.inputRepresentations[(objectName, locationOnObject, featureName)] = (
-          self.inputLayer.getActiveCells())
+            for feature in objectFeatures:
+                locationOnObject = (
+                    feature["top"] + feature["height"] / 2,
+                    feature["left"] + feature["width"] / 2,
+                )
+                self.move(objectName, locationOnObject)
 
-      self.objectRepresentations[objectName] = self.objectLayer.getActiveCells()
+                featureName = feature["name"]
+                featureSDR = self.features[featureName]
+                for _ in range(10):
+                    self.sense(featureSDR, learn=True)
 
+                self.locationRepresentations[(objectName, locationOnObject)] = (
+                    self.getActiveLocationCells()
+                )
+                self.inputRepresentations[
+                    (objectName, locationOnObject, featureName)
+                ] = self.inputLayer.getActiveCells()
 
-  def inferObjectsWithRandomMovements(self):
-    """
-    Infer each object without any location input.
-    """
-    for objectName, objectFeatures in self.objects.items():
-      self.reset()
+            self.objectRepresentations[objectName] = self.objectLayer.getActiveCells()
 
-      inferred = False
-      prevTouchSequence = None
+    def inferObjectsWithRandomMovements(self):
+        """
+        Infer each object without any location input.
+        """
+        for objectName, objectFeatures in self.objects.items():
+            self.reset()
 
-      for _ in range(4):
+            inferred = False
+            prevTouchSequence = None
 
-        while True:
-          touchSequence = list(objectFeatures)
-          random.shuffle(touchSequence)
+            for _ in range(4):
 
-          if prevTouchSequence is not None:
-            if touchSequence[0] == prevTouchSequence[-1]:
-              continue
+                while True:
+                    touchSequence = list(objectFeatures)
+                    random.shuffle(touchSequence)
 
-          break
+                    if prevTouchSequence is not None:
+                        if touchSequence[0] == prevTouchSequence[-1]:
+                            continue
 
-        for i, feature in enumerate(touchSequence):
-          locationOnObject = (feature["top"] + feature["height"]/2,
-                              feature["left"] + feature["width"]/2)
-          self.move(objectName, locationOnObject)
+                    break
 
-          featureName = feature["name"]
-          featureSDR = self.features[featureName]
-          self.sense(featureSDR, learn=False)
+                for feature in touchSequence:
+                    locationOnObject = (
+                        feature["top"] + feature["height"] / 2,
+                        feature["left"] + feature["width"] / 2,
+                    )
+                    self.move(objectName, locationOnObject)
 
-          inferred = (
-            set(self.objectLayer.getActiveCells()) ==
-            set(self.objectRepresentations[objectName]) and
+                    featureName = feature["name"]
+                    featureSDR = self.features[featureName]
+                    self.sense(featureSDR, learn=False)
 
-            set(self.inputLayer.getActiveCells()) ==
-            set(self.inputRepresentations[(objectName,
-                                           locationOnObject,
-                                           featureName)]) and
+                    inferred = (
+                        set(self.objectLayer.getActiveCells())
+                        == set(self.objectRepresentations[objectName])
+                        and set(self.inputLayer.getActiveCells())
+                        == set(
+                            self.inputRepresentations[
+                                (objectName, locationOnObject, featureName)
+                            ]
+                        )
+                        and set(self.getActiveLocationCells())
+                        == set(
+                            self.locationRepresentations[(objectName, locationOnObject)]
+                        )
+                    )
 
-            set(self.getActiveLocationCells()) ==
-            set(self.locationRepresentations[(objectName, locationOnObject)]))
+                    if inferred:
+                        break
 
-          if inferred:
-            break
+                prevTouchSequence = touchSequence
 
-        prevTouchSequence = touchSequence
+                if inferred:
+                    break
 
-        if inferred:
-          break
+    def reset(self):
+        for module in self.locationModules:
+            module.reset()
+        self.objectLayer.reset()
+        self.inputLayer.reset()
 
+        self.locationInWorld = None
 
-  def reset(self):
-    for module in self.locationModules:
-      module.reset()
-    self.objectLayer.reset()
-    self.inputLayer.reset()
-
-    self.locationInWorld = None
-
-    for monitor in list(self.monitors.values()):
-      monitor.afterReset()
-
+        for monitor in list(self.monitors.values()):
+            monitor.afterReset()
 
 
 class Grid2DLocationExperimentMonitor(object, metaclass=abc.ABCMeta):
-  """
-  Abstract base class for a Grid2DLocationExperiment monitor.
-  """
+    """
+    Abstract base class for a Grid2DLocationExperiment monitor.
+    """
 
-  def beforeSense(self, featureSDR): pass
-  def beforeMove(self, deltaLocation): pass
-  def markSensoryRepetition(self): pass
-  def afterReset(self): pass
-  def afterWorldLocationChanged(self, locationInWorld): pass
-  def afterLocationShift(self, **kwargs): pass
-  def afterLocationAnchor(self, **kwargs): pass
-  def afterInputCompute(self, **kwargs): pass
-  def afterObjectCompute(self, **kwargs): pass
+    def beforeSense(self, featureSDR):
+        pass
+
+    def beforeMove(self, deltaLocation):
+        pass
+
+    def markSensoryRepetition(self):
+        pass
+
+    def afterReset(self):
+        pass
+
+    def afterWorldLocationChanged(self, locationInWorld):
+        pass
+
+    def afterLocationShift(self, **kwargs):
+        pass
+
+    def afterLocationAnchor(self, **kwargs):
+        pass
+
+    def afterInputCompute(self, **kwargs):
+        pass
+
+    def afterObjectCompute(self, **kwargs):
+        pass
