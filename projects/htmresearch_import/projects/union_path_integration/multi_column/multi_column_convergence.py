@@ -35,8 +35,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from nupic.engine import Network
 
-from htmresearch.frameworks.location.location_network_creation import createMultipleL246aLocationColumn
-from htmresearch.frameworks.location.object_generation import generateObjects
+from nupic.research.frameworks.location.location_network_creation import createMultipleL246aLocationColumn
+from nupic.research.frameworks.location.object_generation import generateObjects
 from htmresearch.support.expsuite import PyExperimentSuite
 from htmresearch.support.register_regions import registerAllResearchRegions
 
@@ -58,7 +58,7 @@ class MultiColumnExperiment(PyExperimentSuite):
       - Generate objects used by the experiment
       - Learn all objects used by the experiment
     """
-    print params["name"], ":", repetition
+    print(params["name"], ":", repetition)
 
     self.debug = params.get("debug", False)
 
@@ -78,7 +78,7 @@ class MultiColumnExperiment(PyExperimentSuite):
     numModules = params["num_modules"]
     L6aParams["scale"] = [params["scale"]] * numModules
     angle = params["angle"] / numModules
-    orientation = range(angle / 2, angle * numModules, angle)
+    orientation = list(range(angle / 2, angle * numModules, angle))
     L6aParams["orientation"] = np.radians(orientation).tolist()
 
     # Create multi-column L2-L4-L6a network
@@ -97,7 +97,7 @@ class MultiColumnExperiment(PyExperimentSuite):
     self.L2Regions = []
     self.L4Regions = []
     self.L6aRegions = []
-    for i in xrange(self.numColumns):
+    for i in range(self.numColumns):
       col = str(i)
       self.sensorInput.append(network.regions["sensorInput_" + col].getSelf())
       self.motorInput.append(network.regions["motorInput_" + col].getSelf())
@@ -116,8 +116,8 @@ class MultiColumnExperiment(PyExperimentSuite):
     numOfActiveMinicolumns = params["num_active_minicolumns"]
     self.featureSDR = [{
       str(f): sorted(np.random.choice(numOfMinicolumns, numOfActiveMinicolumns))
-      for f in xrange(numFeatures)
-    } for _ in xrange(self.numColumns)]
+      for f in range(numFeatures)
+    } for _ in range(self.numColumns)]
 
     # Generate objects used in the experiment
     self.objects = generateObjects(numObjects=numObjects,
@@ -162,7 +162,7 @@ class MultiColumnExperiment(PyExperimentSuite):
     """
     Set all regions in every column into the given learning mode
     """
-    for col in xrange(self.numColumns):
+    for col in range(self.numColumns):
       self.L2Regions[col].getSelf().setParameter("learningMode", 0, learn)
       self.L4Regions[col].getSelf().setParameter("learn", 0, learn)
       self.L6aRegions[col].getSelf().setParameter("learningMode", 0, learn)
@@ -172,7 +172,7 @@ class MultiColumnExperiment(PyExperimentSuite):
     Sends a reset signal to all regions in the network.
     It should be called before changing objects.
     """
-    for col in xrange(self.numColumns):
+    for col in range(self.numColumns):
       self.sensorInput[col].addResetToQueue(0)
       self.motorInput[col].addDataToQueue(displacement=[0, 0], reset=True)
 
@@ -197,8 +197,8 @@ class MultiColumnExperiment(PyExperimentSuite):
       # Randomize touch sequences
       touchSequence = np.random.permutation(numOfFeatures)
 
-      for sensation in xrange(numOfFeatures):
-        for col in xrange(self.numColumns):
+      for sensation in range(numOfFeatures):
+        for col in range(self.numColumns):
           # Shift the touch sequence for each column
           colSequence = np.roll(touchSequence, col)
           feature = features[colSequence[sensation]]
@@ -212,7 +212,7 @@ class MultiColumnExperiment(PyExperimentSuite):
 
           # learn each pattern multiple times
           activeColumns = self.featureSDR[col][feature["name"]]
-          for _ in xrange(self.numLearningPoints):
+          for _ in range(self.numLearningPoints):
             # Sense feature at location
             self.motorInput[col].addDataToQueue(displacement)
             self.sensorInput[col].addDataToQueue(activeColumns, False, 0)
@@ -242,9 +242,9 @@ class MultiColumnExperiment(PyExperimentSuite):
     # Randomize touch sequences
     touchSequence = np.random.permutation(numOfFeatures)
 
-    for sensation in xrange(self.numOfSensations):
+    for sensation in range(self.numOfSensations):
       # Add sensation for all columns at once
-      for col in xrange(self.numColumns):
+      for col in range(self.numColumns):
         # Shift the touch sequence for each column
         colSequence = np.roll(touchSequence, col)
         feature = features[colSequence[sensation]]
@@ -343,7 +343,7 @@ class MultiColumnExperiment(PyExperimentSuite):
       maxL2Size = 1.5 * self.sdrSize
 
     numCorrectClassifications = 0
-    for col in xrange(self.numColumns):
+    for col in range(self.numColumns):
       overlapWithObject = len(objectRepresentation[col] & L2Representation[col])
 
       if (overlapWithObject >= minOverlap and
@@ -372,7 +372,7 @@ class MultiColumnExperiment(PyExperimentSuite):
     L4PredictedCells = self.getL4PredictedCells()
     L2Representation = self.getL2Representations()
 
-    for i in xrange(self.numColumns):
+    for i in range(self.numColumns):
       statistics["L6a SensoryAssociatedCells C" + str(i)].append(
         len(L6aSensoryAssociatedCells[i]))
       statistics["L6a LearnableCells C" + str(i)].append(
@@ -425,7 +425,7 @@ def plotSensationByColumn(suite, name):
   colorList = ['r', 'b', 'g', 'm', 'c', 'k', 'y']
   for i, features in enumerate(sorted(touches)):
     cols = touches[features]
-    plt.plot(cols.keys(), cols.values(), "-",
+    plt.plot(list(cols.keys()), list(cols.values()), "-",
              label="Unique features={}".format(features),
              color=colorList[i])
 
@@ -468,7 +468,7 @@ def plotDebugStatistics(suite, name):
                "L4 Predicted"]
 
     keys = []
-    for col in xrange(cols):
+    for col in range(cols):
       keys.extend(["{} C{}".format(metric, col) for metric in metrics])
       keys.append("Full L2 SDR C{}".format(col))
 
@@ -478,10 +478,10 @@ def plotDebugStatistics(suite, name):
     # Plot metrics
     for metric in metrics:
       ax = plt.figure(tight_layout={"pad": 0}).gca()
-      for c in xrange(cols):
+      for c in range(cols):
         key = "{} C{}".format(metric, c)
         data = np.mean(history[key], axis=0)
-        plt.plot(xrange(1, len(data) + 1), data, label=key)
+        plt.plot(range(1, len(data) + 1), data, label=key)
 
       # format
       ax.xaxis.set_major_locator(MaxNLocator(integer=True))
@@ -498,7 +498,7 @@ def plotDebugStatistics(suite, name):
       plt.close()
 
     # Plot L2 SDR
-    for c in xrange(cols):
+    for c in range(cols):
       fig = plt.figure(tight_layout={"pad": 0})
       data = history["Full L2 SDR C{}".format(c)]
 
