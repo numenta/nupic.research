@@ -220,7 +220,7 @@ class SingleLayer2DExperimentVisualizer(SingleLayer2DExperimentMonitor):
         cells = dict((cell, []) for cell in activeCells.tolist())
 
         for cell in activeCells.tolist():
-            activeColumn = cell / self.inputLayer.cellsPerColumn
+            activeColumn = cell // self.inputLayer.cellsPerColumn
             assert activeColumn in activeColumns
             segmentData = [["feature", [activeColumn]]]
             cells[cell].append(segmentData)
