@@ -597,7 +597,7 @@ class ApicalDependentTemporalMemory(object):
                       + apicalPotentialOverlaps[apicalCandidateSegments])
         columnsForCandidates = (
             self.basalConnections.mapSegmentsToCells(basalCandidateSegments)
-            / self.cellsPerColumn)
+            // self.cellsPerColumn)
         onePerColumnFilter = np2.argmaxMulti(cellScores, columnsForCandidates,
                                              assumeSorted=True)
 

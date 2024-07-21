@@ -702,7 +702,7 @@ class ApicalTiebreakTemporalMemory(object):
         # Narrow it down to one segment per column.
         cellScores = potentialOverlaps[candidateSegments]
         columnsForCandidates = (connections.mapSegmentsToCells(candidateSegments)
-                                / cellsPerColumn)
+                                // cellsPerColumn)
         onePerColumnFilter = np2.argmaxMulti(cellScores, columnsForCandidates)
 
         learningSegments = candidateSegments[onePerColumnFilter]
